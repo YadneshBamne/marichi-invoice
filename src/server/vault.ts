@@ -48,8 +48,8 @@ export async function putLogo(bytes: Buffer, mime: string) {
   return store(bytes, ext);
 }
 
-/** Platform-generated agreement/notice (HTML for now; PDF rendering is a later swap behind this function). */
-export const putGenerated = (html: string) => store(Buffer.from(html, "utf8"), "html");
+/** Platform-generated agreement or notice, already rendered to PDF. */
+export const putGenerated = (pdf: Uint8Array) => store(Buffer.from(pdf), "pdf");
 
 export async function readDocument(ref: string) {
   if (!REF.test(ref)) throw new Error("invalid document reference");

@@ -6,6 +6,7 @@ import { gateway, type Adapters } from "../integrations/gateway";
 import { ensureVirtualAccount } from "../collections/virtual-accounts";
 import { notifyBusiness } from "../notify";
 import { putGenerated } from "../vault";
+import { renderPdf } from "./pdf";
 import { assignmentNotice, invoiceSchedule, masterAgreement } from "./templates";
 
 const STAFF = ["ops", "compliance", "admin"];
@@ -28,15 +29,15 @@ export async function prepareAgreements(db: Database, offerId: string, gw: Adapt
   const collection = await ensureVirtualAccount(db, inv.id, gw); // the notice must tell the buyer exactly where to pay
 
   const docs = [
-    { kind: "master", offerId: null, html: () => masterAgreement({ seller, now }) },
-    { kind: "invoice_schedule", offerId, html: () => invoiceSchedule({ seller, buyer, invoice, offer, now }) },
-    { kind: "assignment_notice", offerId, html: () => assignmentNotice({ seller, buyer, invoice, collection, now }) },
+    { kind: "master", offerId: null, doc: () => masterAgreement({ seller, now }) },
+    { kind: "invoice_schedule", offerId, doc: () => invoiceSchedule({ seller, buyer, invoice, offer, now }) },
+    { kind: "assignment_notice", offerId, doc: () => assignmentNotice({ seller, buyer, invoice, collection, now }) },
   ] as const;
   for (const d of docs) {
     const exists = await db.select({ id: agreements.id }).from(agreements).where(
       d.kind === "master" ? and(eq(agreements.businessId, seller.id), eq(agreements.kind, "master")) : and(eq(agreements.offerId, offerId), eq(agreements.kind, d.kind)));
     if (exists.length) continue;
-    const { ref, hash } = await putGenerated(d.html());
+    const { ref, hash } = await putGenerated(await renderPdf(d.doc(), { footer: `Marichi Labs  ${d.kind.replaceAll("_", " ")}` }));
     // The partial unique indexes make a concurrent duplicate a no-op rather than a second contract.
     await db.insert(agreements).values({ businessId: seller.id, offerId: d.offerId, kind: d.kind, documentRef: ref, documentHash: hash }).onConflictDoNothing();
   }

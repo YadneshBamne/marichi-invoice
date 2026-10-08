@@ -6,7 +6,9 @@ import { gw, T0, world } from "../testkit";
 import {
   assertReadyToDisburse, canViewDocument, completeSignature, prepareAgreements, prepareAllAccepted, readiness, signInApp, verifyWebhook,
 } from "./service";
-import { esc, masterAgreement } from "./templates";
+import { docText, masterAgreement } from "./templates";
+import { PDFDocument } from "pdf-lib";
+import { pdfSafe, renderPdf } from "./pdf";
 import { readDocument } from "../vault";
 
 let w: Awaited<ReturnType<typeof world>>;
@@ -47,15 +49,26 @@ describe("prepareAgreements", () => {
     expect((await all()).find((a) => a.kind === "assignment_notice")!.status).toBe("sent");
   });
 
-  it("escapes user-controlled names in generated documents", async () => {
+  it("generates real PDFs, and user-controlled names are plain text, never markup", async () => {
     await w.db.update(businesses).set({ legalName: `<script>alert("x")</script> & Co` }).where(eq(businesses.id, w.sellerId));
     await prepareAgreements(w.db, await w.acceptedOffer(), gw, T0);
-    const master = (await all()).find((a) => a.kind === "master")!;
-    const html = (await readDocument(master.documentRef)).bytes.toString();
-    expect(html).not.toContain("<script>alert");
-    expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; Co");
-    expect(esc("a'b")).toBe("a&#39;b");
-    expect(masterAgreement({ seller: { legalName: "X", gstin: null }, now: T0 })).toContain("DRAFT TEMPLATE");
+    const docs = await all();
+    for (const kind of ["master", "invoice_schedule", "assignment_notice"]) {
+      const d = docs.find((a) => a.kind === kind)!;
+      expect(d.documentRef.endsWith(".pdf")).toBe(true);
+      const { bytes, contentType } = await readDocument(d.documentRef);
+      expect(contentType).toBe("application/pdf");
+      expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(bytes.length).toBeGreaterThan(1500);
+    }
+    expect(docText(masterAgreement({ seller: { legalName: `<b>X</b> & Co`, gstin: null }, now: T0 }))).toContain("<b>X</b> & Co");
+  });
+
+  it("renders long documents across pages and keeps the rupee sign and odd characters from breaking the PDF", async () => {
+    expect(pdfSafe("\u20B91,00,000.00 \u201Cquoted\u201D \u0928\u092E\u0938\u094D\u0924\u0947")).toBe('Rs. 1,00,000.00 "quoted" ??????');
+    const long = { title: "Long", blocks: [{ h: "Long" }, ...Array.from({ length: 60 }, (_, i) => ({ p: [{ b: `Clause ${i + 1}. ` }, "This clause repeats to fill the page and force the layout to continue on the next page. ".repeat(4)] }))] };
+    const pdf = await renderPdf(long);
+    expect((await PDFDocument.load(pdf)).getPageCount()).toBeGreaterThan(1);
   });
 });
 

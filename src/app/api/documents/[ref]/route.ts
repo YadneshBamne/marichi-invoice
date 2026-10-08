@@ -16,7 +16,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ ref: st
       headers: {
         "content-type": contentType,
         "x-content-type-options": "nosniff",
-        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
+        // The sandbox directive stops browsers from opening PDFs, so documents and images get a lighter policy instead.
+        "content-security-policy": contentType.startsWith("text/html") ? "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox" : "default-src 'none'; img-src data:; style-src 'unsafe-inline'",
+        "content-disposition": "inline",
         "cache-control": "private, no-store",
       },
     });
