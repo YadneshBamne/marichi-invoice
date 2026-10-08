@@ -17,6 +17,7 @@ const STAFF: Section[] = [
   ] },
   { label: "Risk & finance", items: [
     { href: "/admin/fraud", label: "Fraud cases", icon: "alert", tour: "nav-fraud" },
+    { href: "/admin/models", label: "Model monitor", icon: "target", tour: "nav-models" },
     { href: "/admin/ledger", label: "Ledger", icon: "chart", tour: "nav-ledger" },
     { href: "/admin/support", label: "Support queue", icon: "help", tour: "nav-support" },
   ] },
@@ -70,7 +71,7 @@ export const ROLE_META: Record<string, { label: string; workspace: string; blurb
 export const CRUMBS: Record<string, string> = {
   admin: "Console", seller: "Seller", buyer: "Buyer", kyb: "KYB review", underwriting: "Underwriting", disbursements: "Disbursements",
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
-  system: "System health", policy: "Policy", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
+  system: "System health", policy: "Policy", models: "Model monitor", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
   apps: "Apps", team: "Team",
 };

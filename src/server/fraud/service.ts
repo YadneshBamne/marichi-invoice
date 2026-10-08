@@ -15,10 +15,10 @@ const HANDLERS = ["ops", "compliance", "admin"];
 /** Open (or find) a case. A repeat trigger while one is open is the same case. Callable inside a transaction. */
 export async function openCase(
   db: Database | Tx,
-  p: { entityType: "invoice" | "business"; entityId: string; rule: string; subjectBusinessId?: string; details?: Record<string, unknown> },
+  p: { entityType: "invoice" | "business"; entityId: string; rule: string; subjectBusinessId?: string; details?: Record<string, unknown>; severity?: "low" | "medium" | "high" },
 ) {
   const [row] = await db.insert(fraudCases).values({
-    entityType: p.entityType, entityId: p.entityId, ruleTriggered: p.rule, severity: SEVERITY[p.rule] ?? "medium",
+    entityType: p.entityType, entityId: p.entityId, ruleTriggered: p.rule, severity: p.severity ?? SEVERITY[p.rule] ?? "medium",
     subjectBusinessId: p.subjectBusinessId, details: p.details,
   }).onConflictDoNothing().returning();
   return { created: !!row, id: row?.id };

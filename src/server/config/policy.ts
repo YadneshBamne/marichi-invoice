@@ -8,6 +8,8 @@ import { COLLECTIONS } from "../collections/waterfall";
 import { DISBURSE } from "../disbursements/service";
 import { RULES } from "../invoices/service";
 import { OFFER } from "../offers/pricing";
+import { FRAUD } from "../fraud/engine";
+import { ML } from "../underwriting/ml";
 import { SLA_HOURS } from "../support/policy";
 import { POLICY, type Grade } from "../underwriting/policy";
 import { formatINR, rupeesToPaise, toDecimal } from "../../lib/money";
@@ -26,6 +28,7 @@ const def = (key: string, group: string, label: string, kind: Kind, min: Num, ma
   ({ key, group, label, help, kind, min, max, get: () => bag[prop], set: (v) => { bag[prop] = v; }, fallback: bag[prop] });
 
 const P = POLICY as unknown as Bag, O = OFFER as unknown as Bag, D = DISBURSE as unknown as Bag, C = COLLECTIONS as unknown as Bag, R = RULES as unknown as Bag;
+const F = FRAUD as unknown as Bag, M = ML as unknown as Bag;
 const GRADES: Grade[] = ["A", "B", "C", "D", "E"];
 
 export const DEFS: Def[] = [
@@ -49,6 +52,8 @@ export const DEFS: Def[] = [
     ];
   }),
 
+  def("ml.mode", "Underwriting", "Scoring model: 0 off, 1 shadow, 2 assist", "int", 0, 2, M, "mode", "Shadow records the model beside the rules and changes nothing. Assist may only send an approval to a person when the model rates it two or more grades worse."),
+
   def("offer.validityHours", "Offers", "Offer stays open for (hours)", "hours", 1, 168, O, "validityHours"),
   def("offer.processingFeeBps", "Offers", "Processing fee (before GST)", "percent", 0, 1000, O, "processingFeeBps"),
   def("offer.defaultPlatformCapital", "Offers", "Platform capital available", "rupees", 0, rupeesToPaise("1000000000000"), O, "defaultPlatformCapital", "Ignored when the PLATFORM_CAPITAL_PAISE environment variable is set."),
@@ -57,6 +62,12 @@ export const DEFS: Def[] = [
 
   def("disburse.approvalThreshold", "Payouts", "A second person must approve payouts above", "rupees", 0, rupeesToPaise("1000000000"), D, "approvalThreshold"),
   def("disburse.autoAttempts", "Payouts", "Automatic payout attempts before manual review", "int", 1, 10, D, "autoAttempts"),
+
+  def("fraud.caseThreshold", "Fraud engine", "Score that opens a fraud case", "int", 10, 300, F, "caseThreshold", "Each signal adds points; any single high-severity signal also opens a case."),
+  def("fraud.velocityPerDay", "Fraud engine", "Invoices from one seller in a day that count as a burst", "int", 2, 500, F, "velocityPerDay"),
+  def("fraud.outlierMultiple", "Fraud engine", "Invoice this many times the seller's average is unusual", "int", 2, 100, F, "outlierMultiple"),
+  def("fraud.newSellerDays", "Fraud engine", "A seller account is new for (days)", "int", 1, 180, F, "newSellerDays"),
+  def("fraud.newSellerTicket", "Fraud engine", "A new seller raising at least this much is a signal", "rupees", rupeesToPaise("10000"), rupeesToPaise("1000000000"), F, "newSellerTicket"),
 
   def("collections.graceDays", "Collections", "Grace period after the due date (days)", "int", 0, 30, C, "graceDays"),
   def("collections.penalBps", "Collections", "Penal rate on overdue principal (per year)", "percent", 0, 6000, C, "penalBps"),

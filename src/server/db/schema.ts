@@ -55,6 +55,20 @@ export const businesses = pgTable("businesses", {
   createdAt: createdAt(),
 });
 
+// The scoring model's verdict on each underwriting decision, kept next to the rules' verdict for comparison.
+export const mlScores = pgTable("ml_scores", {
+  invoiceId: uuid("invoice_id").primaryKey().references(() => invoices.id),
+  version: text("version").notNull(),
+  pd: numeric("pd", { precision: 8, scale: 6 }).notNull(),
+  grade: text("grade").notNull(),
+  rulesGrade: text("rules_grade").notNull(),
+  rulesDecision: text("rules_decision").notNull(),
+  finalDecision: text("final_decision").notNull(), // what actually happened (differs from rulesDecision only in assist mode)
+  reasons: jsonb("reasons").notNull(),
+  features: jsonb("features").notNull(),
+  createdAt: createdAt(),
+});
+
 // Admin-editable policy values (Module 15). One row per overridden key; a missing row means "use the code default".
 export const appSettings = pgTable("app_settings", {
   key: text("key").primaryKey(),
@@ -576,6 +590,14 @@ export const fraudCases = pgTable("fraud_cases", {
   uniqueIndex("fraud_open_uniq").on(t.entityType, t.entityId, t.ruleTriggered).where(sql`status = 'open'`),
   index("fraud_status").on(t.status),
 ]);
+
+// Result of the fraud engine scoring one invoice: the weighted signals that fired and their total.
+export const fraudScans = pgTable("fraud_scans", {
+  invoiceId: uuid("invoice_id").primaryKey().references(() => invoices.id),
+  score: integer("score").notNull(),
+  signals: jsonb("signals").notNull(), // [{ rule, label, severity, score, detail }]
+  scannedAt: timestamp("scanned_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const fraudCaseNotes = pgTable("fraud_case_notes", {
   id: id(),

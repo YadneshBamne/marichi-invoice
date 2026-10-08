@@ -12,6 +12,7 @@ import { assertCan, can } from "@/server/permissions";
 import { createInvoice } from "@/server/invoices/service";
 import { issueCreditNote, listCreditNotes } from "@/server/invoices/credit-notes";
 import { sendForConfirmation } from "@/server/confirmations/service";
+import { scanInvoice } from "@/server/fraud/engine";
 import { putDocument } from "@/server/vault";
 import { DataTable, EmptyState, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { UploadForm } from "./upload-form";
@@ -55,7 +56,10 @@ async function upload(fd: FormData) {
       contentHash: doc.hash, documentRef: doc.ref,
     });
     // Telling the buyer happens after the response so the seller is not kept waiting; the worker dispatches it if this fails.
-    if (created.status === "validated") after(() => sendForConfirmation(db, created.id).catch((e) => console.error("[confirm]", e.message)));
+    after(async () => {
+      await scanInvoice(db, created.id).catch((e) => console.error("[fraud-scan]", e.message)); // flag first, so a risky invoice is frozen before anything else happens
+      if (created.status === "validated") await sendForConfirmation(db, created.id).catch((e) => console.error("[confirm]", e.message));
+    });
     return "Invoice uploaded. Your buyer has been asked to confirm it.";
   });
 }

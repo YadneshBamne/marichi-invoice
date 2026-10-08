@@ -65,7 +65,17 @@ export default async function FraudQueue({ searchParams }: { searchParams: Promi
                 ...(c.status === "closed" ? [["Outcome", <b key="o" className="capitalize">{String(c.outcome).replaceAll("_", " ")}</b>], ["Resolution", c.resolution ?? ""]] as [string, React.ReactNode][] : []),
               ]} />
               {c.entityType === "business" && c.ruleTriggered === "kyb_aml_hit" && <p className="mt-3"><Link className="font-semibold text-p-700 underline" href="/admin/kyb">Resolve in the KYB review queue</Link></p>}
-              {c.details != null && <pre className="mt-3 overflow-x-auto rounded-lg bg-panel p-3 text-xs text-muted">{JSON.stringify(c.details, null, 2)}</pre>}
+              {Array.isArray((c.details as { signals?: unknown[] } | null)?.signals) && (
+                <div className="mt-3 rounded-lg bg-panel p-4">
+                  <p className="text-xs font-semibold tracking-wide text-faint uppercase">Why it was flagged{(c.details as { score?: number }).score !== undefined && ` (score ${(c.details as { score: number }).score})`}</p>
+                  <ul className="mt-2 space-y-2">
+                    {((c.details as { signals: { rule: string; label: string; severity: string; score: number }[] }).signals).map((s) => (
+                      <li key={s.rule} className="flex items-start justify-between gap-3 text-sm"><span><b className="font-semibold">{s.label}</b></span><span className="flex shrink-0 items-center gap-2"><span className={`pill capitalize ${SEV[s.severity] ?? SEV.low}`}>{s.severity}</span><span className="text-muted">+{s.score}</span></span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {c.details != null && !Array.isArray((c.details as { signals?: unknown[] }).signals) && <pre className="mt-3 overflow-x-auto rounded-lg bg-panel p-3 text-xs text-muted">{JSON.stringify(c.details, null, 2)}</pre>}
               {c.notes.length > 0 && (<><p className="mt-4 text-xs font-semibold tracking-wide text-faint uppercase">Notes</p><ul className="mt-1.5 list-disc space-y-1 pl-5 text-muted">{c.notes.map((n) => <li key={n.id}>{n.note}</li>)}</ul></>)}
               {c.status === "closed" && c.str && (
                 <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-panel p-3">

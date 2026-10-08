@@ -50,6 +50,20 @@
       "when": 1791461541313,
       "tag": "0006_swift_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791462017010,
+      "tag": "0007_even_shadow_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791462209986,
+      "tag": "0008_noisy_riptide",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,10 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { auditLog, businesses, buyerSellerRelationships, consents, invoices, underwritingDecisions } from "../db/schema";
+import { auditLog, businesses, buyerSellerRelationships, consents, invoices, mlScores, underwritingDecisions } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { assertNotFrozen } from "../fraud/service";
 import { decide, POLICY, type Inputs, type Party } from "./policy";
+import { assist, ML, scoreWithModel, type MlResult } from "./ml";
 
 const OUTSTANDING = ["financed", "due", "overdue"] as const;
 const dayOf = (d: Date | string) => Math.floor(new Date(d).getTime() / 86_400_000);
@@ -82,7 +83,17 @@ export async function underwriteInvoice(db: Database, invoiceId: string, gw: Ada
       cap: rel.maxExposure ?? POLICY.defaultBuyerCap,
     },
   };
-  const out = decide(inputs);
+  const rules = decide(inputs);
+  let out = rules;
+  // The scoring model runs beside the rules. It must never be able to break underwriting, and in assist mode it can only tighten.
+  let ml: MlResult | null = null;
+  if (ML.mode >= 1) {
+    try {
+      ml = scoreWithModel(inputs);
+      const flag = assist(rules.decision, rules.grade, ml);
+      if (flag) out = { ...rules, decision: "referred", reasons: [...rules.reasons, flag] };
+    } catch (e) { console.error("[ml]", (e as Error).message); }
+  }
 
   try {
     return await db.transaction(async (tx) => {
@@ -92,6 +103,12 @@ export async function underwriteInvoice(db: Database, invoiceId: string, gw: Ada
         reasons: out.reasons,
         inputs: JSON.parse(JSON.stringify(inputs, (_, v) => (typeof v === "bigint" ? v.toString() : v))),
       }).returning();
+      if (ml) {
+        await tx.insert(mlScores).values({
+          invoiceId, version: ml.version, pd: ml.pd.toFixed(6), grade: ml.grade, rulesGrade: rules.grade, rulesDecision: rules.decision,
+          finalDecision: out.decision, reasons: ml.reasons, features: ml.features,
+        }).onConflictDoNothing();
+      }
       await tx.insert(auditLog).values({
         action: "underwriting.decide", entity: "invoice", entityId: invoiceId,
         after: { decision: out.decision, grade: out.grade },
