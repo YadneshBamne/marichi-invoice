@@ -5,6 +5,7 @@ import { db } from "@/server/db/client";
 import { invoices, unmatchedCredits, invoiceCollections } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { delinquencyReport, matchUnmatched, writeOff } from "@/server/collections/service";
+import { recentDebits } from "@/server/collections/nach";
 import { DataTable, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { formatINR } from "@/lib/money";
 
@@ -25,7 +26,8 @@ async function writeOffAction(fd: FormData) {
 
 export default async function Collections() {
   const u = await requireUser(["ops", "admin"]);
-  const [report, unmatched, open] = await Promise.all([
+  const [debits, report, unmatched, open] = await Promise.all([
+    recentDebits(db, 20),
     delinquencyReport(db),
     db.select().from(unmatchedCredits).where(isNull(unmatchedCredits.resolvedAt)),
     db.select({ id: invoices.id, no: invoices.invoiceNumber }).from(invoiceCollections)
@@ -53,6 +55,18 @@ export default async function Collections() {
                   <button className="btn btn-ghost btn-sm text-r-600">Write off</button>
                 </form>
               ) },
+            ]} />
+        </Panel>
+
+        <Panel title="Auto-debits (NACH)" sub="Debits presented to buyers who turned on auto-pay. A failed debit is retried the next day, three times in all." flush>
+          <DataTable rows={debits} rowKey={({ d }) => d.id} empty="No auto-debits yet."
+            cols={[
+              { h: "Invoice", cell: ({ inv }) => inv.invoiceNumber },
+              { h: "Attempt", align: "center", cell: ({ d }) => d.attempt },
+              { h: "Amount", align: "right", cell: ({ d }) => formatINR(d.amount) },
+              { h: "Status", cell: ({ d }) => <StatusPill status={d.status} /> },
+              { h: "Presented", cell: ({ d }) => <span className="font-normal text-muted">{d.presentedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span> },
+              { h: "Note", cell: ({ d }) => <span className="font-normal text-muted">{d.failureReason ?? ""}</span> },
             ]} />
         </Panel>
 

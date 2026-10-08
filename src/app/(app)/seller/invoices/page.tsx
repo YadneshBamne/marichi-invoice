@@ -13,7 +13,8 @@ import { createInvoice } from "@/server/invoices/service";
 import { issueCreditNote, listCreditNotes } from "@/server/invoices/credit-notes";
 import { sendForConfirmation } from "@/server/confirmations/service";
 import { putDocument } from "@/server/vault";
-import { DataTable, EmptyState, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { DataTable, EmptyState, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { UploadForm } from "./upload-form";
 import { formatINR, rupeesToPaise } from "@/lib/money";
 
 export const metadata = { title: "Invoices" };
@@ -115,7 +116,6 @@ async function creditNote(fd: FormData) {
   });
 }
 
-const input = "field font-normal";
 const CREDITABLE = ["uploaded", "validated", "sent_for_confirmation", "confirmed", "eligible", "financed", "due", "overdue"];
 
 export default async function Invoices({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
@@ -240,17 +240,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <EmptyState icon="users" title="Add a buyer first">You need a linked and verified buyer before you can upload an invoice. <a className="font-semibold text-p-700 underline" href="/seller/buyers">Add your buyer</a></EmptyState>
       ) : (
         <Panel title="Upload an invoice" tour="upload">
-          <form action={upload} className="grid gap-4 sm:grid-cols-2">
-            <Field label="Buyer" className="sm:col-span-2"><select name="buyerId" className={input}>{buyers.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Field>
-            <Field label="Invoice number"><input name="invoiceNumber" required className={input} /></Field>
-            <Field label="Amount (₹, incl. tax)"><input name="amount" inputMode="decimal" required className={input} /></Field>
-            <Field label="Invoice date"><input name="invoiceDate" type="date" required className={input} /></Field>
-            <Field label="Due date"><input name="dueDate" type="date" required className={input} /></Field>
-            <Field label="e-Invoice IRN (if issued)"><input name="irn" className={input} /></Field>
-            <Field label="PO reference"><input name="poReference" className={input} /></Field>
-            <Field label="Invoice file (PDF, PNG or JPG, up to 4 MB)" className="sm:col-span-2"><input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required className={`${input} file:mr-3 file:rounded-full file:border-0 file:bg-p-100 file:px-4 file:py-1.5 file:font-semibold file:text-p-700`} /></Field>
-            <div className="sm:col-span-2"><button className="btn btn-primary">Submit invoice</button></div>
-          </form>
+          <UploadForm buyers={buyers} action={upload} />
         </Panel>
       )}
     </div>

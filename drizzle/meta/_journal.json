@@ -43,6 +43,13 @@
       "when": 1791460977192,
       "tag": "0005_funny_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791461541313,
+      "tag": "0006_swift_silver_sable",
+      "breakpoints": true
     }
   ]
 }

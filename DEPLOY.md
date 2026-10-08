@@ -35,7 +35,8 @@ The web app runs on Vercel. The background worker does not (see step 5). Files a
 | `DATABASE_URL_DIRECT` | Neon **direct** string |
 | `BETTER_AUTH_SECRET` | new random value: `openssl rand -base64 32` (never reuse the dev one) |
 | `BETTER_AUTH_URL` | your public URL, e.g. `https://app.example.com` (no trailing slash). Sign-in fails if it does not match the domain |
-| `ESIGN_WEBHOOK_SECRET`, `PAYMENTS_WEBHOOK_SECRET`, `NOTIFY_WEBHOOK_SECRET` | three different random values |
+| `ESIGN_WEBHOOK_SECRET`, `PAYMENTS_WEBHOOK_SECRET`, `NOTIFY_WEBHOOK_SECRET`, `MANDATE_WEBHOOK_SECRET` | four different random values |
+| `DATA_ENCRYPTION_KEY` | `openssl rand -base64 32`. Encrypts PAN and bank account numbers. **Keep a copy: losing it makes them unreadable** |
 | `INTEGRATIONS_MODE` | `mock` for now |
 | `GRIEVANCE_OFFICER_NAME`, `_EMAIL`, `_PHONE`, `_ADDRESS` | real details (legally required on `/grievance`) |
 | `RECON_GATE` | `on` |

@@ -14,6 +14,9 @@ import { generateOffer } from "@/server/offers/service";
 import { redirect } from "next/navigation";
 import { raiseDispute } from "@/server/support/disputes";
 import { formatINR, rupeesToPaise } from "@/lib/money";
+import { myMandate } from "@/server/collections/nach";
+import { maskTail } from "@/server/crypto";
+import { Autopay } from "./autopay";
 
 const Form = z.object({
   invoiceId: z.uuid(),
@@ -62,7 +65,8 @@ async function dispute(fd: FormData) {
 
 export default async function BuyerInvoices() {
   const u = await requireUser(["buyer"]);
-  const [rows, payables] = await Promise.all([
+  const [mandateRow, rows, payables] = await Promise.all([
+    myMandate(db, u.businessId!),
     db.select({ i: invoices, seller: businesses.legalName, c: invoiceConfirmations }).from(invoices)
       .innerJoin(businesses, eq(businesses.id, invoices.sellerId)).leftJoin(invoiceConfirmations, eq(invoiceConfirmations.invoiceId, invoices.id))
       .where(eq(invoices.buyerId, u.businessId!)).orderBy(desc(invoices.createdAt)),
@@ -73,6 +77,7 @@ export default async function BuyerInvoices() {
   const pending = rows.filter((r) => r.i.status === "sent_for_confirmation");
   const done = rows.filter((r) => r.i.status !== "sent_for_confirmation" && r.c);
   const lead = can(u, "invoice.confirm");
+  const mandate = mandateRow && { id: mandateRow.id, status: mandateRow.status, maskedAccount: maskTail(mandateRow.accountNumber), ifsc: mandateRow.ifsc, maxLabel: formatINR(mandateRow.maxAmount) };
 
   return (
     <>
@@ -102,6 +107,8 @@ export default async function BuyerInvoices() {
             </div>
           )}
         </section>
+
+        <Autopay mandate={mandate} canManage={lead} mock={(process.env.INTEGRATIONS_MODE ?? "mock") === "mock"} />
 
         {payables.length > 0 && (
           <Panel title="Payments due" sub="These invoices were assigned to Marichi Labs. Pay only to the account shown." flush>

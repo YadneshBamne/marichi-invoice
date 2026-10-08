@@ -510,6 +510,37 @@ export const auditLog = pgTable("audit_log", {
   createdAt: createdAt(),
 });
 
+// NACH / e-mandate: a buyer authorises us to debit their bank account for invoices that fall due.
+export const mandates = pgTable("mandates", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id), // the buyer
+  accountNumber: encrypted("account_number").notNull(),
+  ifsc: text("ifsc").notNull(),
+  holderName: text("holder_name").notNull(),
+  maxAmount: paise("max_amount").notNull(), // the most a single debit may be
+  status: text("status").notNull().default("pending"), // pending | active | rejected | revoked
+  providerRef: text("provider_ref"),
+  createdBy: uuid("created_by"),
+  createdAt: createdAt(),
+  activatedAt: timestamp("activated_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (t) => [index("mandates_business").on(t.businessId, t.status)]);
+
+// One row per debit presented to the buyer's bank. The key makes a retried call a no-op.
+export const nachDebits = pgTable("nach_debits", {
+  id: id(),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  mandateId: uuid("mandate_id").notNull().references(() => mandates.id),
+  amount: paise("amount").notNull(),
+  attempt: integer("attempt").notNull(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  status: text("status").notNull().default("processing"), // processing | succeeded | failed
+  providerRef: text("provider_ref"),
+  failureReason: text("failure_reason"),
+  presentedAt: timestamp("presented_at", { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp("settled_at", { withTimezone: true }),
+}, (t) => [index("nach_debits_invoice").on(t.invoiceId)]);
+
 // Credit notes issued by the seller against an invoice (returns, discounts). The invoice amount drops by the credit.
 export const creditNotes = pgTable("credit_notes", {
   id: id(),

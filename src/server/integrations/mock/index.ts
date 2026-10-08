@@ -56,6 +56,30 @@ export const mock: Adapters = {
       return { requestId: `MOCKSIGN-${p.idempotencyKey}` };
     },
   },
+  // Magic input: an account number ending 0000 has no funds, so its debits fail. Anything else succeeds at once.
+  mandates: {
+    async register(p) { return { mandateRef: `MOCKMD-${p.idempotencyKey}`, status: "pending" }; },
+    async debit(p) {
+      if (p.mandateRef.endsWith("FAIL")) return { debitRef: `MOCKDB-${p.idempotencyKey}`, status: "failed", reason: "insufficient funds" };
+      return { debitRef: `MOCKDB-${p.idempotencyKey}`, status: "succeeded", utr: `NACH${createHash("sha1").update(p.idempotencyKey).digest("hex").slice(0, 12).toUpperCase()}` };
+    },
+    async cancel() {},
+  },
+  // Sandbox reading: plausible values derived from the file itself, flagged as simulated so the UI says so.
+  ocr: {
+    async extractInvoice({ bytes }) {
+      const h = createHash("sha1").update(bytes).digest("hex");
+      const n = parseInt(h.slice(0, 6), 16);
+      const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+      return {
+        simulated: true,
+        fields: {
+          invoiceNumber: `INV-${h.slice(0, 5).toUpperCase()}`, invoiceDate: day(-7), dueDate: day(53), totalAmount: String(100000 + (n % 900000)), currency: "INR",
+          sellerName: null, sellerGstin: null, buyerName: null, buyerGstin: null, irn: null, poReference: `PO-${h.slice(5, 9).toUpperCase()}`,
+        },
+      };
+    },
+  },
   // ponytail: the mock bank has no statement feed, so reconciliation is exercised in tests with injected lines.
   statements: { async fetch() { return []; } },
   notify: {

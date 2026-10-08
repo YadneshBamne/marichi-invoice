@@ -8,13 +8,16 @@ export class CircuitOpenError extends Error {
 
 export type Opts = {
   timeoutMs: number; retries: number; backoffMs: number; breakAfter: number; coolOffMs: number; cacheTtlMs: number;
+  timeouts: Record<string, number>; // "port.method": a longer allowance than timeoutMs for slow calls
   noRetry: string[]; // "port.method": not safe to repeat, or the caller already has a retry queue
   cache: string[];   // "port.method": pure lookups whose answer is stable for cacheTtlMs
   now: () => number; sleep: (ms: number) => Promise<void>; log: (line: string) => void;
 };
 export const DEFAULTS: Opts = {
   timeoutMs: 10_000, retries: 2, backoffMs: 200, breakAfter: 5, coolOffMs: 30_000, cacheTtlMs: 24 * 3_600_000,
-  noRetry: ["notify.send"], // the notification outbox retries with its own schedule; a blind repeat could double-send an SMS
+  timeouts: { "ocr.extractInvoice": 90_000 }, // reading a document takes a while
+  noRetry: ["notify.send", "ocr.extractInvoice"], // a repeat costs money; the user can simply press the button again
+  // (notify.send is retried by the outbox itself) // the notification outbox retries with its own schedule; a blind repeat could double-send an SMS
   cache: ["kyc.verifyPan", "bureau.pull"],
   now: Date.now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: (l) => console.log(l),
 };
@@ -57,7 +60,7 @@ export function harden(base: Adapters, o: Partial<Opts> = {}): Adapters {
           const t0 = c.now();
           s.calls++;
           try {
-            const v = await withTimeout(fn.apply(impl, args), c.timeoutMs, name);
+            const v = await withTimeout(fn.apply(impl, args), c.timeouts[name] ?? c.timeoutMs, name);
             const ms = c.now() - t0; s.totalMs += ms; s.maxMs = Math.max(s.maxMs, ms);
             fails = 0; s.circuit = "closed";
             c.log(`[gateway] ${name} ok ${ms}ms${i ? ` (attempt ${i + 1})` : ""}`);
