@@ -58,15 +58,19 @@ export function stepsFor(role: string, first: string): Step[] {
   ];
 
   if (role === "financier") return [
-    welcome(first, "The financier portal is being built. Your account is ready and you will be notified as capabilities open up.", ["Financier portal: deal flow and portfolio", "Co-lending and capital limits", "Settlement statements and reporting"]),
+    welcome(first, "Fund approved invoices and earn the discount when buyers pay. You choose which invoices to bid on and at what rate.", ["Deal flow: approved invoices open for bids", "Bid on advance and discount; the seller picks", "Portfolio and a statement taken from the ledger"]),
     workspace("This panel shows your account and workspace."),
-    nav("nav-dashboard", "Dashboard", "Your home screen. It will carry deal flow and portfolio views once the portal launches."),
+    nav("nav-dashboard", "Dashboard", "Your funds, what is deployed, what has come back and what it earned."),
+    nav("nav-deals", "Deal flow", "Approved, buyer-confirmed invoices waiting for funding. Place a bid on the advance and the yearly discount."),
+    nav("nav-bids", "My bids", "Every bid you placed. Withdraw an open one any time before the seller accepts."),
+    nav("nav-portfolio", "Portfolio", "Invoices you funded: what is outstanding, what is late, and what has been returned."),
+    nav("nav-statement", "Statement", "Every movement on your funds from the ledger, with a CSV download for your books."),
     nav("nav-support", "Support", "Raise a query and follow it by ticket.", true),
     nav("nav-apps", "Apps", "Your company runs on apps. As the owner you can switch them on or off here, and follow upcoming modules.", true),
     nav("nav-team", "Team", "Create logins for your managers and members. You set the first password and each person replaces it at first sign-in. Managers can commit the company (accept offers, sign); members prepare work.", true),
     nav("nav-settings", "Settings", "Your profile, security and notification preferences."),
     ...shared("customer"),
-    { id: "done", title: "You are all set", body: "Open the coming-soon pages in the menu to see what is planned for financiers.", nextLabel: "Finish" },
+    { id: "done", title: "You are all set", body: "Add funds by transferring to escrow and telling our operations team; your balance appears in Statement once recorded.", nextLabel: "Finish" },
   ];
 
   // ops / compliance / admin

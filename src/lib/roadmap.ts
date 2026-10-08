@@ -9,26 +9,6 @@ const STAFF: RoleName[] = ["admin", "ops", "compliance"];
 
 export const ROADMAP: Planned[] = [
   {
-    slug: "marketplace", short: "Marketplace", title: "Invoice marketplace", icon: "layers", phase: 2, roles: ["seller", "financier", ...STAFF],
-    summary: "Offer one invoice to several financiers at once and take the best bid, instead of a single fixed offer.",
-    bullets: ["Competitive bids from multiple financiers", "Side-by-side comparison of advance, discount and all-in cost", "Automatic best-offer selection with your own guardrails", "Full audit trail of every bid"],
-  },
-  {
-    slug: "financier-portal", short: "Financier portal", title: "Financier portal", icon: "bank", phase: 2, roles: ["financier", ...STAFF],
-    summary: "A dedicated workspace for financiers to source deals, deploy capital and monitor their portfolio.",
-    bullets: ["Deal flow with grade, tenor and buyer quality", "Capital allocation limits and co-lending splits", "Portfolio, yield and delinquency reporting", "Settlement statements and reconciliation"],
-  },
-  {
-    slug: "ml-underwriting", short: "ML underwriting", title: "Model-assisted underwriting", icon: "target", phase: 2, roles: STAFF,
-    summary: "Machine-learning scores alongside the rules-based policy, with explanations a credit officer can review.",
-    bullets: ["Score and reason codes on every decision", "Challenger model run in shadow before it goes live", "Drift and performance monitoring", "Policy overrides stay with the credit team"],
-  },
-  {
-    slug: "fraud-engine", short: "Fraud engine", title: "Advanced fraud engine", icon: "alert", phase: 2, roles: STAFF,
-    summary: "Network and velocity checks beyond duplicate detection, feeding the existing case queue.",
-    bullets: ["Relationship-graph and circular-trade detection", "Velocity and behavioural anomaly rules", "Configurable rule weights and thresholds", "Case queue, freeze and STR flow unchanged"],
-  },
-  {
     slug: "analytics", short: "Analytics", title: "Advanced analytics", icon: "trend", phase: 3, roles: ["seller", "buyer", "financier", ...STAFF],
     summary: "Deeper reporting and forecasting across your invoices, cash flow and portfolio.",
     bullets: ["Cohort, vintage and concentration analysis", "Cash-flow forecasting from open invoices", "Scheduled and exportable reports", "Role-specific views for sellers, buyers and staff"],

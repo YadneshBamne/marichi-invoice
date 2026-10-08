@@ -10,6 +10,7 @@ import { testDb } from "./testdb";
 import { prepareAgreements, signInApp } from "./agreements/service";
 import { executeDisbursement, fundEscrow, requestDisbursement } from "./disbursements/service";
 import { financingOffers, virtualAccounts } from "./db/schema";
+import { recordFunding } from "./marketplace/service";
 
 export const T0 = new Date("2026-10-06T00:00:00Z");
 export const gw = { ...mock, bureau: { pull: async () => ({ score: 780, noHit: false }) } };
@@ -64,5 +65,12 @@ export async function world() {
     const [va] = await db.select().from(virtualAccounts).where(eq(virtualAccounts.invoiceId, inv.id));
     return { offer, disbursementId: d.id, invoiceId: inv.id, account: va.accountNumber };
   };
-  return { db, sellerId, buyerId, sellerActor, buyerUserId: bu.id, offered, acceptedOffer, financed };
+  /** A verified financier company with one login. Optionally funded through the normal staff flow. */
+  const financier = async (name = "Capital One", fund = 0n) => {
+    const [b] = await db.insert(businesses).values({ legalName: name, entityType: "nbfc", kybStatus: "approved" }).returning();
+    const [u] = await db.insert(users).values({ name, email: `${b.id}@fin.com`, role: "financier", businessId: b.id }).returning();
+    if (fund > 0n) await recordFunding(db, { financierId: b.id, amount: fund, ref: `seed-${b.id}`, staffId: "00000000-0000-0000-0000-0000000000a1", staffRole: "ops" });
+    return { id: b.id, actor: { id: u.id, role: "financier", businessId: b.id } };
+  };
+  return { db, sellerId, buyerId, sellerActor, buyerUserId: bu.id, offered, acceptedOffer, financed, financier };
 }

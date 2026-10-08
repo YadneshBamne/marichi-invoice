@@ -9,6 +9,7 @@ import { deliverQueued } from "../server/notify";
 import { notifyNewCases } from "../server/fraud/service";
 import { scanPending } from "../server/fraud/engine";
 import { deliverWebhooks } from "../server/erp/events";
+import { expireBids } from "../server/marketplace/service";
 import { runReconciliation } from "../server/recon/service";
 import { runCollectionsSweep, runSurplusPayouts } from "../server/collections/service";
 import { presentDebits, sendPreDebitNotices } from "../server/collections/nach";
@@ -38,6 +39,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "notifications.deliver": { cron: "* * * * *", run: async () => { await deliverQueued(db); } },          // Module 13: retry with backoff
   "support.sla": { cron: "*/15 * * * *", run: async () => { await runTicketSla(db); } },                    // Module 16: SLA breach -> escalate
   "webhooks.deliver": { cron: "* * * * *", run: async () => { await deliverWebhooks(db); } },               // Phase 2: push status changes to companies' systems
+  "bids.expire": { cron: "*/10 * * * *", run: async () => { await expireBids(db); } },                         // Phase 2: close marketplace bids that ran out of time
   "fraud.scan": { cron: "*/5 * * * *", run: async () => { await scanPending(db); } },                         // Phase 2: score every new invoice for fraud signals
   "fraud.notify-new-cases": { cron: "*/5 * * * *", run: async () => { await notifyNewCases(db); } },     // Module 12
   "irn.retry-pending": { cron: "*/15 * * * *", run: async () => { await revalidatePendingIrns(db); } }, // PRD 12.4

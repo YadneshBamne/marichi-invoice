@@ -7,6 +7,7 @@ import { db } from "@/server/db/client";
 import { businesses, buyerSellerRelationships, financingOffers, invoices, underwritingDecisions } from "@/server/db/schema";
 import { acceptOffer, acceptOffers, expireOffers, generateOffer, rejectOffer, repriceOffer } from "@/server/offers/service";
 import { describeOffer } from "@/server/offers/pricing";
+import { acceptBid, bidsFor } from "@/server/marketplace/service";
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { createInvoice } from "@/server/invoices/service";
@@ -108,6 +109,15 @@ async function newOffer(fd: FormData) {
     return "A new offer is ready.";
   });
 }
+async function chooseBid(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  await attempt(async () => {
+    assertCan(u, "offer.answer");
+    await acceptBid(db, z.uuid().parse(fd.get("bidId")), { id: u.id, role: u.role, businessId: u.businessId });
+    return "Bid accepted. Sign the agreement to receive the funds.";
+  });
+}
 async function creditNote(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
@@ -138,6 +148,10 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
     ids.length ? db.select().from(financingOffers).where(inArray(financingOffers.invoiceId, ids)).orderBy(desc(financingOffers.createdAt)) : [],
     listCreditNotes(db, ids),
   ]);
+  const bidMap = await bidsFor(db, ids);
+  const bidders = new Map<string, string>();
+  const bidderIds = [...new Set([...bidMap.values()].flat().map((b) => b.financierId).concat(allOffers.flatMap((o) => (o.financierId ? [o.financierId] : []))))];
+  if (bidderIds.length) for (const b of await db.select({ id: businesses.id, name: businesses.legalName }).from(businesses).where(inArray(businesses.id, bidderIds))) bidders.set(b.id, b.name);
   const decisionOf = new Map(decisions.map((d) => [d.invoiceId, d]));
   const offerOf = new Map<string, (typeof allOffers)[number]>();
   for (const o of allOffers) if (!offerOf.has(o.invoiceId)) offerOf.set(o.invoiceId, o); // newest first
@@ -191,6 +205,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         const o = offerOf.get(r.id);
         const p = o && describeOffer(o);
         const maxAdvance = (r.amount * BigInt(d.advanceRateBps)) / 10_000n;
+        const bidList = o?.status === "accepted" ? [] : (bidMap.get(r.id) ?? []);
         return (
           <Panel key={r.id} title={`Invoice ${r.invoiceNumber} · ${formatINR(r.amount)}`} className="mb-5">
             {d.decision === "declined" && (
@@ -231,11 +246,29 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                       </details>
                     </>
                   ) : <p className="max-w-xs rounded-lg bg-s-100 p-3 text-xs text-s-600">Accepting an offer commits the company. Ask a manager or the owner to answer it. Valid until {o.expiresAt.toLocaleString("en-IN")}.</p>)}
+                  {o.status === "accepted" && o.financierId && <p className="text-muted">Funded by {bidders.get(o.financierId) ?? "a financier"}.</p>}
                   {o.status === "accepted" && <p className="text-p-700">Accepted. Next: <a className="font-semibold underline" href="/seller/agreements">sign the agreement</a>.</p>}
                   {(o.status === "expired" || o.status === "rejected") && r.status === "eligible" && (
                     <form action={newOffer} className="flex items-center gap-3"><input type="hidden" name="invoiceId" value={r.id} /><span className="text-muted">Offer {o.status}.</span><button className="btn btn-ghost btn-sm">Get a new offer</button></form>
                   )}
                 </div>
+              </div>
+            )}
+            {bidList.length > 0 && (
+              <div className="mt-5 border-t border-hair pt-4">
+                <p className="font-semibold">{bidList.length} bid{bidList.length === 1 ? "" : "s"} from financiers</p>
+                <p className="mb-2 text-xs text-muted">Lowest all-in rate first. Choosing a bid replaces the offer above.</p>
+                <DataTable rows={bidList} rowKey={(b) => b.id}
+                  cols={[
+                    { h: "Financier", cell: (b) => bidders.get(b.financierId) ?? "Financier" },
+                    { h: "You receive now", align: "right", cell: (b) => formatINR(b.netDisbursal) },
+                    { h: "Discount", align: "right", cell: (b) => `${b.discountBps / 100}% p.a.` },
+                    { h: "All-in rate", align: "right", cell: (b) => `${(b.effectiveAprBps / 100).toFixed(2)}% p.a.` },
+                    { h: "Valid until", cell: (b) => <span className="text-muted">{b.expiresAt.toLocaleString("en-IN")}</span> },
+                    { h: "", align: "right", cell: (b) => commit
+                      ? <form action={chooseBid}><input type="hidden" name="bidId" value={b.id} /><button className="btn btn-primary btn-sm">Choose this bid</button></form>
+                      : <span className="text-xs text-s-600">Manager or owner</span> },
+                  ]} />
               </div>
             )}
           </Panel>

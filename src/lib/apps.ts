@@ -21,6 +21,16 @@ export const APPS: AppDef[] = [
     nav: [{ href: "/buyer/invoices", label: "Invoices", icon: "invoice", tour: "nav-invoices" }],
   },
   {
+    id: "marketplace", name: "Marketplace", icon: "layers", types: ["financier"], core: true,
+    blurb: "See approved invoices, bid to fund them, and follow what you have funded, what came back and what it earned.",
+    nav: [
+      { href: "/financier/deals", label: "Deal flow", icon: "layers", tour: "nav-deals" },
+      { href: "/financier/bids", label: "My bids", icon: "handshake", tour: "nav-bids" },
+      { href: "/financier/portfolio", label: "Portfolio", icon: "chart", tour: "nav-portfolio" },
+      { href: "/financier/statement", label: "Statement", icon: "receipt", tour: "nav-statement" },
+    ],
+  },
+  {
     id: "support", name: "Support desk", icon: "help", types: ["seller", "buyer", "financier"], default: true,
     blurb: "Raise queries, complaints and grievances, and follow each by ticket with response times.",
     nav: [{ href: "/support", label: "Support", icon: "help", tour: "nav-support" }],

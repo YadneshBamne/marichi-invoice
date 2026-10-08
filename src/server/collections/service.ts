@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Database, Tx } from "../db/client";
 import {
-  auditLog, businessBankAccounts, collectionEvents, invoiceCollections, invoiceDisputes, invoices, repayments,
+  auditLog, businessBankAccounts, collectionEvents, financingOffers, invoiceCollections, invoiceDisputes, invoices, repayments,
   sellerPayouts, unmatchedCredits, virtualAccounts,
 } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
@@ -11,6 +11,7 @@ import { postEntry, type Line } from "../ledger/post";
 import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
 import { formatINR } from "../../lib/money";
+import { repaymentLegs } from "../marketplace/service";
 import { accrue, applyPayment, bucketOf, COLLECTIONS, daysBetween, isoDay, type State } from "./waterfall";
 
 const asState = (c: typeof invoiceCollections.$inferSelect): State => ({ principal: c.principal, discount: c.discount, penal: c.penal, lastAccrued: c.lastAccruedOn });
@@ -65,6 +66,11 @@ async function settle(db: Database, invoiceId: string, c: Credit, now: Date, gw:
     ];
     const lines: Line[] = [{ account: ACCOUNTS.escrow, direction: "debit", amount: c.amount }];
     for (const [account, amount] of credits) if (amount > 0n) lines.push({ account, direction: "credit", amount });
+    const [funded] = await tx.select({ f: financingOffers.financierId }).from(financingOffers).where(and(eq(financingOffers.invoiceId, invoiceId), eq(financingOffers.status, "accepted")));
+    if (funded?.f) { // financier-funded: principal and their share of discount/penal go back to their funds
+      await ensureAccounts(tx, [ACCOUNTS.financierFunds(funded.f), ACCOUNTS.financierDeployed(funded.f), ACCOUNTS.discountIncome]);
+      lines.push(...repaymentLegs(funded.f, paid));
+    }
     await postEntry(tx, { ref: `repay:${c.utr}`, type: "repayment", lines });
 
     await tx.update(invoiceCollections).set({
@@ -184,8 +190,10 @@ export async function writeOff(db: Database, invoiceId: string, staff: { id: str
     if (daysBetween(inv.dueDate, isoDay(now)) <= COLLECTIONS.writeOffAfterDpd) throw new Error(`not yet ${COLLECTIONS.writeOffAfterDpd}+ days past due`);
     await ensureAccounts(tx, [ACCOUNTS.creditLoss, ACCOUNTS.receivable(inv.sellerId), ACCOUNTS.accruedDiscount, ACCOUNTS.discountIncome]);
     // Principal is lost; discount we already booked as income but will never collect is reversed out of income.
+    const [funded] = await tx.select({ f: financingOffers.financierId }).from(financingOffers).where(and(eq(financingOffers.invoiceId, invoiceId), eq(financingOffers.status, "accepted")));
+    if (funded?.f) await ensureAccounts(tx, [ACCOUNTS.financierDeployed(funded.f)]);
     const lines: Line[] = [
-      { account: ACCOUNTS.creditLoss, direction: "debit", amount: col.principal },
+      { account: funded?.f ? ACCOUNTS.financierDeployed(funded.f) : ACCOUNTS.creditLoss, direction: "debit", amount: col.principal }, // a financier bears its own loss
       { account: ACCOUNTS.receivable(inv.sellerId), direction: "credit", amount: col.principal },
     ];
     if (col.discount > 0n) {

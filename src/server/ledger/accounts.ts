@@ -17,6 +17,8 @@ export const ACCOUNTS = {
   gstPayable: "gst_payable", // liability: GST collected inside processing fees
   penalIncome: "penal_income",
   creditLoss: "credit_loss", // expense: principal written off
+  financierFunds: (id: string) => `financier_funds:${id}`, // liability: a financier's cash held in escrow and free to deploy
+  financierDeployed: (id: string) => `financier_deployed:${id}`, // liability: that financier's capital out in financed invoices
   sellerPayable: (sellerId: string) => `seller_payable:${sellerId}`, // surplus owed back to the seller
 } as const;
 

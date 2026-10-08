@@ -54,10 +54,10 @@ describe("company profile, apps and setup", () => {
   it("setup needs a name; apps are cleaned to what exists for the company type", async () => {
     await expect(completeSetup(w.db, owner)).rejects.toThrow(/name/);
     await updateCompany(w.db, owner, { displayName: "  Asha Traders  ", city: "Pune" });
-    await setApps(w.db, owner, ["support", "buyer-only-nonsense", "marketplace", "confirmations", "support"]);
+    await setApps(w.db, owner, ["support", "buyer-only-nonsense", "analytics", "confirmations", "support"]);
     await completeSetup(w.db, owner, new Date("2026-10-08T00:00:00Z"));
     const [b] = await w.db.select().from(businesses).where(eq(businesses.id, w.sellerId));
-    expect(b).toMatchObject({ displayName: "Asha Traders", city: "Pune", apps: ["support", "marketplace"] });
+    expect(b).toMatchObject({ displayName: "Asha Traders", city: "Pune", apps: ["support", "analytics"] });
     expect(b.setupCompletedAt).toEqual(new Date("2026-10-08T00:00:00Z"));
   });
 

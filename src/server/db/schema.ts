@@ -300,6 +300,25 @@ export const financingOffers = pgTable("financing_offers", {
   uniqueIndex("offer_live").on(t.invoiceId).where(sql`status in ('open','accepted')`),
 ]);
 
+// Marketplace: a financier's bid to fund one invoice. Accepting a bid creates the (accepted) financing offer with that financier.
+export const bids = pgTable("bids", {
+  id: id(),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  financierId: uuid("financier_id").notNull().references(() => businesses.id),
+  advanceAmount: paise("advance_amount").notNull(),
+  discountBps: integer("discount_bps").notNull(),
+  feeAmount: paise("fee_amount").notNull(),
+  expectedDiscount: paise("expected_discount").notNull(),
+  tenorDays: integer("tenor_days").notNull(),
+  status: text("status").notNull().default("open"), // open | accepted | rejected | withdrawn | expired
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("bid_open").on(t.invoiceId, t.financierId).where(sql`status = 'open'`), // one live bid per financier per invoice
+  index("bid_invoice").on(t.invoiceId),
+]);
+
 // master (one per seller) + invoice_schedule (per offer) are e-signed by the seller;
 // assignment_notice (per offer) is sent to the buyer. Disbursement needs all three (Module 8 gate).
 export const agreements = pgTable("agreements", {

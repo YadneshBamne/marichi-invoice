@@ -11,7 +11,7 @@ describe("company apps drive the sidebar", () => {
     expect([...enabledApps("buyer", ["exports"])].sort()).toEqual(["confirmations", "exports"]);
   });
   it("selections are cleaned to ids that exist for the company type", () => {
-    expect(cleanSelection("seller", ["support", "confirmations", "marketplace", "support", "x"])).toEqual(["support", "marketplace"]);
+    expect(cleanSelection("seller", ["support", "confirmations", "analytics", "support", "x"])).toEqual(["support", "analytics"]);
   });
   it("owner sees Apps and Team; a member does not; a removed app disappears", () => {
     const owner = hrefs("seller", { apps: ["invoicing", "support"], orgRole: "owner" });
@@ -20,9 +20,9 @@ describe("company apps drive the sidebar", () => {
     expect(member).not.toContain("/apps"); expect(member).not.toContain("/settings/team"); expect(member).not.toContain("/support");
   });
   it("followed roadmap modules show as coming soon, only for roles they apply to", () => {
-    const s = navFor("seller", { apps: ["invoicing"], picked: ["marketplace", "supply-chain-finance"], orgRole: "owner" });
+    const s = navFor("seller", { apps: ["invoicing"], picked: ["analytics", "supply-chain-finance"], orgRole: "owner" });
     const soon = s.find((x) => x.label === "Coming soon")!.items.map((i) => i.href);
-    expect(soon).toEqual(["/soon/marketplace"]); // supply-chain-finance is a buyer module
+    expect(soon).toEqual(["/soon/analytics"]); // supply-chain-finance is a buyer module
     expect(navFor("seller", { apps: ["invoicing"], orgRole: "owner" }).some((x) => x.label === "Coming soon")).toBe(false);
   });
   it("staff get their fixed console regardless of apps", () => {

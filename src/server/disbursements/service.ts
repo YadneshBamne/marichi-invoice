@@ -11,6 +11,7 @@ import { splitGst } from "../ledger/tax";
 import { assertPreviousDayReconciled } from "../recon/service";
 import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
+import { platformCash, position } from "../marketplace/service";
 import { formatINR } from "../../lib/money";
 
 export const DISBURSE = {
@@ -93,6 +94,13 @@ async function finalize(db: Database, d: typeof disbursements.$inferSelect, bank
       ...(fee.base > 0n ? [{ account: ACCOUNTS.feeIncome, direction: "credit" as const, amount: fee.base }] : []),
       ...(fee.gst > 0n ? [{ account: ACCOUNTS.gstPayable, direction: "credit" as const, amount: fee.gst }] : []),
     ] });
+    if (offer.financierId) { // the advance is now the financier's capital out in this invoice
+      await ensureAccounts(tx, [ACCOUNTS.financierFunds(offer.financierId), ACCOUNTS.financierDeployed(offer.financierId)]);
+      await postEntry(tx, { ref: `deploy:${d.id}`, type: "deploy", lines: [
+        { account: ACCOUNTS.financierFunds(offer.financierId), direction: "debit", amount: offer.advanceAmount },
+        { account: ACCOUNTS.financierDeployed(offer.financierId), direction: "credit", amount: offer.advanceAmount },
+      ] });
+    }
     await tx.update(disbursements).set({ status: "succeeded", bankRef, completedAt: now, failureReason: null }).where(eq(disbursements.id, d.id));
     // Start the collections clock: the seller now owes the advance, accruing discount from today (Module 9).
     await tx.insert(invoiceCollections).values({
@@ -144,6 +152,8 @@ export async function executeDisbursement(db: Database, id: string, gw: Adapters
       // Reserve: escrow balance minus payouts already in flight must cover this one.
       const [{ inflight }] = await tx.select({ inflight: sql<string>`coalesce(sum(${disbursements.amount}), 0)` }).from(disbursements).where(eq(disbursements.status, "processing"));
       if ((await balance(tx, ACCOUNTS.escrow)) - BigInt(inflight) < d.amount) throw new Error("ESCROW_INSUFFICIENT");
+      if (!offer.financierId && (await platformCash(tx)) - BigInt(inflight) < d.amount) throw new Error("ESCROW_INSUFFICIENT"); // financiers' cash is not ours to lend
+      if (offer.financierId && (await position(tx, offer.financierId)).funds < offer.advanceAmount) throw new Error("FINANCIER_FUNDS_INSUFFICIENT");
       await tx.update(disbursements).set({ status: "processing", rail }).where(eq(disbursements.id, id));
     }
     return { done: false as const, d, rail, acct };

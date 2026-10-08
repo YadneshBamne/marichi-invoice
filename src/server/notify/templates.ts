@@ -31,6 +31,8 @@ export const TEMPLATES: Record<string, Template> = {
 
   // --- offers & agreements ---
   offer_ready: { fields: ["invoiceNumber", "advance", "expires"], email: { subject: "Financing offer ready for invoice {{invoiceNumber}}", body: "You have an advance offer of {{advance}} for invoice {{invoiceNumber}}. It is valid until {{expires}}." } },
+  bid_received: { fields: ["invoiceNumber", "advance"], email: { subject: "New bid on invoice {{invoiceNumber}}", body: "A financier has bid {{advance}} on invoice {{invoiceNumber}}. Compare the bids and choose one in your Invoices page." } },
+  bid_accepted: { fields: ["invoiceNumber", "advance"], email: { subject: "Your bid on invoice {{invoiceNumber}} was accepted", body: "The seller accepted your bid of {{advance}} on invoice {{invoiceNumber}}. The advance is paid out once the agreements are signed." } },
   invoice_unfunded: { fields: ["invoiceNumber"], email: { subject: "Invoice {{invoiceNumber}} cannot be funded right now", body: "We could not fund invoice {{invoiceNumber}} at this time. We will retry when capacity is available." } },
   assignment_notice: { fields: ["invoiceNumber", "link"], critical: true, email: { subject: "Notice of assignment: invoice {{invoiceNumber}}", body: "Invoice {{invoiceNumber}} has been assigned to Marichi Labs. Payment must be made only to the account in this notice:\n{{link}}" }, sms: { text: "Marichi: invoice {{invoiceNumber}} has been assigned to Marichi Labs. Pay only to the account in the notice emailed to you.", dltTemplateId: DLT } },
 

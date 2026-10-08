@@ -10,6 +10,7 @@ import { RULES } from "../invoices/service";
 import { OFFER } from "../offers/pricing";
 import { FRAUD } from "../fraud/engine";
 import { ML } from "../underwriting/ml";
+import { MARKET } from "../marketplace/service";
 import { SLA_HOURS } from "../support/policy";
 import { POLICY, type Grade } from "../underwriting/policy";
 import { formatINR, rupeesToPaise, toDecimal } from "../../lib/money";
@@ -28,7 +29,7 @@ const def = (key: string, group: string, label: string, kind: Kind, min: Num, ma
   ({ key, group, label, help, kind, min, max, get: () => bag[prop], set: (v) => { bag[prop] = v; }, fallback: bag[prop] });
 
 const P = POLICY as unknown as Bag, O = OFFER as unknown as Bag, D = DISBURSE as unknown as Bag, C = COLLECTIONS as unknown as Bag, R = RULES as unknown as Bag;
-const F = FRAUD as unknown as Bag, M = ML as unknown as Bag;
+const F = FRAUD as unknown as Bag, M = ML as unknown as Bag, K = MARKET as unknown as Bag;
 const GRADES: Grade[] = ["A", "B", "C", "D", "E"];
 
 export const DEFS: Def[] = [
@@ -53,6 +54,11 @@ export const DEFS: Def[] = [
   }),
 
   def("ml.mode", "Underwriting", "Scoring model: 0 off, 1 shadow, 2 assist", "int", 0, 2, M, "mode", "Shadow records the model beside the rules and changes nothing. Assist may only send an approval to a person when the model rates it two or more grades worse."),
+
+  def("market.bidValidityHours", "Marketplace", "A bid stays open for (hours)", "hours", 1, 168, K, "bidValidityHours"),
+  def("market.minDiscountBps", "Marketplace", "Lowest discount a financier may bid", "percent", 0, 6000, K, "minDiscountBps", "A year, as a percentage."),
+  def("market.maxDiscountBps", "Marketplace", "Highest discount a financier may bid", "percent", 0, 6000, K, "maxDiscountBps", "The cap on what a seller can be charged."),
+  def("market.platformShareBps", "Marketplace", "Platform share of discount and penal charges", "percent", 0, 10000, K, "platformShareBps", "Kept by the platform on financier-funded deals, besides the processing fee."),
 
   def("offer.validityHours", "Offers", "Offer stays open for (hours)", "hours", 1, 168, O, "validityHours"),
   def("offer.processingFeeBps", "Offers", "Processing fee (before GST)", "percent", 0, 1000, O, "processingFeeBps"),
