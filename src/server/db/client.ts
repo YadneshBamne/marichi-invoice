@@ -6,10 +6,13 @@ import * as schema from "./schema";
 // node-postgres (TCP) rather than Neon's HTTP driver:
 // ledger/disbursement code needs interactive transactions.
 const g = globalThis as unknown as { pool?: Pool };
-// A fresh TLS connection to a remote Neon region costs 1-3 s, so connections are kept warm: two always open, idle ones
-// live ten minutes (the default is ten seconds, which made the first click after a pause crawl).
+// A fresh TLS connection to a remote Neon region costs 1-3 s, so locally connections are kept warm: two always open, idle
+// ones live ten minutes (the default is ten seconds, which made the first click after a pause crawl).
+// On Vercel every function instance has its own pool in front of Neon's pooler, so keep each one small and let idle ones go.
+const serverless = Boolean(process.env.VERCEL);
 export const pool = g.pool ?? new Pool({
-  connectionString: process.env.DATABASE_URL, max: 10, min: 2, idleTimeoutMillis: 600_000, connectionTimeoutMillis: 15_000, keepAlive: true,
+  connectionString: process.env.DATABASE_URL, max: serverless ? 5 : 10, min: serverless ? 0 : 2,
+  idleTimeoutMillis: serverless ? 30_000 : 600_000, connectionTimeoutMillis: 15_000, keepAlive: true,
 });
 pool.on("error", (e) => console.error("[db] idle client error (it will be replaced):", e.message)); // never crash on a dropped idle socket
 if (process.env.NODE_ENV !== "production" && !g.pool) {
