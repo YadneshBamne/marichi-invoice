@@ -36,6 +36,8 @@ The web app runs on Vercel. The background worker does not (see step 5). Files a
 | `BETTER_AUTH_SECRET` | new random value: `openssl rand -base64 32` (never reuse the dev one) |
 | `BETTER_AUTH_URL` | your public URL, e.g. `https://app.example.com` (no trailing slash). Sign-in fails if it does not match the domain |
 | `ESIGN_WEBHOOK_SECRET`, `PAYMENTS_WEBHOOK_SECRET`, `NOTIFY_WEBHOOK_SECRET`, `MANDATE_WEBHOOK_SECRET` | four different random values |
+| `ANTHROPIC_API_KEY` (optional) | Turns on real invoice reading. Without it the upload form uses clearly labelled simulated values. `OCR_MODEL` overrides the model |
+| `RESEND_API_KEY`, `MAIL_FROM` (optional) | Both set = email is sent for real. Without them emails are only recorded. SMS stays simulated either way |
 | `DATA_ENCRYPTION_KEY` | `openssl rand -base64 32`. Encrypts PAN and bank account numbers. **Keep a copy: losing it makes them unreadable** |
 | `INTEGRATIONS_MODE` | `mock` for now |
 | `GRIEVANCE_OFFICER_NAME`, `_EMAIL`, `_PHONE`, `_ADDRESS` | real details (legally required on `/grievance`) |
@@ -54,6 +56,9 @@ Add your domain in Vercel, then set `BETTER_AUTH_URL` to it and redeploy. Passwo
 ## 5. The background worker (required)
 Vercel cannot run `npm run worker`, and without it these never happen: daily interest accrual, payouts, collections
 sweeps, notification retries, offer expiry, support timers, reconciliation, underwriting and agreement preparation.
+Since Phase 2 and 3 it also runs: fraud scoring (`fraud.scan`), outbound webhook delivery (`webhooks.deliver`), auto-debit notices
+and presentation (`collections.nach-*`), expiry of marketplace bids and early-payment proposals (`bids.expire`, `earlypay.expire`)
+and scheduled report building (`reports.run`).
 
 Run it on any always-on host (Railway, Render, Fly, a small VM) as a **worker service**:
 - Build: `npm install`  Start: `npm run worker`
@@ -63,7 +68,24 @@ Run it on any always-on host (Railway, Render, Fly, a small VM) as a **worker se
 - Run exactly **one** instance (pg-boss de-duplicates jobs, but one is simplest).
 - It needs `tsx`, which is a dev dependency, so install dev dependencies on that host.
 
-## 6. Known limits
+## 6. Before you go live: migrations
+Run `npm run db:migrate` against the production database before the first deploy and after every update that adds a file under
+`drizzle/` (the latest are `0010_marketplace` to `0014_analytics`). Then create the first admin with `scripts/seed-staff.ts`.
+
+## 7. What is real and what is simulated
+Everything below runs end to end in the product, but the outside world is stood in for until you sign the provider:
+- **Payments rails, virtual accounts, bank statements, bureau, KYC/AML, e-invoice registry, e-sign, e-NACH**: mock adapters
+  behind `src/server/integrations/gateway.ts`. Each is one adapter file to replace; nothing else changes.
+- **FX rates** (cross-border): fixed sandbox rates. A treasury or bank rate feed goes in `fx.rate`.
+- **SMS**: simulated until a provider and DLT template registration exist.
+- **Invoice reading**: real once `ANTHROPIC_API_KEY` is set.
+- **Email**: real once `RESEND_API_KEY` and `MAIL_FROM` are set.
+- **Model-assisted underwriting**: the scoring model is an expert-weighted prior, not trained on your data. It starts in shadow mode.
+- **Overseas buyers** have no Indian bureau record, so every export invoice goes to an analyst; there is no overseas credit-report feed yet.
+- **Financier funds** are one pooled escrow account with per-financier ledger accounts; the bank-side segregation, and the
+  partner/licensing arrangement for lending other people's money, are for you and your counsel.
+
+## 8. Known limits
 - Provider metrics and the circuit breaker are per server instance, so **Admin > System** shows one instance's view.
 - The 4 MB document cap comes from Vercel's 4.5 MB request limit.
 - Webhook endpoints (`/api/webhooks/*`) are public and HMAC-signed. Real providers need their URLs and secrets configured

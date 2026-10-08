@@ -61,6 +61,19 @@ export function Tabs({ items }: { items: { href: string; label: string; active: 
   );
 }
 
+/**
+ * A button that opens a small form in the browser's top layer. Unlike an absolutely placed dropdown it is never clipped by a
+ * scrolling table, and a click outside or Escape closes it. `id` must be unique on the page (use the row's id).
+ */
+export function Pop({ id, label, cls = "btn btn-primary btn-sm", children }: { id: string; label: ReactNode; cls?: string; children: ReactNode }) {
+  return (
+    <>
+      <button type="button" popoverTarget={id} className={cls}>{label}</button>
+      <div id={id} popover="auto" className="pop">{children}</div>
+    </>
+  );
+}
+
 /** Label / value pairs. */
 export function KV({ rows, cols = 1 }: { rows: [ReactNode, ReactNode][]; cols?: 1 | 2 }) {
   return (

@@ -4,7 +4,7 @@ import { db } from "@/server/db/client";
 import { businesses, users } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { position, recordFunding, recordWithdrawal } from "@/server/marketplace/service";
-import { DataTable, Notice, PageHead, Panel } from "@/components/ui/page";
+import { DataTable, Notice, PageHead, Panel, Pop } from "@/components/ui/page";
 import { formatINR, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 
@@ -43,9 +43,8 @@ export default async function Financiers({ searchParams }: { searchParams: Promi
             { h: "Promised", align: "right", cell: (r) => formatINR(r.pos.reserved) },
             { h: "Deployed", align: "right", cell: (r) => formatINR(r.pos.deployed) },
             { h: "", align: "right", cell: (r) => (
-              <details className="relative inline-block text-left">
-                <summary className="btn btn-ghost btn-sm cursor-pointer list-none">Record movement</summary>
-                <form action={move} className="absolute right-0 z-10 mt-2 w-72 space-y-2 rounded-card bg-card p-4 shadow-pop">
+              <Pop id={`pf-${r.id}`} label="Record movement" cls="btn btn-ghost btn-sm">
+                <form action={move} className="space-y-2">
                   <input type="hidden" name="financierId" value={r.id} />
                   <input type="hidden" name="ref" value={crypto.randomUUID()} />
                   <select name="kind" className="field !py-2 text-sm"><option value="fund">Deposit received</option><option value="withdraw">Withdrawal paid</option></select>
@@ -53,7 +52,7 @@ export default async function Financiers({ searchParams }: { searchParams: Promi
                   <input name="bankRef" placeholder="Bank reference (UTR)" className="field !py-2 text-sm" />
                   <button className="btn btn-primary btn-sm w-full">Record</button>
                 </form>
-              </details>
+              </Pop>
             ) },
           ]} />
       </Panel>

@@ -7,7 +7,7 @@ import { businesses, invoiceConfirmations, invoices, virtualAccounts } from "@/s
 import { after } from "next/server";
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
-import { DataTable, EmptyState, PageHead, Panel, ReviewCard, StatusPill } from "@/components/ui/page";
+import { DataTable, EmptyState, PageHead, Panel, ReviewCard, StatusPill, Pop } from "@/components/ui/page";
 import { respondToInvoice } from "@/server/confirmations/service";
 import { underwriteInvoice } from "@/server/underwriting/service";
 import { generateOffer } from "@/server/offers/service";
@@ -120,15 +120,14 @@ export default async function BuyerInvoices() {
                 { h: "Pay to", cell: ({ va }) => <span className="font-mono text-[13px] font-normal">{va.accountNumber}<span className="block text-xs text-muted">IFSC {va.ifsc}</span></span> },
                 { h: "Reference", cell: ({ i }) => <span className="font-mono text-[13px] font-normal">{i.invoiceNumber}</span> },
                 { h: "", align: "right", cell: ({ i }) => lead && (
-                  <details className="relative inline-block text-left">
-                    <summary className="btn btn-ghost btn-sm cursor-pointer list-none">Dispute</summary>
-                    <form action={dispute} className="absolute right-0 z-10 mt-2 w-72 space-y-2 rounded-card bg-card p-4 shadow-pop">
+                  <Pop id={`dp-${i.id}`} label="Dispute" cls="btn btn-ghost btn-sm">
+                    <form action={dispute} className="space-y-2">
                       <input type="hidden" name="invoiceId" value={i.id} />
                       <input name="reason" placeholder="What is wrong?" required className="field !py-2 text-sm" />
                       <input name="amount" inputMode="decimal" placeholder="Disputed amount (blank = all)" className="field !py-2 text-sm" />
                       <button className="btn btn-danger btn-sm w-full">Raise dispute</button>
                     </form>
-                  </details>
+                  </Pop>
                 ) },
               ]} />
           </Panel>

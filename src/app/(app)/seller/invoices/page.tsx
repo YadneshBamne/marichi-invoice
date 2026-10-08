@@ -16,7 +16,7 @@ import { issueCreditNote, listCreditNotes } from "@/server/invoices/credit-notes
 import { sendForConfirmation } from "@/server/confirmations/service";
 import { scanInvoice } from "@/server/fraud/engine";
 import { putDocument } from "@/server/vault";
-import { DataTable, EmptyState, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { DataTable, EmptyState, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
 import { UploadForm } from "./upload-form";
 import { formatINR, formatMinor, rupeesToPaise } from "@/lib/money";
 
@@ -215,16 +215,15 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
             { h: "Status", cell: (r) => <StatusPill status={r.status} /> },
             { h: "e-Invoice", cell: (r) => <span className="font-normal text-muted">{r.irnStatus}</span> },
             { h: "", align: "right", cell: (r) => can(u, "creditnote.issue") && CREDITABLE.includes(r.status) && !r.disputeFlag && (
-              <details className="relative inline-block text-left">
-                <summary className="btn btn-ghost btn-sm cursor-pointer list-none">Credit note</summary>
-                <form action={creditNote} className="absolute right-0 z-10 mt-2 w-80 space-y-2 rounded-card bg-card p-4 shadow-pop">
+              <Pop id={`cn-${r.id}`} label="Credit note" cls="btn btn-ghost btn-sm">
+                <form action={creditNote} className="space-y-2">
                   <input type="hidden" name="invoiceId" value={r.id} />
                   <p className="text-xs text-muted">Reduces what {r.invoiceNumber} is worth. Your buyer is told, and any open offer is withdrawn.</p>
                   <input name="amount" inputMode="decimal" placeholder="Credit amount (₹)" required className="field !py-2 text-sm" />
                   <input name="reason" placeholder="Reason, e.g. goods returned" required className="field !py-2 text-sm" />
                   <button className="btn btn-primary btn-sm w-full">Issue credit note</button>
                 </form>
-              </details>
+              </Pop>
             ) },
           ]} />
       </Panel>

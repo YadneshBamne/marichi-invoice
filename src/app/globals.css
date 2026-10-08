@@ -154,6 +154,8 @@
 .stagger > :nth-child(4) { animation-delay: .15s; } .stagger > :nth-child(5) { animation-delay: .2s; }
 .stagger > :nth-child(6) { animation-delay: .25s; } .stagger > :nth-child(n+7) { animation-delay: .3s; }
 .lift { transition: transform .18s, box-shadow .18s; }
+.pop { margin: auto; width: min(22rem, calc(100vw - 2rem)); border: 0; border-radius: var(--radius-card, 16px); padding: 1.1rem; background: var(--color-card); color: inherit; box-shadow: var(--shadow-pop); text-align: left; }
+.pop::backdrop { background: rgb(18 29 40 / .32); }
 .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
 .grow-x { transform-origin: left; animation: var(--animate-grow-x); }
 .grow-y { transform-origin: bottom; animation: var(--animate-grow-y); }

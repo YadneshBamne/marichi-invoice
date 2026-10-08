@@ -2,7 +2,7 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
 import { decideProgramme, listProgrammes, SCF } from "@/server/scf/service";
-import { DataTable, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { DataTable, Notice, PageHead, Panel, StatusPill, Pop } from "@/components/ui/page";
 import { formatINR, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 
@@ -44,9 +44,8 @@ export default async function Programmes({ searchParams }: { searchParams: Promi
             { h: "In use", align: "right", cell: (r) => formatINR(r.used) },
             { h: "Price", align: "right", cell: (r) => (r.p.discountBps ? `${r.p.discountBps / 100}% / ${(r.p.advanceBps ?? 0) / 100}%` : "-") },
             { h: "", align: "right", cell: (r) => r.p.status === "requested" ? (
-              <details className="relative inline-block text-left">
-                <summary className="btn btn-primary btn-sm cursor-pointer list-none">Decide</summary>
-                <form action={decide} className="absolute right-0 z-10 mt-2 w-80 space-y-2 rounded-card bg-card p-4 shadow-pop">
+              <Pop id={`pd-${r.p.id}`} label="Decide" cls="btn btn-primary btn-sm">
+                <form action={decide} className="space-y-2">
                   <input type="hidden" name="id" value={r.p.id} />
                   <input name="limit" inputMode="decimal" defaultValue={(Number(r.p.requestedLimit) / 100).toString()} placeholder="Limit (₹)" className="field !py-2 text-sm" />
                   <input name="discountPct" type="number" step="0.01" min={SCF.minDiscountBps / 100} max={SCF.maxDiscountBps / 100} placeholder="Yearly discount %" className="field !py-2 text-sm" />
@@ -54,7 +53,7 @@ export default async function Programmes({ searchParams }: { searchParams: Promi
                   <input name="note" placeholder="Note (required to decline)" className="field !py-2 text-sm" />
                   <div className="flex gap-2"><button name="decision" value="approve" className="btn btn-primary btn-sm flex-1">Approve</button><button name="decision" value="decline" className="btn btn-ghost btn-sm flex-1">Decline</button></div>
                 </form>
-              </details>
+              </Pop>
             ) : (r.p.status === "active" || r.p.status === "paused") ? (
               <form action={decide}><input type="hidden" name="id" value={r.p.id} /><button name="decision" value={r.p.status === "active" ? "pause" : "resume"} className="btn btn-ghost btn-sm">{r.p.status === "active" ? "Pause" : "Resume"}</button></form>
             ) : null },

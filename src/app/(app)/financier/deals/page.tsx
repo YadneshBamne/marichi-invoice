@@ -4,7 +4,7 @@ import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { dealFlow, MARKET, placeBid, position } from "@/server/marketplace/service";
 import { priceOffer } from "@/server/offers/pricing";
-import { DataTable, EmptyState, Notice, PageHead, Panel } from "@/components/ui/page";
+import { DataTable, EmptyState, Notice, PageHead, Panel, Pop } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
 import { formatINR } from "@/lib/money";
 import { attempt } from "../attempt";
@@ -55,9 +55,8 @@ export default async function Deals({ searchParams }: { searchParams: Promise<{ 
                 ? <span className="text-p-700">{formatINR(d.myBid.advanceAmount)} at {d.myBid.discountBps / 100}%</span>
                 : <span className="text-faint">none</span> },
               { h: "", align: "right", cell: (d) => may && (
-                <details className="relative inline-block text-left">
-                  <summary className="btn btn-primary btn-sm cursor-pointer list-none">{d.myBid ? "Change bid" : "Bid"}</summary>
-                  <form action={bid} className="absolute right-0 z-10 mt-2 w-72 space-y-2 rounded-card bg-card p-4 shadow-pop">
+                <Pop id={`bid-${d.invoiceId}`} label={d.myBid ? "Change bid" : "Bid"} cls="btn btn-primary btn-sm">
+                  <form action={bid} className="space-y-2">
                     <input type="hidden" name="invoiceId" value={d.invoiceId} />
                     <label className="block text-xs font-medium">Advance (% of invoice, up to {d.maxAdvanceBps / 100})
                       <input name="advancePct" type="number" step="0.01" min="1" max={d.maxAdvanceBps / 100} defaultValue={d.maxAdvanceBps / 100} required className="field !py-2 text-sm font-normal" /></label>
@@ -66,7 +65,7 @@ export default async function Deals({ searchParams }: { searchParams: Promise<{ 
                     <p className="text-xs text-muted">Guide for this grade: {d.guideDiscountBps / 100}% a year. At the guide your return over {d.tenorDays} days is about {formatINR(priceOffer({ amount: d.amount, advanceBps: d.maxAdvanceBps, discountBps: d.guideDiscountBps, tenorDays: d.tenorDays }).expectedDiscount * BigInt(10_000 - MARKET.platformShareBps) / 10_000n)} after the platform share.</p>
                     <button className="btn btn-primary btn-sm w-full">Place bid</button>
                   </form>
-                </details>
+                </Pop>
               ) },
             ]} />
         </Panel>

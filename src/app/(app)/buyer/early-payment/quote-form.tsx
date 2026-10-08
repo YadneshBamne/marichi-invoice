@@ -15,7 +15,7 @@ export function QuoteForm({ amount, days, minBps, maxBps, feeBps, action, invoic
   // What the buyer earns on the cash it pays today, annualised.
   const buyerApr = q && q.net > 0n ? Number((q.discount * 10_000n * 365n) / (q.net * BigInt(days))) / 100 : 0;
   return (
-    <form action={action} className="absolute right-0 z-10 mt-2 w-80 space-y-2 rounded-card bg-card p-4 text-left shadow-pop">
+    <form action={action} className="space-y-2">
       <input type="hidden" name="invoiceId" value={invoiceId} />
       <label className="block text-xs font-medium">Discount you ask for (% a year, {minBps / 100} to {maxBps / 100})
         <input name="discountPct" type="number" step="0.01" min={minBps / 100} max={maxBps / 100} value={pct} onChange={(e) => setPct(Number(e.target.value))} required className="field !py-2 text-sm font-normal" /></label>

@@ -5,7 +5,7 @@ import { businesses, financingOffers, invoices } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { DD, listEarlyPayments, proposeEarlyPayment, withdrawEarlyPayment } from "@/server/earlypay/service";
-import { DataTable, EmptyState, KV, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { DataTable, EmptyState, KV, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
 import { formatINR } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 import { QuoteForm } from "./quote-form";
@@ -69,10 +69,9 @@ export default async function EarlyPayment({ searchParams }: { searchParams: Pro
               { h: "Amount", align: "right", cell: (r) => formatINR(r.i.amount) },
               { h: "Due", cell: (r) => <>{r.i.dueDate}<span className="block text-xs font-normal text-muted">{day(r.i.dueDate) - today} days away</span></> },
               { h: "", align: "right", cell: (r) => may && (
-                <details className="relative inline-block text-left">
-                  <summary className="btn btn-primary btn-sm cursor-pointer list-none">Pay early</summary>
+                <Pop id={`pe-${r.i.id}`} label="Pay early">
                   <QuoteForm amount={r.i.amount.toString()} days={day(r.i.dueDate) - today} minBps={DD.minBps} maxBps={DD.maxBps} feeBps={DD.feeBps} action={propose} invoiceId={r.i.id} />
-                </details>
+                </Pop>
               ) },
             ]} />
         </Panel>
