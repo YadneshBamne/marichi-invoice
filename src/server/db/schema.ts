@@ -218,6 +218,7 @@ export const invoices = pgTable("invoices", {
   poReference: text("po_reference"),
   irn: text("irn"),
   contentHash: text("content_hash").notNull(),
+  source: text("source").notNull().default("upload"), // upload | api | csv: how the invoice reached us
   documentRef: text("document_ref"), // vault reference to the uploaded PDF/image
   // absent = no IRN supplied (compensating controls apply); pending = IRP down, auto-retried
   irnStatus: text("irn_status").notNull().default("absent"), // absent | verified | mismatch | pending
@@ -523,6 +524,46 @@ export const auditLog = pgTable("audit_log", {
   after: jsonb("after"),
   createdAt: createdAt(),
 });
+
+// ERP and accounting sync (Phase 2): per-company API keys, and signed webhooks that push status changes back out.
+export const apiKeys = pgTable("api_keys", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  kind: text("kind").notNull(), // seller | buyer: what the key may do
+  name: text("name").notNull(),
+  prefix: text("prefix").notNull(), // first characters, shown so a key can be recognised
+  keyHash: text("key_hash").notNull().unique(), // sha256 of the key; the key itself is shown once and never stored
+  createdBy: uuid("created_by"),
+  createdAt: createdAt(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (t) => [index("api_keys_business").on(t.businessId)]);
+
+export const webhookEndpoints = pgTable("webhook_endpoints", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  url: text("url").notNull(),
+  secret: encrypted("secret").notNull(), // signs every delivery; encrypted at rest
+  events: text("events").array().notNull().default(sql`'{}'::text[]`), // empty = every event
+  active: boolean("active").notNull().default(true),
+  createdBy: uuid("created_by"),
+  createdAt: createdAt(),
+}, (t) => [index("webhook_endpoints_business").on(t.businessId)]);
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: id(),
+  endpointId: uuid("endpoint_id").notNull().references(() => webhookEndpoints.id),
+  businessId: uuid("business_id").notNull(),
+  type: text("type").notNull(),
+  payload: jsonb("payload").notNull(),
+  status: text("status").notNull().default("pending"), // pending | delivered | failed
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  lastStatusCode: integer("last_status_code"),
+  lastError: text("last_error"),
+  createdAt: createdAt(),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+}, (t) => [index("webhook_deliveries_due").on(t.status, t.nextAttemptAt), index("webhook_deliveries_endpoint").on(t.endpointId, t.createdAt)]);
 
 // NACH / e-mandate: a buyer authorises us to debit their bank account for invoices that fall due.
 export const mandates = pgTable("mandates", {

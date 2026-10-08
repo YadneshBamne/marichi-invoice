@@ -14,11 +14,6 @@ export const ROADMAP: Planned[] = [
     bullets: ["Competitive bids from multiple financiers", "Side-by-side comparison of advance, discount and all-in cost", "Automatic best-offer selection with your own guardrails", "Full audit trail of every bid"],
   },
   {
-    slug: "erp-sync", short: "ERP sync", title: "ERP & accounting sync", icon: "plug", phase: 2, roles: ["seller", "buyer", ...STAFF],
-    summary: "Connect your accounting system so invoices flow in and settlements flow back without manual uploads.",
-    bullets: ["Connectors for Tally, Zoho Books, SAP and Dynamics", "Invoices pulled in as they are raised", "Settlement and payment status posted back automatically", "Buyer-side payables sync for faster confirmation"],
-  },
-  {
     slug: "financier-portal", short: "Financier portal", title: "Financier portal", icon: "bank", phase: 2, roles: ["financier", ...STAFF],
     summary: "A dedicated workspace for financiers to source deals, deploy capital and monitor their portfolio.",
     bullets: ["Deal flow with grade, tenor and buyer quality", "Capital allocation limits and co-lending splits", "Portfolio, yield and delinquency reporting", "Settlement statements and reconciliation"],

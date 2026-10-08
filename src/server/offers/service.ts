@@ -4,6 +4,7 @@ import { auditLog, financingOffers, invoices, underwritingDecisions } from "../d
 import { gateway, type Adapters } from "../integrations/gateway";
 import { assertNotFrozen } from "../fraud/service";
 import { notifyBusiness } from "../notify";
+import { emitEvent } from "../erp/events";
 import { formatINR } from "../../lib/money";
 import { OFFER, platformCapital, priceOffer } from "./pricing";
 
@@ -71,6 +72,10 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
     await notifyBusiness(db, inv.sellerId, "offer_ready", {
       invoiceNumber: inv.invoiceNumber, advance: formatINR(result.offer.advanceAmount), expires: result.offer.expiresAt.toISOString(),
     }, gw);
+    await emitEvent(db, inv.sellerId, "offer.created", {
+      invoiceNumber: inv.invoiceNumber, advanceAmountPaise: result.offer.advanceAmount.toString(), feePaise: result.offer.feeAmount.toString(),
+      netPayoutPaise: (result.offer.advanceAmount - result.offer.feeAmount).toString(), expiresAt: result.offer.expiresAt.toISOString(),
+    }, now);
   }
   return { unfunded: false as const, offer: result.offer, price };
 }

@@ -9,6 +9,7 @@ import { railPlan } from "../disbursements/service";
 import { ACCOUNTS, ensureAccounts } from "../ledger/accounts";
 import { postEntry, type Line } from "../ledger/post";
 import { notifyBusiness, notifyStaff } from "../notify";
+import { emitEvent } from "../erp/events";
 import { formatINR } from "../../lib/money";
 import { accrue, applyPayment, bucketOf, COLLECTIONS, daysBetween, isoDay, type State } from "./waterfall";
 
@@ -85,6 +86,9 @@ async function settle(db: Database, invoiceId: string, c: Credit, now: Date, gw:
     const d = { invoiceNumber: out.invoiceNumber!, amount: formatINR(c.amount) };
     await notifyBusiness(db, out.buyerId!, "payment_received", d, gw);
     await notifyBusiness(db, out.sellerId!, out.closed ? "invoice_settled" : "payment_received_partial", d, gw);
+    const ev = { invoiceNumber: out.invoiceNumber, amountPaise: c.amount.toString(), utr: c.utr, receivedAt: c.receivedAt.toISOString(), settled: out.closed, surplusToSellerPaise: out.surplus.toString() };
+    await emitEvent(db, out.sellerId!, out.closed ? "invoice.paid" : "invoice.payment_received", ev, now);
+    await emitEvent(db, out.buyerId!, "invoice.payment_received", { invoiceNumber: out.invoiceNumber, amountPaise: c.amount.toString(), utr: c.utr, settled: out.closed }, now);
   }
   return out;
 }
@@ -148,7 +152,12 @@ export async function runCollectionsSweep(db: Database, gw: Adapters = gateway, 
     const info = { invoiceNumber: i.invoiceNumber, due: i.dueDate, amount: formatINR(i.amount) };
     const send = async (kind: string, fn: () => Promise<unknown>) => { if (await once(db, i.id, kind)) { await fn(); n.events++; } };
 
-    if (dpd > COLLECTIONS.graceDays && ["financed", "due"].includes(i.status)) await db.update(invoices).set({ status: "overdue" }).where(eq(invoices.id, i.id));
+    if (dpd > COLLECTIONS.graceDays && ["financed", "due"].includes(i.status)) {
+      await db.update(invoices).set({ status: "overdue" }).where(eq(invoices.id, i.id));
+      const ev = { invoiceNumber: i.invoiceNumber, dueDate: i.dueDate, daysPastDue: dpd };
+      await emitEvent(db, i.sellerId, "invoice.overdue", ev, now);
+      await emitEvent(db, i.buyerId, "invoice.overdue", ev, now);
+    }
     else if (dpd >= 0 && i.status === "financed") await db.update(invoices).set({ status: "due" }).where(eq(invoices.id, i.id));
 
     if (toDue > 0 && toDue <= 3) await send("pre_due", () => notifyBusiness(db, i.buyerId, "payment_reminder_pre_due", info, gw));

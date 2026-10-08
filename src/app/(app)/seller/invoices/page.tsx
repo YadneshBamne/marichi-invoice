@@ -149,7 +149,9 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
 
   return (
     <div className="text-sm">
-      <PageHead title="Invoices" sub="Upload invoices, follow them through confirmation, answer offers, and issue credit notes." />
+      <PageHead title="Invoices" sub="Upload invoices, follow them through confirmation, answer offers, and issue credit notes.">
+        <a className="btn btn-ghost btn-sm" href="/seller/invoices/import">Import from CSV</a>
+      </PageHead>
       {q.ok && <div className="mb-4"><Notice tone="good">{q.ok}</Notice></div>}
       {q.error && <div className="mb-4"><Notice tone="bad">{q.error}</Notice></div>}
 

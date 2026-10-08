@@ -26,6 +26,11 @@ export const APPS: AppDef[] = [
     nav: [{ href: "/support", label: "Support", icon: "help", tour: "nav-support" }],
   },
   {
+    id: "integrations", name: "ERP and accounting sync", icon: "plug", types: ["seller", "buyer"],
+    blurb: "Connect your accounting system: API keys, CSV import, and webhooks that push status changes back to you.",
+    nav: [{ href: "/settings/integrations", label: "Integrations", icon: "plug", tour: "nav-integrations" }],
+  },
+  {
     id: "exports", name: "Reports and exports", icon: "download", types: ["seller", "buyer"], default: true,
     blurb: "Download your invoices and settlement data as CSV for your accountant.",
   },

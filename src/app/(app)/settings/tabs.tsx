@@ -10,11 +10,11 @@ const TABS = [
   { href: "/settings/notifications", label: "Notifications" },
 ];
 
-export function SettingsTabs() {
+export function SettingsTabs({ integrations = false }: { integrations?: boolean }) {
   const path = usePathname();
   return (
     <nav aria-label="Settings sections" className="scroll-thin -mb-px flex gap-1 overflow-x-auto border-b border-hair">
-      {TABS.map((t) => {
+      {(integrations ? [...TABS.slice(0, 3), { href: "/settings/integrations", label: "Integrations" }, ...TABS.slice(3)] : TABS).map((t) => {
         const on = path === t.href;
         return (
           <Link key={t.href} href={t.href} aria-current={on ? "page" : undefined}

@@ -10,6 +10,7 @@ import { postEntry } from "../ledger/post";
 import { splitGst } from "../ledger/tax";
 import { assertPreviousDayReconciled } from "../recon/service";
 import { notifyBusiness, notifyStaff } from "../notify";
+import { emitEvent } from "../erp/events";
 import { formatINR } from "../../lib/money";
 
 export const DISBURSE = {
@@ -102,7 +103,10 @@ async function finalize(db: Database, d: typeof disbursements.$inferSelect, bank
     await tx.insert(auditLog).values({ action: "disbursement.succeeded", entity: "disbursement", entityId: d.id, after: { bankRef } });
     return inv;
   });
-  if (done) await notifyBusiness(db, done.sellerId, "disbursed", { invoiceNumber: done.invoiceNumber, amount: formatINR(d.amount) }, gw);
+  if (done) {
+    await notifyBusiness(db, done.sellerId, "disbursed", { invoiceNumber: done.invoiceNumber, amount: formatINR(d.amount) }, gw);
+    await emitEvent(db, done.sellerId, "invoice.financed", { invoiceNumber: done.invoiceNumber, netPayoutPaise: d.amount.toString(), bankRef, paidOutAt: now.toISOString() }, now);
+  }
 }
 
 async function fail(db: Database, d: typeof disbursements.$inferSelect, reason: string, gw: Adapters) {

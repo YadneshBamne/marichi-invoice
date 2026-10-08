@@ -4,6 +4,7 @@ import { auditLog, invoiceConfirmations, invoices, buyerSellerRelationships } fr
 import { gateway, type Adapters } from "../integrations/gateway";
 import { checkBasics } from "../invoices/service";
 import { notifyBusiness, notifyStaff } from "../notify";
+import { emitEvent } from "../erp/events";
 import { openDisputeInTx } from "../support/disputes";
 import { announceTicket } from "../support/service";
 import { formatINR } from "../../lib/money";
@@ -83,6 +84,7 @@ export async function respondToInvoice(
 
   const template = { confirm: "invoice_confirmed", dispute: "invoice_disputed", clarify: "invoice_clarification_requested" }[p.decision];
   await notifyBusiness(db, out.inv.sellerId, template, { ...info(out.inv), note: note ?? "" }, gw);
+  if (out.status === "confirmed" || out.status === "disputed") await emitEvent(db, out.inv.sellerId, out.status === "confirmed" ? "invoice.confirmed" : "invoice.disputed", { invoiceNumber: out.inv.invoiceNumber, note: note ?? null }, now);
   return { status: out.status };
 }
 
