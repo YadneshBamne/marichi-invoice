@@ -99,6 +99,13 @@
       "when": 1791464810110,
       "tag": "0013_cross_border",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791465134774,
+      "tag": "0014_analytics",
+      "breakpoints": true
     }
   ]
 }

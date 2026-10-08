@@ -51,6 +51,11 @@ export const APPS: AppDef[] = [
     nav: [{ href: "/seller/invoices/export", label: "Export invoices", icon: "globe", tour: "nav-export" }],
   },
   {
+    id: "analytics", name: "Analytics", icon: "trend", types: ["seller", "buyer", "financier"],
+    blurb: "Cash-flow forecast, vintage and concentration analysis, and reports built for you on a schedule.",
+    nav: [{ href: "/analytics", label: "Analytics", icon: "trend", tour: "nav-analytics" }],
+  },
+  {
     id: "integrations", name: "ERP and accounting sync", icon: "plug", types: ["seller", "buyer"],
     blurb: "Connect your accounting system: API keys, CSV import, and webhooks that push status changes back to you.",
     nav: [{ href: "/settings/integrations", label: "Integrations", icon: "plug", tour: "nav-integrations" }],

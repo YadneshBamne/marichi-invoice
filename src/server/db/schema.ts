@@ -388,6 +388,29 @@ export const foreignReceipts = pgTable("foreign_receipts", {
   createdAt: createdAt(),
 });
 
+// Reports a user asked to have built on a schedule. Each run keeps its CSV so it can be downloaded later.
+export const reportSchedules = pgTable("report_schedules", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  businessId: uuid("business_id"), // null for platform staff
+  role: text("role").notNull(), // the scope the report is built for
+  kind: text("kind").notNull(), // forecast | vintage | concentration
+  frequency: text("frequency").notNull(), // weekly | monthly
+  active: boolean("active").notNull().default(true),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("rs_user_kind").on(t.userId, t.kind)]);
+
+export const reportRuns = pgTable("report_runs", {
+  id: id(),
+  scheduleId: uuid("schedule_id").notNull().references(() => reportSchedules.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(),
+  filename: text("filename").notNull(),
+  content: text("content").notNull(), // the CSV
+  createdAt: createdAt(),
+}, (t) => [index("rr_user").on(t.userId, t.createdAt)]);
+
 // master (one per seller) + invoice_schedule (per offer) are e-signed by the seller;
 // assignment_notice (per offer) is sent to the buyer. Disbursement needs all three (Module 8 gate).
 export const agreements = pgTable("agreements", {

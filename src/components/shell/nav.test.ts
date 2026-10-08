@@ -19,11 +19,9 @@ describe("company apps drive the sidebar", () => {
     const member = hrefs("seller", { apps: ["invoicing"], orgRole: "member" });
     expect(member).not.toContain("/apps"); expect(member).not.toContain("/settings/team"); expect(member).not.toContain("/support");
   });
-  it("followed roadmap modules show as coming soon, only for roles they apply to", () => {
+  it("shows no coming-soon group while nothing is planned, and ignores followed ids that no longer exist", () => {
     const s = navFor("seller", { apps: ["invoicing"], picked: ["analytics", "supply-chain-finance"], orgRole: "owner" });
-    const soon = s.find((x) => x.label === "Coming soon")!.items.map((i) => i.href);
-    expect(soon).toEqual(["/soon/analytics"]); // supply-chain-finance is a buyer module
-    expect(navFor("seller", { apps: ["invoicing"], orgRole: "owner" }).some((x) => x.label === "Coming soon")).toBe(false);
+    expect(s.some((x) => x.label === "Coming soon")).toBe(false);
   });
   it("staff get their fixed console regardless of apps", () => {
     expect(hrefs("ops")).toContain("/admin/kyb");

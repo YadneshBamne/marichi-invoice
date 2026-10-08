@@ -22,6 +22,7 @@ const STAFF: Section[] = [
     { href: "/admin/fraud", label: "Fraud cases", icon: "alert", tour: "nav-fraud" },
     { href: "/admin/models", label: "Model monitor", icon: "target", tour: "nav-models" },
     { href: "/admin/ledger", label: "Ledger", icon: "chart", tour: "nav-ledger" },
+    { href: "/admin/analytics", label: "Analytics", icon: "trend", tour: "nav-analytics" },
     { href: "/admin/support", label: "Support queue", icon: "help", tour: "nav-support" },
   ] },
 ];
@@ -76,5 +77,5 @@ export const CRUMBS: Record<string, string> = {
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
   system: "System health", policy: "Policy", models: "Model monitor", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
-  apps: "Apps", team: "Team", financier: "Financier", "early-payment": "Pay early", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
+  apps: "Apps", team: "Team", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
 };

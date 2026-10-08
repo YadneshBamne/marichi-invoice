@@ -5,15 +5,8 @@ export type Planned = {
   slug: string; title: string; short: string; icon: string; phase: 2 | 3; roles: RoleName[]; summary: string; bullets: string[];
 };
 
-const STAFF: RoleName[] = ["admin", "ops", "compliance"];
-
-export const ROADMAP: Planned[] = [
-  {
-    slug: "analytics", short: "Analytics", title: "Advanced analytics", icon: "trend", phase: 3, roles: ["seller", "buyer", "financier", ...STAFF],
-    summary: "Deeper reporting and forecasting across your invoices, cash flow and portfolio.",
-    bullets: ["Cohort, vintage and concentration analysis", "Cash-flow forecasting from open invoices", "Scheduled and exportable reports", "Role-specific views for sellers, buyers and staff"],
-  },
-];
+// Everything in the PRD's Phase 2 and 3 is built, so nothing is planned right now. Add entries here to bring the "Coming soon" group back.
+export const ROADMAP: Planned[] = [];
 
 export const roadmapFor = (role: string) => ROADMAP.filter((p) => p.roles.includes(role as RoleName));
 export const roadmapItem = (slug: string) => ROADMAP.find((p) => p.slug === slug);

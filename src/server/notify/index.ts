@@ -58,6 +58,12 @@ export async function notifyBusiness(db: Database, businessId: string, template:
   return send(db, gw, us, template, data, now);
 }
 
+/** Notify one person. */
+export async function notifyUser(db: Database, userId: string, template: string, data: Record<string, string>, gw: Adapters = gateway, now = new Date()) {
+  const us = await db.select({ id: users.id, email: users.email, phone: users.phone, phoneVerified: users.phoneVerified }).from(users).where(eq(users.id, userId));
+  return send(db, gw, us, template, data, now);
+}
+
 /** Notify internal staff (e.g. relationship-manager escalation, compliance alerts). */
 export async function notifyStaff(db: Database, roles: Role[], template: string, data: Record<string, string>, gw: Adapters = gateway, now = new Date()) {
   const us = await db.select({ id: users.id, email: users.email, phone: users.phone, phoneVerified: users.phoneVerified }).from(users).where(inArray(users.role, roles));

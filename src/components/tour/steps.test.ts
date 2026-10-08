@@ -7,7 +7,7 @@ import { stepsFor } from "./steps";
 
 // Page-level targets live in page code; everything else must be provided by the shell or the role's own nav.
 const SHELL = ["workspace", "search", "notifications", "help", "user-menu", "sandbox"];
-const PAGE = ["kpis", "setup", "todo", "queues"];
+const PAGE = ["kpis", "setup", "todo", "queues", "nav-soon"]; // nav-soon only exists while the roadmap has entries
 
 const ANY_NAV = new Set(["seller", "buyer", "financier", "ops", "admin"].flatMap((r) => navFor(r, ALL).flatMap((s) => s.items.map((i) => i.tour))));
 
