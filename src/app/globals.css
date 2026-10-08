@@ -1,26 +1,187 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  Marichi design system. Calm, soft enterprise tone: layered rounded panels, generous radii, pill controls, restrained colour.
+  Tokens are the single source of truth. Brand colour (p-*) is re-pointed per account type below, so every
+  component re-themes without knowing the role: seller = green, buyer = indigo, staff = graphite, financier = plum.
+*/
+@theme {
+  --color-page: #e6eae7;
+  --color-panel: #f4f6f4;
+  --color-card: #fdfefd;
+  --color-hair: #e1e6e2;
+  --color-ink: #14201a;
+  --color-muted: #5f6b64;
+  --color-faint: #78847d;
+
+  --color-p-950: #0e3b2e;
+  --color-p-800: #14573f;
+  --color-p-700: #1b6e50;
+  --color-p-600: #258763;
+  --color-p-400: #62bd97;
+  --color-p-200: #b4e0cc;
+  --color-p-100: #e4f3ec;
+
+  --color-s-600: #a85f0e;
+  --color-s-500: #e39a35;
+  --color-s-100: #fbecd2;
+  --color-r-600: #b3302f;
+  --color-r-100: #fbe3e1;
+  --color-i-500: #4a5bc7;
+  --color-i-100: #e4e8fa;
+  --color-g-600: #1f7a4d;
+  --color-g-100: #dff3e8;
+
+  --font-sans: var(--font-sans-brand), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-card: 20px;
+  --radius-panel: 28px;
+  --shadow-card: 0 1px 2px rgb(18 29 40 / 0.05), 0 10px 28px -16px rgb(18 29 40 / 0.2);
+  --shadow-pop: 0 0 0 1px var(--color-hair), 0 18px 44px -12px rgb(18 29 40 / 0.28);
+
+  --animate-fade-up: fade-up .38s cubic-bezier(.2,.7,.2,1) both;
+  --animate-fade-in: fade-in .25s ease both;
+  --animate-pop: pop .16s cubic-bezier(.2,.8,.3,1) both;
+  --animate-slide-in: slide-in .28s cubic-bezier(.2,.7,.2,1) both;
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-pulse-ring: pulse-ring 2s ease-out infinite;
+  --animate-grow-x: grow-x .7s cubic-bezier(.2,.7,.2,1) both;
+  --animate-grow-y: grow-y .7s cubic-bezier(.2,.7,.2,1) both;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes slide-in { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgb(227 154 53 / .55); } 80%, 100% { box-shadow: 0 0 0 10px rgb(227 154 53 / 0); } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* Account-type themes. Only the brand ramp changes; neutrals, status colours and the saffron accent are shared. */
+[data-role="buyer"] {
+  --color-p-950: #121c47; --color-p-800: #1c2d6e; --color-p-700: #2a4096; --color-p-600: #3a53b3;
+  --color-p-400: #7e92e2; --color-p-200: #c5cef6; --color-p-100: #e8ecfb;
+}
+[data-role="ops"], [data-role="admin"], [data-role="compliance"] {
+  --color-p-950: #141a22; --color-p-800: #222b37; --color-p-700: #2f3a49; --color-p-600: #435063;
+  --color-p-400: #8a99ad; --color-p-200: #cbd3de; --color-p-100: #e8ecf1;
+}
+[data-role="financier"] {
+  --color-p-950: #2a1233; --color-p-800: #431a5a; --color-p-700: #5a2477; --color-p-600: #733394;
+  --color-p-400: #b07fd0; --color-p-200: #dcc4ec; --color-p-100: #f1e7f8;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Base rules MUST live in a layer: unlayered CSS beats every Tailwind utility regardless of specificity. */
+@layer base {
+  html { background: var(--color-page); scroll-behavior: smooth; }
+  body {
+    background: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
   }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--color-p-600); outline-offset: 2px; border-radius: 4px; }
+  ::selection { background: var(--color-p-200); color: var(--color-p-950); }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--color-p-700); width: 1rem; height: 1rem; }
+  select, input:not([type="checkbox"]):not([type="radio"]), textarea {
+    border-radius: 14px; border: 1.5px solid var(--color-hair); background: var(--color-card); padding: 9px 14px; font: inherit; color: var(--color-ink);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  select:hover, input:hover, textarea:hover { border-color: #c3ccd5; }
+  select:focus, input:focus, textarea:focus { outline: none; border-color: var(--color-p-600); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-p-600) 18%, transparent); }
+  input::placeholder, textarea::placeholder { color: var(--color-faint); }
+  /* Raw tables inside the app get the same dense data-grid treatment as .tbl */
+  .app-main table { width: 100%; border-collapse: collapse; }
+  .app-main th { color: var(--color-faint); font-weight: 600; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; padding: 8px 12px 8px 0; text-align: left; white-space: nowrap; }
+  .app-main td { padding: 10px 12px 10px 0; vertical-align: top; }
+  .app-main tbody tr { transition: background-color .12s; }
+  .app-main tbody tr:hover { background: color-mix(in srgb, var(--color-panel) 55%, transparent); }
+  .app-main code { background: var(--color-panel); border-radius: 4px; padding: 1px 5px; font-size: .92em; }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Buttons */
+@utility btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 22px; border-radius: 999px;
+  font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; user-select: none;
+  transition: background-color .15s, box-shadow .15s, transform .12s, color .15s;
 }
+@utility btn-primary { background: var(--color-p-700); color: #fff; box-shadow: 0 1px 2px rgb(18 29 40 / .18); }
+@utility btn-ghost { background: var(--color-card); color: var(--color-ink); box-shadow: inset 0 0 0 1.5px var(--color-p-800); }
+@utility btn-danger { background: var(--color-r-600); color: #fff; }
+@utility btn-sm { height: 34px; padding: 0 16px; font-size: 13px; }
+.btn:active { transform: scale(.975); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; transform: none; }
+.btn-primary:hover { background: var(--color-p-600); }
+.btn-ghost:hover { background: var(--color-p-100); }
+.btn-danger:hover { background: #9c2827; }
+
+/* Form fields */
+@utility field {
+  display: block; width: 100%; margin-top: 4px; padding: 10px 14px;
+  background: var(--color-card); border: 1.5px solid var(--color-hair); border-radius: 14px;
+  font: inherit; color: var(--color-ink);
+}
+@utility field-inline {
+  display: inline-block; padding: 8px 14px; background: var(--color-card);
+  border: 1.5px solid var(--color-hair); border-radius: 14px; font: inherit; color: var(--color-ink);
+}
+
+/* Small badges */
+@utility pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 20px;
+}
+
+/* Content typography for pages rendered inside the app shell */
+.page-title { font-size: clamp(22px, 2.2vw, 28px); font-weight: 650; letter-spacing: -0.025em; line-height: 1.15; }
+.page-sub { color: var(--color-muted); margin-top: 4px; }
+.tbl { width: 100%; border-collapse: collapse; text-align: left; }
+.tbl th { color: var(--color-faint); font-weight: 600; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; padding: 8px 12px 8px 0; }
+.tbl td { padding: 10px 12px 10px 0; border-top: 1px solid var(--color-hair); vertical-align: top; }
+
+/* Motion helpers */
+.anim-up { animation: var(--animate-fade-up); }
+.anim-in { animation: var(--animate-fade-in); }
+.anim-pop { animation: var(--animate-pop); transform-origin: top; }
+.skeleton { background: linear-gradient(90deg, var(--color-panel) 25%, #f6f8f9 50%, var(--color-panel) 75%); background-size: 200% 100%; animation: var(--animate-shimmer); border-radius: 8px; }
+.stagger > * { animation: fade-in .35s ease both; }
+.stagger > :nth-child(2) { animation-delay: .05s; } .stagger > :nth-child(3) { animation-delay: .1s; }
+.stagger > :nth-child(4) { animation-delay: .15s; } .stagger > :nth-child(5) { animation-delay: .2s; }
+.stagger > :nth-child(6) { animation-delay: .25s; } .stagger > :nth-child(n+7) { animation-delay: .3s; }
+.lift { transition: transform .18s, box-shadow .18s; }
+.lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+.grow-x { transform-origin: left; animation: var(--animate-grow-x); }
+.grow-y { transform-origin: bottom; animation: var(--animate-grow-y); }
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
+
+/* Striped "planned / no data" fill used by charts */
+.hatch { background: repeating-linear-gradient(-45deg, var(--color-faint) 0 2px, transparent 2px 7px); opacity: .45; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+/* Pending state for forms (set by PendingForms): buttons lock and show a spinner until the server action returns. */
+form[data-pending] button:not([type="button"]), form[data-pending] input[type="submit"] { pointer-events: none; opacity: .7; position: relative; }
+form[data-pending] button:not([type="button"])::after {
+  content: ""; width: 14px; height: 14px; margin-left: 8px; border-radius: 999px; flex: none;
+  border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Navigation progress bar: eases toward 85% and waits for the page. */
+.nav-bar { width: 0; animation: nav-progress 8s cubic-bezier(.1, .6, .2, 1) forwards; }
+@keyframes nav-progress { to { width: 85%; } }
+
+/* Data grid (DataTable). Specific enough to beat the generic in-app table rules. */
+table.dt { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.dt th { padding: 10px 20px; background: var(--color-panel); color: var(--color-muted); font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; border-bottom: 1px solid var(--color-hair); }
+table.dt td { padding: 13px 20px; border-top: 1px solid var(--color-hair); vertical-align: middle; }
+table.dt tbody tr:first-child td { border-top: 0; }
+table.dt tbody tr:hover { background: color-mix(in srgb, var(--color-panel) 60%, transparent); }
+table.dt td:first-child { font-weight: 600; }
+@media (min-width: 640px) { table.dt th:first-child, table.dt td:first-child { padding-left: 24px; } table.dt th:last-child, table.dt td:last-child { padding-right: 24px; } }
