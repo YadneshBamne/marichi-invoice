@@ -1,37 +1,22 @@
+import Link from "next/link";
 import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
 import { systemHealth } from "@/server/admin/service";
-import { POLICY } from "@/server/underwriting/policy";
-import { OFFER } from "@/server/offers/pricing";
-import { DISBURSE } from "@/server/disbursements/service";
-import { COLLECTIONS } from "@/server/collections/waterfall";
-import { RULES } from "@/server/invoices/service";
-import { SLA_HOURS } from "@/server/support/policy";
 import { gatewayStats } from "@/server/integrations/harden";
-import { DataTable, KV, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { DataTable, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
-import { formatINR } from "@/lib/money";
 
-export const metadata = { title: "System and policy" };
+export const metadata = { title: "System health" };
 
 export default async function System() {
   await requireUser(["admin"]);
   const h = await systemHealth(db);
   const stale = !h.workerLastRun || Date.now() - h.workerLastRun.getTime() > 15 * 60_000;
-  const policy: [string, string][] = [
-    ["Max invoice age", `${RULES.maxAgeDays} days`], ["Invoice size", `${formatINR(RULES.minTicket)} to ${formatINR(RULES.maxTicket)}`],
-    ["Tenor", `${POLICY.minTenorDays} to ${POLICY.maxTenorDays} days`], ["Minimum bureau score", String(POLICY.minBureauScore)],
-    ["Seller limit", formatINR(POLICY.defaultSellerLimit)], ["Per-buyer cap", formatINR(POLICY.defaultBuyerCap)],
-    ["Processing fee", `${OFFER.processingFeeBps / 100}% plus 18% GST`], ["Offer validity", `${OFFER.validityHours} hours`],
-    ["Second approval above", formatINR(DISBURSE.approvalThreshold)],
-    ["Grace period", `${COLLECTIONS.graceDays} days`], ["Penal rate", `${COLLECTIONS.penalBps / 100}% a year`], ["Written off after", `${COLLECTIONS.writeOffAfterDpd} days past due`],
-  ];
-  const grades = Object.entries(POLICY.matrix);
   const stats = Object.entries(gatewayStats()).map(([provider, s]) => ({ provider, ...s }));
 
   return (
     <>
-      <PageHead title="System and policy" sub="Live health of the background worker, notifications, payouts and providers, and the policy values currently in force." />
+      <PageHead title="System health" sub="Live health of the background worker, notifications, payouts and providers." />
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat hero label="Background worker" value={stale ? "Not running" : "Running"} note={h.workerLastRun ? `last job ${h.workerLastRun.toISOString().slice(0, 16).replace("T", " ")}` : "no job has run yet"} tone={stale ? "bad" : undefined} />
         <Stat label="Notifications failed" value={String(h.failedNotifs)} note={`${h.queued} queued · ${h.stuckNotifs} stuck`} tone={h.failedNotifs ? "bad" : "good"} />
@@ -51,26 +36,7 @@ export default async function System() {
           ]} />
       </Panel>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Panel title="Policy values" sub="Read-only. Set in code today."><KV rows={policy} /></Panel>
-        <div className="space-y-5">
-          <Panel title="Pricing by grade" flush>
-            <DataTable rows={grades} rowKey={([g]) => g} cols={[
-              { h: "Grade", cell: ([g]) => g },
-              { h: "Advance", align: "right", cell: ([, m]) => `${m.advanceBps / 100}%` },
-              { h: "Discount p.a.", align: "right", cell: ([, m]) => `${m.discountBps / 100}%` },
-              { h: "Auto-approve up to", align: "right", cell: ([, m]) => (m.autoMax > 0n ? formatINR(m.autoMax) : <span className="text-faint">manual</span>) },
-            ]} />
-          </Panel>
-          <Panel title="Support timers" flush>
-            <DataTable rows={Object.entries(SLA_HOURS)} rowKey={([k]) => k} cols={[
-              { h: "Type", cell: ([k]) => <span className="capitalize">{k}</span> },
-              { h: "First response", align: "right", cell: ([, s]) => `${s.firstResponse} h` },
-              { h: "Resolve within", align: "right", cell: ([, s]) => `${s.resolve / 24} days` },
-            ]} />
-          </Panel>
-        </div>
-      </div>
+      <Panel title="Policy values" sub="Pricing, limits, approvals, collections and support timers."><p className="text-sm text-muted">These are now editable, with a reason and a history for every change. <Link className="font-semibold text-p-700 underline" href="/admin/policy">Open Policy</Link></p></Panel>
     </>
   );
 }

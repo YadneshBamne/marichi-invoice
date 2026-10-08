@@ -24,7 +24,8 @@ const STAFF: Section[] = [
 const ADMIN_ONLY: Section = { label: "Administration", items: [
   { href: "/admin/users", label: "Users & roles", icon: "users", tour: "nav-users" },
   { href: "/admin/audit", label: "Audit log", icon: "scale", tour: "nav-audit" },
-  { href: "/admin/system", label: "System & policy", icon: "gear", tour: "nav-system" },
+  { href: "/admin/policy", label: "Policy", icon: "scale", tour: "nav-policy" },
+  { href: "/admin/system", label: "System health", icon: "gear", tour: "nav-system" },
 ] };
 
 export type NavOpts = { apps?: Iterable<string>; picked?: string[]; orgRole?: string };
@@ -69,7 +70,7 @@ export const ROLE_META: Record<string, { label: string; workspace: string; blurb
 export const CRUMBS: Record<string, string> = {
   admin: "Console", seller: "Seller", buyer: "Buyer", kyb: "KYB review", underwriting: "Underwriting", disbursements: "Disbursements",
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
-  system: "System & policy", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
+  system: "System health", policy: "Policy", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
   apps: "Apps", team: "Team",
 };

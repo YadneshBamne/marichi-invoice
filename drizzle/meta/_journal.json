@@ -29,6 +29,13 @@
       "when": 1791432195233,
       "tag": "0003_mature_moira_mactaggert",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791460489249,
+      "tag": "0004_sharp_giant_girl",
+      "breakpoints": true
     }
   ]
 }

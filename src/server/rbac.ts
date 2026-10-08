@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { effectivePicks, enabledApps } from "../lib/apps";
+import { db } from "./db/client";
+import { refreshPolicy } from "./config/policy";
 import { getMe } from "./me";
 import { roleOf } from "./permissions";
 
@@ -11,7 +13,7 @@ type Role = "seller" | "buyer" | "financier" | "admin" | "ops" | "compliance";
  * for every role) -> role allowed -> company owner has finished the setup wizard.
  */
 export async function requireUser(roles?: Role[], opts?: { skipSetup?: boolean }) {
-  const me = await getMe();
+  const [me] = await Promise.all([getMe(), refreshPolicy(db)]); // policy edits reach this instance within 30 s
   if (!me) redirect("/login");
   if (me.suspendedAt) redirect("/account-suspended");
   if (me.mustChangePassword) redirect("/change-password");

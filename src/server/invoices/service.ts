@@ -6,7 +6,7 @@ import { assertCanRaiseInvoice } from "../relationships/service";
 import { openCase } from "../fraud/service";
 
 // Illustrative defaults (PRD 3.3 / Module 3); move to the admin-console config (Module 15) later.
-export const RULES = { maxAgeDays: 90, minTicket: 10_000_00n, maxTicket: 50_00_000_00n } as const;
+export const RULES = { maxAgeDays: 90, minTicket: 10_000_00n, maxTicket: 50_00_000_00n }; // editable at runtime (see config/policy.ts)
 
 export type InvoiceStatus = typeof invoices.$inferSelect.status;
 export type NewInvoice = {

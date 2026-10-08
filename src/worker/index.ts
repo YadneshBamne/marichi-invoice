@@ -2,6 +2,7 @@
 // pg-boss uses the same Postgres, so no extra infra. Handlers below are stubs, filled per module.
 import { PgBoss } from "pg-boss";
 import { db } from "../server/db/client";
+import { refreshPolicy } from "../server/config/policy";
 import { revalidatePendingIrns } from "../server/invoices/service";
 import { runTicketSla } from "../server/support/service";
 import { deliverQueued } from "../server/notify";
@@ -42,7 +43,7 @@ async function main() {
   await boss.start();
   for (const [name, j] of Object.entries(jobs)) {
     await boss.createQueue(name);
-    await boss.work(name, async () => j.run());
+    await boss.work(name, async () => { await refreshPolicy(db, true); await j.run(); }); // always run with the latest policy
     await boss.schedule(name, j.cron);
   }
   console.log("worker up:", Object.keys(jobs).join(", "));

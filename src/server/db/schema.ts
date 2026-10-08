@@ -55,6 +55,25 @@ export const businesses = pgTable("businesses", {
   createdAt: createdAt(),
 });
 
+// Admin-editable policy values (Module 15). One row per overridden key; a missing row means "use the code default".
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  version: integer("version").notNull().default(1),
+  updatedBy: uuid("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const settingsHistory = pgTable("settings_history", {
+  id: id(),
+  key: text("key").notNull(),
+  version: integer("version").notNull(),
+  before: jsonb("before"),
+  after: jsonb("after"), // null = reset to default
+  note: text("note").notNull(),
+  changedBy: uuid("changed_by"),
+  createdAt: createdAt(),
+}, (t) => [index("settings_history_key").on(t.key, t.createdAt)]);
+
 // Better Auth tables (user/session/account/verification/twoFactor): column keys must match its field names.
 // `role` and `businessId` are server-controlled (see auth.ts, input:false).
 export const users = pgTable("users", {
