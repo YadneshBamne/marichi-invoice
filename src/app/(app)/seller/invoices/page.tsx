@@ -166,7 +166,7 @@ export default async function Invoices() {
             <label className="block font-medium">Due date<input name="dueDate" type="date" required className={input} /></label>
             <label className="block font-medium">e-Invoice IRN <span className="font-normal text-faint">(if issued)</span><input name="irn" className={input} /></label>
             <label className="block font-medium">PO reference<input name="poReference" className={input} /></label>
-            <label className="block font-medium sm:col-span-2">Invoice file <span className="font-normal text-faint">(PDF, PNG or JPG, up to 5 MB)</span><input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required className={`${input} file:mr-3 file:rounded-full file:border-0 file:bg-p-100 file:px-4 file:py-1.5 file:font-semibold file:text-p-700`} /></label>
+            <label className="block font-medium sm:col-span-2">Invoice file <span className="font-normal text-faint">(PDF, PNG or JPG, up to 4 MB)</span><input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required className={`${input} file:mr-3 file:rounded-full file:border-0 file:bg-p-100 file:px-4 file:py-1.5 file:font-semibold file:text-p-700`} /></label>
             <div className="sm:col-span-2"><button className="btn btn-primary">Submit invoice</button></div>
           </form>
         </Card>

@@ -1,23 +1,34 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { get, put } from "@vercel/blob";
 
 const ALLOWED: Record<string, string> = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg" };
 const MIME: Record<string, string> = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", webp: "image/webp", html: "text/html; charset=utf-8" };
 const LOGO: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }; // never SVG: it can carry script
-const MAX_BYTES = 5 * 1024 * 1024;
-const REF = /^[a-f0-9]{64}\.(pdf|png|jpg|webp|html)$/; // the only shape that ever touches the filesystem path
-const dir = () => join(process.cwd(), ".data", "vault");
+// Vercel rejects request bodies over 4.5 MB, so documents stop at 4 MB (the rest of the form needs a little room).
+export const MAX_DOC_BYTES = 4 * 1024 * 1024;
+const REF = /^[a-f0-9]{64}\.(pdf|png|jpg|webp|html)$/; // the only shape that ever touches a path or a blob name
 
 /**
  * Document vault. Content-addressed, so the same bytes always give the same ref and hash.
- * ponytail: local disk. Swap these functions for S3 (SSE + versioning) before production.
+ * Storage: Vercel Blob (private) when BLOB_READ_WRITE_TOKEN is set; a local folder for development only.
+ * Production without the token is an error, because a serverless disk is temporary and files would silently vanish.
  */
+const useBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+const dir = () => join(process.cwd(), ".data", "vault");
+
 async function store(bytes: Buffer, ext: string) {
   const hash = createHash("sha256").update(bytes).digest("hex");
-  await mkdir(dir(), { recursive: true });
   const ref = `${hash}.${ext}`;
-  await writeFile(join(dir(), ref), bytes);
+  if (useBlob()) {
+    // Same bytes -> same name, so overwriting is harmless and a repeat upload is a no-op.
+    await put(`vault/${ref}`, bytes, { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: MIME[ext] });
+  } else {
+    if (process.env.NODE_ENV === "production") throw new Error("document storage is not configured: set BLOB_READ_WRITE_TOKEN");
+    await mkdir(dir(), { recursive: true });
+    await writeFile(join(dir(), ref), bytes);
+  }
   return { ref, hash };
 }
 
@@ -25,7 +36,7 @@ async function store(bytes: Buffer, ext: string) {
 export async function putDocument(bytes: Buffer, mime: string) {
   const ext = ALLOWED[mime];
   if (!ext) throw new Error("only PDF, PNG or JPEG files are accepted");
-  if (bytes.length === 0 || bytes.length > MAX_BYTES) throw new Error("file must be between 1 byte and 5 MB");
+  if (bytes.length === 0 || bytes.length > MAX_DOC_BYTES) throw new Error("the file must be between 1 byte and 4 MB");
   return store(bytes, ext);
 }
 
@@ -42,5 +53,11 @@ export const putGenerated = (html: string) => store(Buffer.from(html, "utf8"), "
 
 export async function readDocument(ref: string) {
   if (!REF.test(ref)) throw new Error("invalid document reference");
-  return { bytes: await readFile(join(dir(), ref)), contentType: MIME[ref.split(".")[1]] };
+  const contentType = MIME[ref.split(".")[1]];
+  if (useBlob()) {
+    const r = await get(`vault/${ref}`, { access: "private" });
+    if (!r || r.statusCode !== 200) throw new Error("document not found");
+    return { bytes: Buffer.from(await new Response(r.stream).arrayBuffer()), contentType };
+  }
+  return { bytes: await readFile(join(dir(), ref)), contentType };
 }
