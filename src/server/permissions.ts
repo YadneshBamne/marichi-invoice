@@ -14,6 +14,8 @@ export const PERMS = {
   "offer.answer": LEAD, // accepting an offer is a financial commitment
   "agreement.sign": LEAD,
   "invoice.confirm": LEAD, // a buyer's confirmation is a legal acknowledgement
+  "creditnote.issue": LEAD, // changes what the buyer owes
+  "offer.reprice": LEAD,
   "ticket.open": ALL,
 } as const satisfies Record<string, OrgRole[]>;
 export type Permission = keyof typeof PERMS;

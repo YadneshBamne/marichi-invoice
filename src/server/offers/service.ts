@@ -22,7 +22,13 @@ export async function expireOffers(db: Database, now = new Date()) {
  * Create the offer for an approved, eligible invoice. Phase 1: the platform balance sheet is the only financier,
  * so capacity is `platformCapital() - advances still deployed`. Not enough room => `unfunded` (seller is told).
  */
-export async function generateOffer(db: Database, invoiceId: string, gw: Adapters = gateway, now = new Date()) {
+export type OfferOptions = {
+  /** Finance less than the maximum advance (partial financing). */
+  advanceAmount?: bigint;
+  /** Replace the offer that is currently open instead of returning it (used when the seller re-prices). */
+  replaceOpen?: boolean;
+};
+export async function generateOffer(db: Database, invoiceId: string, gw: Adapters = gateway, now = new Date(), opts: OfferOptions = {}) {
   await expireOffers(db, now);
   const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!inv) throw new Error("invoice not found");
@@ -33,12 +39,15 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
 
   const tenorDays = dayOf(inv.dueDate) - dayOf(now);
   if (tenorDays < 1) throw new Error("invoice is due; too late to finance");
-  const price = priceOffer({ amount: inv.amount, advanceBps: uw.advanceRateBps, discountBps: uw.discountRateBps, tenorDays });
+  const price = priceOffer({ amount: inv.amount, advanceBps: uw.advanceRateBps, discountBps: uw.discountRateBps, tenorDays, advanceAmount: opts.advanceAmount });
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(7001)`); // serialise capacity checks across concurrent offers
     const [live] = await tx.select().from(financingOffers).where(and(eq(financingOffers.invoiceId, invoiceId), inArray(financingOffers.status, [...LIVE])));
-    if (live) return { offer: live, created: false as const };
+    if (live && opts.replaceOpen && live.status === "open") {
+      await tx.update(financingOffers).set({ status: "rejected" }).where(eq(financingOffers.id, live.id));
+      await tx.insert(auditLog).values({ action: "offer.repriced", entity: "invoice", entityId: invoiceId, before: { offerId: live.id, advance: live.advanceAmount.toString() }, after: { advance: price.advanceAmount.toString() } });
+    } else if (live) return { offer: live, created: false as const };
 
     const [{ deployed }] = await tx.select({ deployed: sql<string>`coalesce(sum(${financingOffers.advanceAmount}), 0)` })
       .from(financingOffers).innerJoin(invoices, eq(invoices.id, financingOffers.invoiceId))
@@ -106,3 +115,25 @@ async function respond(db: Database, offerId: string, actor: SellerActor, to: "a
 
 export const acceptOffer = (db: Database, offerId: string, actor: SellerActor, now = new Date()) => respond(db, offerId, actor, "accepted", now);
 export const rejectOffer = (db: Database, offerId: string, actor: SellerActor, now = new Date()) => respond(db, offerId, actor, "rejected", now);
+
+/** The seller finances less than the maximum: the open offer is replaced by a freshly priced one. */
+export async function repriceOffer(db: Database, offerId: string, actor: SellerActor, advanceAmount: bigint, gw: Adapters = gateway, now = new Date()) {
+  const [offer] = await db.select().from(financingOffers).where(eq(financingOffers.id, offerId));
+  if (!offer) throw new Error("offer not found");
+  const [inv] = await db.select().from(invoices).where(eq(invoices.id, offer.invoiceId));
+  if (actor.role !== "seller" || actor.businessId !== inv.sellerId) throw new Error("FORBIDDEN");
+  if (offer.status !== "open") throw new Error(`offer is ${offer.status}`);
+  const r = await generateOffer(db, inv.id, gw, now, { advanceAmount, replaceOpen: true });
+  if (r.unfunded) throw new Error("there is not enough capital available to re-price this offer right now");
+  return r.offer;
+}
+
+/** Accept several offers at once. Each is its own commitment: one failing does not stop the others, and each failure is reported. */
+export async function acceptOffers(db: Database, offerIds: string[], actor: SellerActor, now = new Date()) {
+  const results: { offerId: string; ok: boolean; error?: string }[] = [];
+  for (const id of new Set(offerIds)) {
+    try { await acceptOffer(db, id, actor, now); results.push({ offerId: id, ok: true }); }
+    catch (e) { results.push({ offerId: id, ok: false, error: (e as Error).message }); }
+  }
+  return results;
+}

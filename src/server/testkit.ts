@@ -33,8 +33,8 @@ export async function world() {
   ]).returning();
   const sellerActor = { id: su.id, email: su.email, role: "seller", businessId: sellerId };
   let n = 0;
-  /** Invoice -> eligible -> underwritten -> offered -> accepted. Returns the accepted offer id. */
-  const acceptedOffer = async (amount = 10_00_000_00n) => {
+  /** Invoice -> eligible -> underwritten -> offered. Returns the open offer and its invoice. */
+  const offered = async (amount = 10_00_000_00n) => {
     const { id } = await createInvoice(db, {
       sellerId, buyerId, invoiceNumber: `INV-${++n}`, invoiceDate: "2026-09-25", dueDate: "2026-11-20",
       amount, contentHash: `h${n}`, irn: `IRN-OK-${n}`,
@@ -43,8 +43,13 @@ export async function world() {
     await underwriteInvoice(db, id, gw, T0);
     const o = await generateOffer(db, id, gw, T0);
     if (o.unfunded) throw new Error("unfunded");
-    await acceptOffer(db, o.offer.id, sellerActor, T0);
-    return o.offer.id;
+    return { offerId: o.offer.id, invoiceId: id };
+  };
+  /** The same, then accepted. Returns the accepted offer id. */
+  const acceptedOffer = async (amount?: bigint) => {
+    const { offerId } = await offered(amount);
+    await acceptOffer(db, offerId, sellerActor, T0);
+    return offerId;
   };
   /** Accepted -> signed -> escrow funded -> paid out at T0. Returns what a test needs to simulate the buyer paying. */
   const financed = async (amount?: bigint) => {
@@ -59,5 +64,5 @@ export async function world() {
     const [va] = await db.select().from(virtualAccounts).where(eq(virtualAccounts.invoiceId, inv.id));
     return { offer, disbursementId: d.id, invoiceId: inv.id, account: va.accountNumber };
   };
-  return { db, sellerId, buyerId, sellerActor, buyerUserId: bu.id, acceptedOffer, financed };
+  return { db, sellerId, buyerId, sellerActor, buyerUserId: bu.id, offered, acceptedOffer, financed };
 }

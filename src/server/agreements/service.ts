@@ -113,6 +113,16 @@ export async function signInApp(
   return signed;
 }
 
+/** Sign the documents of several accepted offers in one go. Reports each offer separately. */
+export async function signAll(db: Database, p: { offerIds: string[]; actor: Parameters<typeof signInApp>[1]["actor"] }, now = new Date()) {
+  const results: { offerId: string; ok: boolean; signed?: number; error?: string }[] = [];
+  for (const offerId of new Set(p.offerIds)) {
+    try { results.push({ offerId, ok: true, signed: await signInApp(db, { offerId, actor: p.actor }, now) }); }
+    catch (e) { results.push({ offerId, ok: false, error: (e as Error).message }); }
+  }
+  return results;
+}
+
 /** HMAC-SHA256 check for provider webhooks (constant-time). */
 export function verifyWebhook(rawBody: string, signature: string | null, secret: string) {
   if (!signature || !secret) return false;

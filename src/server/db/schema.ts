@@ -510,6 +510,19 @@ export const auditLog = pgTable("audit_log", {
   createdAt: createdAt(),
 });
 
+// Credit notes issued by the seller against an invoice (returns, discounts). The invoice amount drops by the credit.
+export const creditNotes = pgTable("credit_notes", {
+  id: id(),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  number: text("number").notNull().unique(), // CN-<invoice number>-<n>
+  amount: paise("amount").notNull(),
+  amountBefore: paise("amount_before").notNull(), // invoice amount before this credit
+  reason: text("reason").notNull(),
+  phase: text("phase").notNull(), // pre_funding | post_funding
+  issuedBy: uuid("issued_by"),
+  createdAt: createdAt(),
+}, (t) => [index("credit_notes_invoice").on(t.invoiceId)]);
+
 // Module 12 case queue. An OPEN case on an invoice freezes it (no underwriting/offer/payout) until a reviewer resolves it.
 export const fraudCases = pgTable("fraud_cases", {
   id: id(),

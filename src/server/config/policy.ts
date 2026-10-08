@@ -53,6 +53,8 @@ export const DEFS: Def[] = [
   def("offer.processingFeeBps", "Offers", "Processing fee (before GST)", "percent", 0, 1000, O, "processingFeeBps"),
   def("offer.defaultPlatformCapital", "Offers", "Platform capital available", "rupees", 0, rupeesToPaise("1000000000000"), O, "defaultPlatformCapital", "Ignored when the PLATFORM_CAPITAL_PAISE environment variable is set."),
 
+  def("offer.minPartialAdvance", "Offers", "Smallest advance when financing part of an invoice", "rupees", 0, rupeesToPaise("1000000"), O, "minPartialAdvance"),
+
   def("disburse.approvalThreshold", "Payouts", "A second person must approve payouts above", "rupees", 0, rupeesToPaise("1000000000"), D, "approvalThreshold"),
   def("disburse.autoAttempts", "Payouts", "Automatic payout attempts before manual review", "int", 1, 10, D, "autoAttempts"),
 
