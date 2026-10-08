@@ -15,6 +15,7 @@ const STAFF: Section[] = [
     { href: "/admin/disbursements", label: "Disbursements", icon: "coins", tour: "nav-disbursements" },
     { href: "/admin/collections", label: "Collections", icon: "bank", tour: "nav-collections" },
     { href: "/admin/financiers", label: "Financiers", icon: "handshake", tour: "nav-financiers" },
+    { href: "/admin/programmes", label: "Programmes", icon: "layers", tour: "nav-programmes" },
   ] },
   { label: "Risk & finance", items: [
     { href: "/admin/fraud", label: "Fraud cases", icon: "alert", tour: "nav-fraud" },
@@ -74,5 +75,5 @@ export const CRUMBS: Record<string, string> = {
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
   system: "System health", policy: "Policy", models: "Model monitor", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
-  apps: "Apps", team: "Team", financier: "Financier", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
+  apps: "Apps", team: "Team", financier: "Financier", "early-payment": "Pay early", programme: "Supplier finance", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
 };

@@ -8,6 +8,7 @@ import { businesses, buyerSellerRelationships, financingOffers, invoices, underw
 import { acceptOffer, acceptOffers, expireOffers, generateOffer, rejectOffer, repriceOffer } from "@/server/offers/service";
 import { describeOffer } from "@/server/offers/pricing";
 import { acceptBid, bidsFor } from "@/server/marketplace/service";
+import { listEarlyPayments, respondEarlyPayment } from "@/server/earlypay/service";
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { createInvoice } from "@/server/invoices/service";
@@ -118,6 +119,16 @@ async function chooseBid(fd: FormData) {
     return "Bid accepted. Sign the agreement to receive the funds.";
   });
 }
+async function answerEarly(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  await attempt(async () => {
+    assertCan(u, "offer.answer");
+    const accept = fd.get("action") === "accept";
+    await respondEarlyPayment(db, { id: u.id, role: u.role, businessId: u.businessId }, z.uuid().parse(fd.get("id")), accept ? "accept" : "decline");
+    return accept ? "Accepted. Your buyer has been told how to pay; you are paid out as soon as it arrives." : "Declined.";
+  });
+}
 async function creditNote(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
@@ -149,6 +160,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
     listCreditNotes(db, ids),
   ]);
   const bidMap = await bidsFor(db, ids);
+  const earlyOffers = (await listEarlyPayments(db, { sellerId: u.businessId! })).filter((e) => e.e.status === "proposed" && e.e.expiresAt > new Date());
   const bidders = new Map<string, string>();
   const bidderIds = [...new Set([...bidMap.values()].flat().map((b) => b.financierId).concat(allOffers.flatMap((o) => (o.financierId ? [o.financierId] : []))))];
   if (bidderIds.length) for (const b of await db.select({ id: businesses.id, name: businesses.legalName }).from(businesses).where(inArray(businesses.id, bidderIds))) bidders.set(b.id, b.name);
@@ -175,6 +187,23 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
           <div><p className="font-semibold">{openOffers.length} offers are waiting for you</p><p className="text-muted">Accept them together to receive {formatINR(bulkNet)} in total once signed. Each offer stays its own agreement.</p></div>
           {commit ? <button className="btn btn-primary">Accept all {openOffers.length}</button> : <p className="max-w-xs text-xs text-s-600">Ask a manager or the owner to accept offers.</p>}
         </form>
+      )}
+
+      {earlyOffers.length > 0 && (
+        <Panel title={`${earlyOffers.length} early payment offer${earlyOffers.length === 1 ? "" : "s"} from your buyers`} sub="Your buyer wants to pay now, from its own cash, in return for a discount. Accepting withdraws any financing offer on that invoice." className="mb-5" flush>
+          <DataTable rows={earlyOffers} rowKey={(e) => e.e.id}
+            cols={[
+              { h: "Invoice", cell: (e) => e.inv.invoiceNumber },
+              { h: "Buyer", cell: (e) => e.buyer },
+              { h: "You receive now", align: "right", cell: (e) => formatINR(e.e.netAmount - e.e.feeAmount) },
+              { h: "Discount", align: "right", cell: (e) => <>{formatINR(e.e.discountAmount)}<span className="block text-xs font-normal text-muted">{e.e.daysEarly} days early</span></> },
+              { h: "Fee", align: "right", cell: (e) => formatINR(e.e.feeAmount) },
+              { h: "Answer by", cell: (e) => <span className="font-normal text-muted">{e.e.expiresAt.toLocaleString("en-IN")}</span> },
+              { h: "", align: "right", cell: (e) => commit
+                ? <form action={answerEarly} className="inline-flex gap-2"><input type="hidden" name="id" value={e.e.id} /><button name="action" value="accept" className="btn btn-primary btn-sm">Accept</button><button name="action" value="decline" className="btn btn-ghost btn-sm">Decline</button></form>
+                : <span className="text-xs text-s-600">Manager or owner</span> },
+            ]} />
+        </Panel>
       )}
 
       <Panel title={`All invoices (${rows.length})`} className="mb-5" flush>

@@ -18,6 +18,7 @@ import { ACCOUNTS, balance, ensureAccounts } from "../ledger/accounts";
 import { postEntry, type Line } from "../ledger/post";
 import { describeOffer, priceOffer } from "../offers/pricing";
 import { notifyBusiness } from "../notify";
+import { assertNoEarlyPayment } from "../earlypay/service";
 import { formatINR } from "../../lib/money";
 
 export const MARKET = {
@@ -141,6 +142,7 @@ export async function placeBid(db: Database, actor: FinancierActor, p: { invoice
     const [inv] = await tx.select().from(invoices).where(eq(invoices.id, p.invoiceId));
     if (!inv || inv.status !== "eligible" || inv.disputeFlag) throw new Error("this invoice is not open for bids");
     await assertNotFrozen(tx, inv.id);
+    await assertNoEarlyPayment(tx, inv.id);
     const [uw] = await tx.select().from(underwritingDecisions).where(eq(underwritingDecisions.invoiceId, inv.id));
     if (uw?.decision !== "approved") throw new Error("this invoice is not open for bids");
     const [taken] = await tx.select({ id: financingOffers.id }).from(financingOffers).where(and(eq(financingOffers.invoiceId, inv.id), eq(financingOffers.status, "accepted")));
@@ -200,6 +202,7 @@ export async function acceptBid(db: Database, bidId: string, actor: SellerActor,
     }
     if (inv.status !== "eligible" || inv.disputeFlag) throw new Error("invoice is no longer eligible for financing");
     await assertNotFrozen(tx, inv.id);
+    await assertNoEarlyPayment(tx, inv.id);
     const [live] = await tx.select().from(financingOffers).where(and(eq(financingOffers.invoiceId, inv.id), inArray(financingOffers.status, ["open", "accepted"])));
     if (live?.status === "accepted") throw new Error("this invoice has already been funded");
     if ((await position(tx, bid.financierId)).available < bid.advanceAmount) throw new Error("that financier no longer has the funds for this bid; choose another");

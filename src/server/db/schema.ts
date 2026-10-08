@@ -319,6 +319,54 @@ export const bids = pgTable("bids", {
   index("bid_invoice").on(t.invoiceId),
 ]);
 
+// Dynamic discounting: the buyer pays an approved invoice early from its own cash, at a discount the seller accepts.
+export const earlyPayments = pgTable("early_payments", {
+  id: id(),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  buyerId: uuid("buyer_id").notNull().references(() => businesses.id),
+  sellerId: uuid("seller_id").notNull().references(() => businesses.id),
+  discountBps: integer("discount_bps").notNull(), // annualised
+  daysEarly: integer("days_early").notNull(),
+  discountAmount: paise("discount_amount").notNull(), // what the buyer saves
+  netAmount: paise("net_amount").notNull(), // what the buyer pays now (invoice amount less the discount)
+  feeAmount: paise("fee_amount").notNull(), // platform fee deducted from the seller's payout, GST-inclusive
+  status: text("status").notNull().default("proposed"), // proposed | accepted | declined | expired | paid | cancelled
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), // while proposed: the seller's time to answer. once accepted: the buyer's time to pay
+  proposedBy: uuid("proposed_by"),
+  respondedBy: uuid("responded_by"),
+  respondedAt: timestamp("responded_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("ep_live").on(t.invoiceId).where(sql`status in ('proposed','accepted')`),
+]);
+
+// Supply chain finance: a buyer-led programme. Staff approve the buyer with a limit and a price based on the buyer's credit;
+// the buyer's suppliers who join are financed at that price instead of their own.
+export const scfProgrammes = pgTable("scf_programmes", {
+  id: id(),
+  buyerId: uuid("buyer_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  requestedLimit: paise("requested_limit").notNull(),
+  limit: paise("limit").notNull().default(sql`0`), // approved; zero until staff approve
+  discountBps: integer("discount_bps"), // yearly, set at approval
+  advanceBps: integer("advance_bps"), // share of the invoice advanced, set at approval
+  status: text("status").notNull().default("requested"), // requested | active | paused | declined
+  decidedBy: uuid("decided_by"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decisionNote: text("decision_note"),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("scf_buyer").on(t.buyerId).where(sql`status in ('requested','active','paused')`)]);
+
+export const scfSuppliers = pgTable("scf_suppliers", {
+  id: id(),
+  programmeId: uuid("programme_id").notNull().references(() => scfProgrammes.id),
+  sellerId: uuid("seller_id").notNull().references(() => businesses.id),
+  status: text("status").notNull().default("invited"), // invited | active | declined | removed
+  invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
+  respondedAt: timestamp("responded_at", { withTimezone: true }),
+}, (t) => [uniqueIndex("scf_supplier").on(t.programmeId, t.sellerId)]);
+
 // master (one per seller) + invoice_schedule (per offer) are e-signed by the seller;
 // assignment_notice (per offer) is sent to the buyer. Disbursement needs all three (Module 8 gate).
 export const agreements = pgTable("agreements", {

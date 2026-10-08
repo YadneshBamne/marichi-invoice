@@ -6,6 +6,8 @@ import { businesses, buyerInvites, buyerSellerRelationships } from "@/server/db/
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { linkBuyer } from "@/server/relationships/service";
+import { invitationsFor, respondInvite } from "@/server/scf/service";
+import { formatINR } from "@/lib/money";
 import { DataTable, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 
 const Form = z.object({
@@ -22,10 +24,19 @@ async function add(fd: FormData) {
   revalidatePath("/seller/buyers");
 }
 
+async function answerInvite(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  assertCan(u, "programme.join");
+  await respondInvite(db, { id: u.id, role: u.role, businessId: u.businessId }, z.uuid().parse(fd.get("programmeId")), fd.get("action") === "accept");
+  revalidatePath("/seller/buyers");
+}
+
 const input = "field font-normal";
 export default async function Buyers() {
   const u = await requireUser(["seller"]);
-  const [linked, invited] = await Promise.all([
+  const [programmes, linked, invited] = await Promise.all([
+    invitationsFor(db, u.businessId!),
     db.select({ name: businesses.legalName, gstin: businesses.gstin, days: buyerSellerRelationships.creditTermsDays })
       .from(buyerSellerRelationships).innerJoin(businesses, eq(businesses.id, buyerSellerRelationships.buyerId)).where(eq(buyerSellerRelationships.sellerId, u.businessId!)),
     db.select().from(buyerInvites).where(eq(buyerInvites.sellerId, u.businessId!)),
@@ -39,6 +50,21 @@ export default async function Buyers() {
   return (
     <>
       <PageHead title="Buyers" sub="The companies that owe you money. A buyer must be linked and verified before their invoices can be financed." />
+      {programmes.length > 0 && (
+        <Panel title="Supplier finance programmes" sub="A buyer that runs a programme finances your invoices on its credit, usually at a lower rate than your own." className="mb-5" flush>
+          <DataTable rows={programmes} rowKey={(p) => p.s.id}
+            cols={[
+              { h: "Buyer", cell: (p) => <>{p.buyer}<span className="block text-xs font-normal text-muted">{p.p.name}</span></> },
+              { h: "Price", align: "right", cell: (p) => `${(p.p.discountBps ?? 0) / 100}% a year` },
+              { h: "Advance", align: "right", cell: (p) => `${(p.p.advanceBps ?? 0) / 100}%` },
+              { h: "Programme limit", align: "right", cell: (p) => formatINR(p.p.limit) },
+              { h: "Status", cell: (p) => <StatusPill status={p.s.status === "active" ? "approved" : "pending"} label={p.s.status === "active" ? "Joined" : "Invited"} /> },
+              { h: "", align: "right", cell: (p) => p.s.status === "invited" && can(u, "programme.join") && (
+                <form action={answerInvite} className="inline-flex gap-2"><input type="hidden" name="programmeId" value={p.p.id} /><button name="action" value="accept" className="btn btn-primary btn-sm">Join</button><button name="action" value="decline" className="btn btn-ghost btn-sm">Decline</button></form>
+              ) },
+            ]} />
+        </Panel>
+      )}
       <div className="grid gap-5 xl:grid-cols-[1fr_22rem]">
         <Panel title="Linked and invited" sub={`${linked.length} linked, ${waiting.length} waiting`} flush>
           <DataTable rows={rows} rowKey={(r) => r.key} empty="No buyers yet. Add your first one."

@@ -11,6 +11,8 @@ import { OFFER } from "../offers/pricing";
 import { FRAUD } from "../fraud/engine";
 import { ML } from "../underwriting/ml";
 import { MARKET } from "../marketplace/service";
+import { DD } from "../earlypay/service";
+import { SCF } from "../scf/service";
 import { SLA_HOURS } from "../support/policy";
 import { POLICY, type Grade } from "../underwriting/policy";
 import { formatINR, rupeesToPaise, toDecimal } from "../../lib/money";
@@ -29,7 +31,7 @@ const def = (key: string, group: string, label: string, kind: Kind, min: Num, ma
   ({ key, group, label, help, kind, min, max, get: () => bag[prop], set: (v) => { bag[prop] = v; }, fallback: bag[prop] });
 
 const P = POLICY as unknown as Bag, O = OFFER as unknown as Bag, D = DISBURSE as unknown as Bag, C = COLLECTIONS as unknown as Bag, R = RULES as unknown as Bag;
-const F = FRAUD as unknown as Bag, M = ML as unknown as Bag, K = MARKET as unknown as Bag;
+const F = FRAUD as unknown as Bag, M = ML as unknown as Bag, K = MARKET as unknown as Bag, E = DD as unknown as Bag, S = SCF as unknown as Bag;
 const GRADES: Grade[] = ["A", "B", "C", "D", "E"];
 
 export const DEFS: Def[] = [
@@ -59,6 +61,16 @@ export const DEFS: Def[] = [
   def("market.minDiscountBps", "Marketplace", "Lowest discount a financier may bid", "percent", 0, 6000, K, "minDiscountBps", "A year, as a percentage."),
   def("market.maxDiscountBps", "Marketplace", "Highest discount a financier may bid", "percent", 0, 6000, K, "maxDiscountBps", "The cap on what a seller can be charged."),
   def("market.platformShareBps", "Marketplace", "Platform share of discount and penal charges", "percent", 0, 10000, K, "platformShareBps", "Kept by the platform on financier-funded deals, besides the processing fee."),
+
+  def("dd.minBps", "Dynamic discounting", "Lowest yearly discount a buyer may propose", "percent", 0, 6000, E, "minBps"),
+  def("dd.maxBps", "Dynamic discounting", "Highest yearly discount a buyer may propose", "percent", 0, 6000, E, "maxBps"),
+  def("dd.minDaysEarly", "Dynamic discounting", "Fewest days before the due date", "int", 1, 365, E, "minDaysEarly"),
+  def("dd.feeBps", "Dynamic discounting", "Platform fee on the invoice (GST-inclusive)", "percent", 0, 1000, E, "feeBps", "Deducted from what the seller receives."),
+  def("dd.proposalHours", "Dynamic discounting", "Seller's time to answer (hours)", "hours", 1, 168, E, "proposalHours"),
+
+  def("scf.minDiscountBps", "Supplier finance", "Lowest yearly discount a programme can be priced at", "percent", 0, 6000, S, "minDiscountBps"),
+  def("scf.maxDiscountBps", "Supplier finance", "Highest yearly discount a programme can be priced at", "percent", 0, 6000, S, "maxDiscountBps"),
+  def("scf.maxAdvanceBps", "Supplier finance", "Largest share of an invoice a programme can advance", "percent", 0, 10000, S, "maxAdvanceBps"),
 
   def("offer.validityHours", "Offers", "Offer stays open for (hours)", "hours", 1, 168, O, "validityHours"),
   def("offer.processingFeeBps", "Offers", "Processing fee (before GST)", "percent", 0, 1000, O, "processingFeeBps"),

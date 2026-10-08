@@ -36,6 +36,16 @@ export const APPS: AppDef[] = [
     nav: [{ href: "/support", label: "Support", icon: "help", tour: "nav-support" }],
   },
   {
+    id: "dynamic-discounting", name: "Pay early", icon: "coins", types: ["buyer"],
+    blurb: "Use spare cash to pay approved invoices early, for a discount that grows with how early you pay.",
+    nav: [{ href: "/buyer/early-payment", label: "Pay early", icon: "coins", tour: "nav-early" }],
+  },
+  {
+    id: "supply-chain-finance", name: "Supplier finance", icon: "handshake", types: ["buyer"],
+    blurb: "Run a programme that lets your suppliers get paid early at a price based on your credit, with limits, an invoice feed and a payment calendar.",
+    nav: [{ href: "/buyer/programme", label: "Supplier finance", icon: "handshake", tour: "nav-programme" }],
+  },
+  {
     id: "integrations", name: "ERP and accounting sync", icon: "plug", types: ["seller", "buyer"],
     blurb: "Connect your accounting system: API keys, CSV import, and webhooks that push status changes back to you.",
     nav: [{ href: "/settings/integrations", label: "Integrations", icon: "plug", tour: "nav-integrations" }],

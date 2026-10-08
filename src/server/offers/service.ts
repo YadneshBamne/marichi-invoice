@@ -3,6 +3,8 @@ import type { Database } from "../db/client";
 import { auditLog, financingOffers, invoices, underwritingDecisions } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { assertNotFrozen } from "../fraud/service";
+import { assertNoEarlyPayment } from "../earlypay/service";
+import { termsFor, utilisation } from "../scf/service";
 import { notifyBusiness } from "../notify";
 import { emitEvent } from "../erp/events";
 import { formatINR } from "../../lib/money";
@@ -35,12 +37,17 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
   if (!inv) throw new Error("invoice not found");
   if (inv.status !== "eligible" || inv.disputeFlag) throw new Error(`invoice cannot be offered financing (${inv.status})`);
   await assertNotFrozen(db, invoiceId);
+  await assertNoEarlyPayment(db, invoiceId);
   const [uw] = await db.select().from(underwritingDecisions).where(eq(underwritingDecisions.invoiceId, invoiceId));
   if (uw?.decision !== "approved") throw new Error("invoice is not approved by underwriting");
 
   const tenorDays = dayOf(inv.dueDate) - dayOf(now);
   if (tenorDays < 1) throw new Error("invoice is due; too late to finance");
-  const price = priceOffer({ amount: inv.amount, advanceBps: uw.advanceRateBps, discountBps: uw.discountRateBps, tenorDays, advanceAmount: opts.advanceAmount });
+  // A buyer's supply chain finance programme prices its suppliers' invoices on the buyer's credit. The supplier's own approval still gates the offer.
+  const programme = await termsFor(db, inv.buyerId, inv.sellerId);
+  const advanceBps = programme?.advanceBps ?? uw.advanceRateBps;
+  const discountBps = programme?.discountBps ?? uw.discountRateBps;
+  const price = priceOffer({ amount: inv.amount, advanceBps, discountBps, tenorDays, advanceAmount: opts.advanceAmount });
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(7001)`); // serialise capacity checks across concurrent offers
@@ -54,9 +61,10 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
       .from(financingOffers).innerJoin(invoices, eq(invoices.id, financingOffers.invoiceId))
       .where(and(eq(financingOffers.status, "accepted"), inArray(invoices.status, ["eligible", "financed", "due", "overdue"])));
     if (BigInt(deployed) + price.advanceAmount > platformCapital()) return { unfunded: true as const };
+    if (programme && (await utilisation(tx, inv.buyerId)) + price.advanceAmount > programme.limit) return { unfunded: true as const }; // the buyer's programme limit is full
 
     const [offer] = await tx.insert(financingOffers).values({
-      invoiceId, financierId: null, advanceAmount: price.advanceAmount, discountBps: uw.discountRateBps,
+      invoiceId, financierId: null, advanceAmount: price.advanceAmount, discountBps,
       feeAmount: price.feeAmount, tenorDays, expectedDiscount: price.expectedDiscount, recourse: true,
       expiresAt: new Date(now.getTime() + OFFER.validityHours * 3_600_000),
     }).returning();
@@ -108,7 +116,7 @@ async function respond(db: Database, offerId: string, actor: SellerActor, to: "a
       return null;
     }
     if (to === "accepted" && (inv.status !== "eligible" || inv.disputeFlag)) throw new Error("invoice is no longer eligible for financing");
-    if (to === "accepted") await assertNotFrozen(tx, inv.id);
+    if (to === "accepted") { await assertNotFrozen(tx, inv.id); await assertNoEarlyPayment(tx, inv.id); }
     await tx.update(financingOffers).set({ status: to, ...(to === "accepted" ? { acceptedAt: now, acceptedBy: actor.id } : {}) })
       .where(eq(financingOffers.id, offer.id));
     await tx.insert(auditLog).values({ actorId: actor.id, action: `offer.${to}`, entity: "invoice", entityId: inv.id, after: { offerId } });

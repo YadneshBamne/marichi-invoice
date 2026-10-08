@@ -16,6 +16,9 @@ export const PERMS = {
   "invoice.confirm": LEAD, // a buyer's confirmation is a legal acknowledgement
   "creditnote.issue": LEAD, // changes what the buyer owes
   "offer.reprice": LEAD,
+  "programme.manage": LEAD, // a programme commits the buyer to its suppliers
+  "programme.join": LEAD, // joining changes how the supplier is priced
+  "earlypay.propose": LEAD, // paying early commits company cash
   "bid.place": LEAD, // a bid commits the financier's capital
   "integrations.manage": ["owner"], // API keys and webhooks give outside systems access to the company's data
   "ticket.open": ALL,

@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Database, Tx } from "../db/client";
 import {
-  auditLog, businessBankAccounts, collectionEvents, financingOffers, invoiceCollections, invoiceDisputes, invoices, repayments,
+  auditLog, businessBankAccounts, collectionEvents, earlyPayments, financingOffers, invoiceCollections, invoiceDisputes, invoices, repayments,
   sellerPayouts, unmatchedCredits, virtualAccounts,
 } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
@@ -12,6 +12,7 @@ import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
 import { formatINR } from "../../lib/money";
 import { repaymentLegs } from "../marketplace/service";
+import { settleEarlyPayment } from "../earlypay/service";
 import { accrue, applyPayment, bucketOf, COLLECTIONS, daysBetween, isoDay, type State } from "./waterfall";
 
 const asState = (c: typeof invoiceCollections.$inferSelect): State => ({ principal: c.principal, discount: c.discount, penal: c.penal, lastAccrued: c.lastAccruedOn });
@@ -44,7 +45,14 @@ async function settle(db: Database, invoiceId: string, c: Credit, now: Date, gw:
     const [dupe] = await tx.select({ id: repayments.id }).from(repayments).where(eq(repayments.utr, c.utr));
     if (dupe) return { status: "replayed" };
     const [col] = await tx.select().from(invoiceCollections).where(eq(invoiceCollections.invoiceId, invoiceId)).for("update");
-    if (!col) return { status: "unmatched", reason: "invoice not financed yet" };
+    if (!col) {
+      // Not financed: it may be a buyer paying early (dynamic discounting).
+      const [ep] = await tx.select().from(earlyPayments).where(and(eq(earlyPayments.invoiceId, invoiceId), eq(earlyPayments.status, "accepted"))).for("update");
+      if (!ep) return { status: "unmatched", reason: "invoice not financed yet" };
+      const [einv] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+      const r = await settleEarlyPayment(tx, ep, einv, c, now);
+      return r.status === "applied" ? { ...r, sellerId: einv.sellerId, buyerId: einv.buyerId, invoiceNumber: einv.invoiceNumber } : r;
+    }
     if (col.closedAt) return { status: "unmatched", reason: "invoice already settled" };
     const [inv] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
 
