@@ -49,6 +49,11 @@ export interface MandatePort {
   cancel(mandateRef: string): Promise<void>;
 }
 
+export interface FxPort {
+  /** Mid-market rate: rupees per one whole unit of `currency`, times 1,000,000 (an integer, so no float ever touches money). */
+  rate(currency: string): Promise<{ midMicro: bigint; asOf: string }>;
+}
+
 export type OcrFields = {
   invoiceNumber: string | null; invoiceDate: string | null; dueDate: string | null; totalAmount: string | null; currency: string | null;
   sellerName: string | null; sellerGstin: string | null; buyerName: string | null; buyerGstin: string | null; irn: string | null; poReference: string | null;
@@ -59,7 +64,7 @@ export interface OcrPort {
 }
 
 export type Adapters = {
-  kyc: KycPort; irn: IrnPort; bureau: BureauPort; payments: PaymentsPort; esign: EsignPort; notify: NotifyPort; statements: StatementPort; mandates: MandatePort; ocr: OcrPort;
+  kyc: KycPort; irn: IrnPort; bureau: BureauPort; payments: PaymentsPort; esign: EsignPort; notify: NotifyPort; statements: StatementPort; mandates: MandatePort; ocr: OcrPort; fx: FxPort;
 };
 
 // ponytail: mock only; add real adapters per provider when licences exist, select via INTEGRATIONS_MODE.

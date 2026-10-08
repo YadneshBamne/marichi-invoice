@@ -9,6 +9,7 @@ import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { submitKyb, submitLightKyb } from "@/server/kyb/service";
+import { submitForeignKyb } from "@/server/crossborder/service";
 import { Card, PageHead } from "@/components/ui/cards";
 import { Icon } from "@/components/ui/icons";
 
@@ -63,6 +64,15 @@ async function submitLight(fd: FormData) {
   revalidatePath("/onboarding");
 }
 
+async function submitForeign(fd: FormData) {
+  "use server";
+  const user = await requireUser(["buyer"]);
+  const f = z.object({ country: z.string().length(2), taxId: z.string().min(4) }).parse(Object.fromEntries(fd));
+  await captureConsent(fd, user);
+  await submitForeignKyb(db, { businessId: user.businessId!, ...f });
+  revalidatePath("/onboarding");
+}
+
 const input = "field font-normal";
 const STAGES = [["draft", "Details"], ["under_review", "Review"], ["approved", "Verified"]] as const;
 const stageOf = (s: string) => (s === "approved" ? 2 : s === "under_review" || s === "submitted" ? 1 : 0);
@@ -112,6 +122,15 @@ export default async function Onboarding() {
             <label className="flex items-start gap-3 text-[13.5px] text-muted"><input name="consent" type="checkbox" required className="mt-0.5" />{CONSENT_TEXT}</label>
             <button className="btn btn-primary">Verify</button>
           </form>
+          <details className="mt-5 border-t border-hair pt-4 text-sm">
+            <summary className="cursor-pointer font-semibold text-p-700">Is your company based outside India?</summary>
+            <form action={submitForeign} className="mt-3 space-y-4">
+              <label className="block font-medium">Country (two-letter code, for example US, GB, AE)<input name="country" required maxLength={2} className={`${input} uppercase`} /></label>
+              <label className="block font-medium">Tax or company registration number<input name="taxId" required className={input} /></label>
+              <label className="flex items-start gap-3 text-[13.5px] text-muted"><input name="consent" type="checkbox" required className="mt-0.5" />{CONSENT_TEXT}</label>
+              <button className="btn btn-ghost">Verify as an overseas company</button>
+            </form>
+          </details>
         </Card>
       )}
       {canSubmit && !buyer && (

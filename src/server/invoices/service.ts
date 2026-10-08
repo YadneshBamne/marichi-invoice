@@ -15,6 +15,7 @@ export type NewInvoice = {
   amount: bigint; // paise
   irn?: string; poReference?: string; taxBreakup?: unknown; lineItems?: unknown;
   contentHash: string; documentRef?: string;
+  currency?: string; foreignAmount?: bigint; fxRateMicro?: bigint; shippingBill?: string; purposeCode?: string; // export invoices (amount stays in rupees)
 };
 
 const day = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 86_400_000;

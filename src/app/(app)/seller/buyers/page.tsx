@@ -6,6 +6,7 @@ import { businesses, buyerInvites, buyerSellerRelationships } from "@/server/db/
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { linkBuyer } from "@/server/relationships/service";
+import { linkForeignBuyer } from "@/server/crossborder/service";
 import { invitationsFor, respondInvite } from "@/server/scf/service";
 import { formatINR } from "@/lib/money";
 import { DataTable, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
@@ -29,6 +30,15 @@ async function answerInvite(fd: FormData) {
   const u = await requireUser(["seller"]);
   assertCan(u, "programme.join");
   await respondInvite(db, { id: u.id, role: u.role, businessId: u.businessId }, z.uuid().parse(fd.get("programmeId")), fd.get("action") === "accept");
+  revalidatePath("/seller/buyers");
+}
+
+async function addOverseas(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  assertCan(u, "buyer.invite");
+  const f = z.object({ country: z.string().length(2), taxId: z.string().min(4), buyerEmail: z.email(), creditTermsDays: z.coerce.number().int().min(1).max(365) }).parse(Object.fromEntries(fd));
+  await linkForeignBuyer(db, { sellerId: u.businessId!, ...f });
   revalidatePath("/seller/buyers");
 }
 
@@ -85,6 +95,18 @@ export default async function Buyers() {
               <button className="btn btn-primary w-full">Add buyer</button>
               <p className="text-xs text-muted">If the buyer is not verified yet, they are invited and linked automatically once they are.</p>
             </form>
+            {u.apps.has("cross-border") && (
+              <details className="mt-5 border-t border-hair pt-4">
+                <summary className="cursor-pointer text-sm font-semibold text-p-700">Overseas buyer</summary>
+                <form action={addOverseas} className="mt-3 space-y-4">
+                  <Field label="Country (two-letter code)"><input name="country" required maxLength={2} placeholder="US" className={`${input} uppercase`} /></Field>
+                  <Field label="Tax or registration number"><input name="taxId" required className={input} /></Field>
+                  <Field label="Their accounts-payable email"><input name="buyerEmail" type="email" required className={input} /></Field>
+                  <Field label="Credit terms (days)"><input name="creditTermsDays" type="number" defaultValue={60} className={input} /></Field>
+                  <button className="btn btn-ghost w-full">Add overseas buyer</button>
+                </form>
+              </details>
+            )}
           </Panel>
         )}
       </div>

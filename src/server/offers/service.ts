@@ -5,6 +5,7 @@ import { gateway, type Adapters } from "../integrations/gateway";
 import { assertNotFrozen } from "../fraud/service";
 import { assertNoEarlyPayment } from "../earlypay/service";
 import { termsFor, utilisation } from "../scf/service";
+import { CROSS } from "../crossborder/rules";
 import { notifyBusiness } from "../notify";
 import { emitEvent } from "../erp/events";
 import { formatINR } from "../../lib/money";
@@ -45,8 +46,9 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
   if (tenorDays < 1) throw new Error("invoice is due; too late to finance");
   // A buyer's supply chain finance programme prices its suppliers' invoices on the buyer's credit. The supplier's own approval still gates the offer.
   const programme = await termsFor(db, inv.buyerId, inv.sellerId);
-  const advanceBps = programme?.advanceBps ?? uw.advanceRateBps;
-  const discountBps = programme?.discountBps ?? uw.discountRateBps;
+  const abroad = inv.currency !== "INR"; // export invoices are advanced less and priced for country and currency risk
+  const advanceBps = (programme?.advanceBps ?? uw.advanceRateBps) - (abroad ? CROSS.advanceCutBps : 0);
+  const discountBps = (programme?.discountBps ?? uw.discountRateBps) + (abroad ? CROSS.riskPremiumBps : 0);
   const price = priceOffer({ amount: inv.amount, advanceBps, discountBps, tenorDays, advanceAmount: opts.advanceAmount });
 
   const result = await db.transaction(async (tx) => {

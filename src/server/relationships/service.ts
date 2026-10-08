@@ -3,6 +3,8 @@ import type { Database } from "../db/client";
 import { isBlacklisted } from "../fraud/service";
 import { auditLog, businesses, buyerInvites, buyerSellerRelationships } from "../db/schema";
 
+/** How an invitation names an overseas buyer, which has no GSTIN. */
+export const foreignKey = (country: string, taxId: string) => `FOREIGN:${country.toUpperCase()}:${taxId.trim().toUpperCase()}`;
 const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/;
 
 async function statusOf(db: Database, id: string) {
@@ -42,9 +44,10 @@ export async function linkBuyer(
 /** Call whenever a business becomes approved: turns pending invites for its GSTIN into relationships. Idempotent. */
 export async function resolveInvites(db: Database, businessId: string) {
   const [b] = await db.select().from(businesses).where(eq(businesses.id, businessId));
-  if (!b?.gstin || b.kybStatus !== "approved") return 0;
+  const key = b?.gstin ?? (b?.country && b.taxId ? foreignKey(b.country, b.taxId) : null);
+  if (!b || !key || b.kybStatus !== "approved") return 0;
   const pending = await db.select().from(buyerInvites)
-    .where(and(eq(buyerInvites.buyerGstin, b.gstin), eq(buyerInvites.status, "pending")));
+    .where(and(eq(buyerInvites.buyerGstin, key), eq(buyerInvites.status, "pending")));
   for (const inv of pending) {
     if (inv.sellerId === b.id) continue;
     await db.insert(buyerSellerRelationships).values({

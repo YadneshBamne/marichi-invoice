@@ -52,6 +52,8 @@ export const businesses = pgTable("businesses", {
   phone: text("phone"),
   city: text("city"),
   industry: text("industry"),
+  country: text("country"), // ISO-3166 alpha-2; null means India
+  taxId: text("tax_id"), // an overseas company's tax or registration number (no GSTIN)
   createdAt: createdAt(),
 });
 
@@ -219,6 +221,12 @@ export const invoices = pgTable("invoices", {
   irn: text("irn"),
   contentHash: text("content_hash").notNull(),
   source: text("source").notNull().default("upload"), // upload | api | csv: how the invoice reached us
+  // Export invoices: `amount` is always rupees (the locked conversion), so the rest of the platform needs no change.
+  currency: text("currency").notNull().default("INR"),
+  foreignAmount: paise("foreign_amount"), // minor units (cents) of `currency`, when it is not INR
+  fxRateMicro: paise("fx_rate_micro"), // locked rupees per unit x 1e6, after the safety buffer
+  shippingBill: text("shipping_bill"), // goods exports
+  purposeCode: text("purpose_code"), // RBI purpose-of-remittance code, services exports
   documentRef: text("document_ref"), // vault reference to the uploaded PDF/image
   // absent = no IRN supplied (compensating controls apply); pending = IRP down, auto-retried
   irnStatus: text("irn_status").notNull().default("absent"), // absent | verified | mismatch | pending
@@ -366,6 +374,19 @@ export const scfSuppliers = pgTable("scf_suppliers", {
   invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
   respondedAt: timestamp("responded_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("scf_supplier").on(t.programmeId, t.sellerId)]);
+
+// A buyer's payment in a foreign currency, as received, and what it converted to. Kept for FX reporting and export-proof paperwork.
+export const foreignReceipts = pgTable("foreign_receipts", {
+  id: id(),
+  utr: text("utr").notNull().unique(),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  currency: text("currency").notNull(),
+  foreignAmount: paise("foreign_amount").notNull(),
+  rateMicro: paise("rate_micro").notNull(), // rupees per unit x 1e6 used for the conversion, after the bank spread
+  inrAmount: paise("inr_amount").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
 
 // master (one per seller) + invoice_schedule (per offer) are e-signed by the seller;
 // assignment_notice (per offer) is sent to the buyer. Disbursement needs all three (Module 8 gate).

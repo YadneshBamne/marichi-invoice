@@ -65,6 +65,14 @@ export const mock: Adapters = {
     },
     async cancel() {},
   },
+  // Fixed sandbox rates (rupees per unit, micro). A real adapter reads the bank's or a treasury feed's live rate.
+  fx: {
+    async rate(currency) {
+      const r: Record<string, bigint> = { USD: 83_500_000n, EUR: 90_200_000n, GBP: 105_800_000n, AED: 22_730_000n, SGD: 62_000_000n };
+      if (!r[currency]) throw new Error(`no rate for ${currency}`);
+      return { midMicro: r[currency], asOf: new Date().toISOString() };
+    },
+  },
   // Sandbox reading: plausible values derived from the file itself, flagged as simulated so the UI says so.
   ocr: {
     async extractInvoice({ bytes }) {

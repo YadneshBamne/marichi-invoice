@@ -18,7 +18,7 @@ import { scanInvoice } from "@/server/fraud/engine";
 import { putDocument } from "@/server/vault";
 import { DataTable, EmptyState, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { UploadForm } from "./upload-form";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatINR, formatMinor, rupeesToPaise } from "@/lib/money";
 
 export const metadata = { title: "Invoices" };
 
@@ -210,7 +210,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <DataTable rows={rows} rowKey={(r) => r.id} empty="No invoices yet. Upload your first one below."
           cols={[
             { h: "No.", cell: (r) => r.invoiceNumber },
-            { h: "Amount", align: "right", cell: (r) => <>{formatINR(r.amount)}{creditOf.has(r.id) && <span className="block text-xs font-normal text-muted">after {formatINR(creditOf.get(r.id)!)} credit</span>}</> },
+            { h: "Amount", align: "right", cell: (r) => <>{formatINR(r.amount)}{r.currency !== "INR" && <span className="block text-xs font-normal text-muted">{formatMinor(r.foreignAmount ?? 0n, r.currency)}</span>}{creditOf.has(r.id) && <span className="block text-xs font-normal text-muted">after {formatINR(creditOf.get(r.id)!)} credit</span>}</> },
             { h: "Due", cell: (r) => r.dueDate },
             { h: "Status", cell: (r) => <StatusPill status={r.status} /> },
             { h: "e-Invoice", cell: (r) => <span className="font-normal text-muted">{r.irnStatus}</span> },

@@ -13,6 +13,7 @@ import { ML } from "../underwriting/ml";
 import { MARKET } from "../marketplace/service";
 import { DD } from "../earlypay/service";
 import { SCF } from "../scf/service";
+import { CROSS } from "../crossborder/rules";
 import { SLA_HOURS } from "../support/policy";
 import { POLICY, type Grade } from "../underwriting/policy";
 import { formatINR, rupeesToPaise, toDecimal } from "../../lib/money";
@@ -31,7 +32,7 @@ const def = (key: string, group: string, label: string, kind: Kind, min: Num, ma
   ({ key, group, label, help, kind, min, max, get: () => bag[prop], set: (v) => { bag[prop] = v; }, fallback: bag[prop] });
 
 const P = POLICY as unknown as Bag, O = OFFER as unknown as Bag, D = DISBURSE as unknown as Bag, C = COLLECTIONS as unknown as Bag, R = RULES as unknown as Bag;
-const F = FRAUD as unknown as Bag, M = ML as unknown as Bag, K = MARKET as unknown as Bag, E = DD as unknown as Bag, S = SCF as unknown as Bag;
+const F = FRAUD as unknown as Bag, M = ML as unknown as Bag, K = MARKET as unknown as Bag, E = DD as unknown as Bag, S = SCF as unknown as Bag, X = CROSS as unknown as Bag;
 const GRADES: Grade[] = ["A", "B", "C", "D", "E"];
 
 export const DEFS: Def[] = [
@@ -71,6 +72,11 @@ export const DEFS: Def[] = [
   def("scf.minDiscountBps", "Supplier finance", "Lowest yearly discount a programme can be priced at", "percent", 0, 6000, S, "minDiscountBps"),
   def("scf.maxDiscountBps", "Supplier finance", "Highest yearly discount a programme can be priced at", "percent", 0, 6000, S, "maxDiscountBps"),
   def("scf.maxAdvanceBps", "Supplier finance", "Largest share of an invoice a programme can advance", "percent", 0, 10000, S, "maxAdvanceBps"),
+
+  def("cross.fxBufferBps", "Cross-border", "Safety buffer below the market rate when locking an invoice", "percent", 0, 2000, X, "fxBufferBps"),
+  def("cross.settleSpreadBps", "Cross-border", "Bank spread when converting a buyer's payment", "percent", 0, 1000, X, "settleSpreadBps"),
+  def("cross.advanceCutBps", "Cross-border", "Advance reduction for export invoices", "percent", 0, 5000, X, "advanceCutBps", "Percentage points taken off the advance rate."),
+  def("cross.riskPremiumBps", "Cross-border", "Added to the yearly discount for export invoices", "percent", 0, 3000, X, "riskPremiumBps"),
 
   def("offer.validityHours", "Offers", "Offer stays open for (hours)", "hours", 1, 168, O, "validityHours"),
   def("offer.processingFeeBps", "Offers", "Processing fee (before GST)", "percent", 0, 1000, O, "processingFeeBps"),

@@ -46,6 +46,11 @@ export const APPS: AppDef[] = [
     nav: [{ href: "/buyer/programme", label: "Supplier finance", icon: "handshake", tour: "nav-programme" }],
   },
   {
+    id: "cross-border", name: "Export financing", icon: "globe", types: ["seller"],
+    blurb: "Finance export invoices raised on overseas buyers in USD, EUR, GBP, AED or SGD, with the exchange rate locked when you upload.",
+    nav: [{ href: "/seller/invoices/export", label: "Export invoices", icon: "globe", tour: "nav-export" }],
+  },
+  {
     id: "integrations", name: "ERP and accounting sync", icon: "plug", types: ["seller", "buyer"],
     blurb: "Connect your accounting system: API keys, CSV import, and webhooks that push status changes back to you.",
     nav: [{ href: "/settings/integrations", label: "Integrations", icon: "plug", tour: "nav-integrations" }],

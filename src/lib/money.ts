@@ -5,6 +5,12 @@ export function rupeesToPaise(s: string): bigint {
   return BigInt(m[1]) * 100n + BigInt((m[2] ?? "").padEnd(2, "0") || "0");
 }
 
+/** "USD 12,000.00" from minor units (cents). Display only: money maths stays in bigint. */
+export function formatMinor(minor: bigint, currency: string): string {
+  const n = Number(minor) / 100;
+  return `${currency} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function formatINR(paise: bigint): string {
   const neg = paise < 0n;
   const p = neg ? -paise : paise;
