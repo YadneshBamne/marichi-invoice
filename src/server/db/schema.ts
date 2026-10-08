@@ -1,7 +1,16 @@
 import { sql } from "drizzle-orm";
+import { customType } from "drizzle-orm/pg-core";
+import { decrypt, encrypt } from "../crypto";
 import {
   pgTable, pgEnum, uuid, text, timestamp, bigint, integer, boolean, jsonb, date, numeric, uniqueIndex, index,
 } from "drizzle-orm/pg-core";
+
+// Sensitive text stored encrypted (AES-256-GCM): code reads and writes plain values, the database only ever sees ciphertext.
+const encrypted = customType<{ data: string; driverData: string }>({
+  dataType: () => "text",
+  toDriver: (v) => encrypt(v),
+  fromDriver: (v) => decrypt(v),
+});
 
 // Money is ALWAYS integer paise (bigint). Never floats.
 const paise = (name: string) => bigint(name, { mode: "bigint" });
@@ -29,7 +38,7 @@ export const businesses = pgTable("businesses", {
   legalName: text("legal_name").notNull(),
   entityType: text("entity_type").notNull(),
   gstin: text("gstin").unique(),
-  pan: text("pan"), // encrypt at app layer before insert
+  pan: encrypted("pan"), // encrypted at rest
   cin: text("cin"),
   kybStatus: kycStatus("kyb_status").notNull().default("draft"),
   kybNote: text("kyb_note"),
@@ -120,7 +129,7 @@ export const twoFactor = pgTable("two_factor", {
 export const businessBankAccounts = pgTable("business_bank_accounts", {
   id: id(),
   businessId: uuid("business_id").notNull().references(() => businesses.id),
-  accountNumber: text("account_number").notNull(), // encrypt at app layer; mask in UI/logs
+  accountNumber: encrypted("account_number").notNull(), // encrypted at rest; mask in UI and logs
   ifsc: text("ifsc").notNull(),
   holderName: text("holder_name").notNull(),
   verified: boolean("verified").notNull().default(false),
