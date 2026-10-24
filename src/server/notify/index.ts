@@ -1,6 +1,6 @@
-import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { notificationPreferences, notifications, users } from "../db/schema";
+import { memberships, notificationPreferences, notifications, users } from "../db/schema";
 import { gateway, type Adapters, type Channel } from "../integrations/gateway";
 import { render, TEMPLATES } from "./templates";
 
@@ -10,7 +10,7 @@ type Recipient = { id: string; email: string; phone: string | null; phoneVerifie
 export const MAX_ATTEMPTS = 5;
 const BACKOFF_SECONDS = [60, 300, 1800, 7200]; // after attempt 1..4; the 5th failure is final
 const STUCK_AFTER_MS = 10 * 60_000; // a `sending` row older than this means the worker died mid-send
-const appUrl = () => (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
+export const appUrl = () => (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 /** Relative links in template data become absolute so they work in an email/SMS. */
 const absolutize = (data: Record<string, string>) =>
@@ -54,7 +54,12 @@ async function send(db: Database, gw: Adapters, to: Recipient[], template: strin
 
 /** Notify every user of a business. Never throws on delivery trouble: a flaky provider must not undo a state change. */
 export async function notifyBusiness(db: Database, businessId: string, template: string, data: Record<string, string>, gw: Adapters = gateway, now = new Date()) {
-  const us = await db.select({ id: users.id, email: users.email, phone: users.phone, phoneVerified: users.phoneVerified }).from(users).where(eq(users.businessId, businessId));
+  // Everyone who belongs to the company, including people whose active company is a different one right now.
+  const us = await db.select({ id: users.id, email: users.email, phone: users.phone, phoneVerified: users.phoneVerified }).from(users)
+    .where(or(
+      and(eq(users.businessId, businessId), isNull(users.suspendedAt)),
+      sql`${users.id} in (select ${memberships.userId} from ${memberships} where ${memberships.businessId} = ${businessId} and ${memberships.suspendedAt} is null)`,
+    ));
   return send(db, gw, us, template, data, now);
 }
 

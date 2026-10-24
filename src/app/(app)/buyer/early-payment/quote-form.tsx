@@ -4,8 +4,8 @@ import { quoteEarly } from "@/server/earlypay/quote";
 import { formatINR } from "@/lib/money";
 
 /** Live preview of an early-payment proposal. The maths is the same function the server uses to price it. */
-export function QuoteForm({ amount, days, minBps, maxBps, feeBps, action, invoiceId }: {
-  amount: string; days: number; minBps: number; maxBps: number; feeBps: number; action: (fd: FormData) => void | Promise<void>; invoiceId: string;
+export function QuoteForm({ amount, days, minBps, maxBps, feeBps, action, invoiceId, cta = "Send to supplier" }: {
+  cta?: string; amount: string; days: number; minBps: number; maxBps: number; feeBps: number; action: (fd: FormData) => void | Promise<void>; invoiceId: string;
 }) {
   const [pct, setPct] = useState(12);
   const [treasury, setTreasury] = useState(7);
@@ -30,7 +30,7 @@ export function QuoteForm({ amount, days, minBps, maxBps, feeBps, action, invoic
           <dt className="text-muted">Supplier&apos;s all-in cost</dt><dd className="text-right">{(q.sellerCostBps / 100).toFixed(2)}% a year</dd>
         </dl>
       ) : <p className="text-xs text-r-600">Enter a rate between {minBps / 100}% and {maxBps / 100}%.</p>}
-      <button className="btn btn-primary btn-sm w-full" disabled={!ok}>Send to supplier</button>
+      <button className="btn btn-primary btn-sm w-full" disabled={!ok}>{cta}</button>
     </form>
   );
 }

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice lifecycle: 14 steps by party</title>
+<meta name="description" content="Swim-lane workflow of the 14 invoice steps with country pack plug-in points and maker-checker approvals.">
+<script>(function(){var t=null;try{t=localStorage.getItem('marichi-diagram-theme')}catch(e){}
+if(t!=='light'&&t!=='dark'){t=null}
+if(t){document.documentElement.setAttribute('data-theme',t)}})();</script>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#14202b;--muted:#566474;--line:#8a97a5;--grid:#dde2e8;--stripe:#eef1f4;
+--seller:#2563eb;--buyer:#15803d;--financier:#7c3aed;--staff:#475569;--system:#0e7490;
+--cp:#d97706;--cp-ink:#3b2300;--appr:#14202b;--appr-ink:#fff;--bad:#c2282d;--trust:#0f766e;--shadow:0 1px 2px rgba(20,32,43,.08)}
+:root[data-theme=dark]{--bg:#0f151b;--panel:#18212a;--ink:#e8edf2;--muted:#9fadbb;--line:#6f7d8b;--grid:#2a3540;--stripe:#141c24;
+--seller:#6ea0ff;--buyer:#4ade80;--financier:#b69bff;--staff:#a9b6c4;--system:#4fd1e6;
+--cp:#f5a524;--cp-ink:#2a1900;--appr:#e8edf2;--appr-ink:#0f151b;--bad:#ff7b80;--trust:#2dd4bf;--shadow:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){--bg:#0f151b;--panel:#18212a;--ink:#e8edf2;--muted:#9fadbb;--line:#6f7d8b;--grid:#2a3540;--stripe:#141c24;
+--seller:#6ea0ff;--buyer:#4ade80;--financier:#b69bff;--staff:#a9b6c4;--system:#4fd1e6;
+--cp:#f5a524;--cp-ink:#2a1900;--appr:#e8edf2;--appr-ink:#0f151b;--bad:#ff7b80;--trust:#2dd4bf;--shadow:none}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1680px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:1.45rem;line-height:1.25;margin:0 0 4px}
+.sub{margin:0;color:var(--muted);max-width:80ch}
+button.theme{font:inherit;font-size:.85rem;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:36px}
+button.theme:focus-visible,a:focus-visible{outline:2px solid var(--system);outline-offset:2px}
+.board{background:var(--panel);border:1px solid var(--grid);border-radius:12px;box-shadow:var(--shadow);padding:8px}
+svg.d{display:block;width:100%;height:auto}
+svg.d text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--ink)}
+svg.d .m{fill:var(--muted)}
+svg.d a{cursor:pointer}
+svg.d a:hover .node,svg.d a:focus .node{stroke-width:3}
+.node{fill:color-mix(in srgb,var(--c) 13%,var(--panel));stroke:var(--c);stroke-width:1.6}
+.lane-seller{--c:var(--seller)}.lane-buyer{--c:var(--buyer)}.lane-financier{--c:var(--financier)}.lane-staff{--c:var(--staff)}.lane-system{--c:var(--system)}
+.cpd{fill:var(--cp);stroke:var(--panel);stroke-width:1.5}
+.cpt{fill:var(--cp-ink)!important;font-weight:700}
+.apc{fill:var(--appr);stroke:var(--panel);stroke-width:1.5}
+.apk{fill:none;stroke:var(--appr-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.edge{fill:none;stroke:var(--line);stroke-width:1.7}
+.edge.bad{stroke:var(--bad);stroke-dasharray:6 4}
+.edge.dot{stroke-dasharray:2 3}
+.ah{fill:var(--line)}.ah-bad{fill:var(--bad)}
+.badge{fill:var(--c)}
+.badge-t{fill:var(--panel)!important;font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin:12px 2px 0;color:var(--muted);font-size:.85rem;align-items:center}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend svg{flex:none}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:18px}
+.card{background:var(--panel);border:1px solid var(--grid);border-left:4px solid var(--c,var(--line));border-radius:10px;padding:10px 14px;box-shadow:var(--shadow);scroll-margin-top:12px}
+.card:target{outline:3px solid var(--cp);outline-offset:1px}
+.card h3{margin:0 0 4px;font-size:1rem;line-height:1.3}
+.card p{margin:2px 0;font-size:.9rem}
+.card .k{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+.tag{display:inline-block;font-size:.78rem;border-radius:999px;padding:1px 9px;margin:2px 4px 2px 0;border:1px solid var(--line);color:var(--ink)}
+.tag.cp{background:color-mix(in srgb,var(--cp) 22%,var(--panel));border-color:var(--cp)}
+.tag.ap{background:var(--appr);color:var(--appr-ink);border-color:var(--appr)}
+.tag.bad{border-color:var(--bad);color:var(--bad)}
+h2{font-size:1.05rem;margin:26px 0 0}
+.note{color:var(--muted);font-size:.85rem;margin:10px 2px 0;max-width:110ch}
+.hint{display:none;color:var(--muted);font-size:.8rem;margin:6px 2px 0}
+.board{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:899px){svg.d{min-width:var(--minw,1000px)}.hint{display:block}.cards{grid-template-columns:1fr}}
+@media print{button.theme{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div><h1>Invoice lifecycle: 14 steps by party</h1><p class="sub">From verifying the company to closing or writing off. Diamonds mark where a country pack plugs in; check circles mark steps that need an Approver.</p></div>
+<button class="theme" id="theme" type="button">Switch theme</button>
+</header>
+<section class="board" aria-label="Swim-lane diagram" tabindex="0"><svg class="d" style="--minw:1100px" viewBox="0 0 1584 596" role="img" aria-labelledby="t1 d1" xmlns="http://www.w3.org/2000/svg">
+<title id="t1">Invoice lifecycle swim-lane diagram</title>
+<desc id="d1">Fourteen steps from verifying the company to closing or writing off, placed in lanes for seller, buyer, financier, platform staff and system. A diamond marks a country pack plug-in point; a check circle marks a step needing an Approver.</desc>
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+<marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah-bad"/></marker>
+</defs>
+<g class="lane-seller"><rect x="0" y="64" width="1584" height="104" fill="var(--stripe)"/><rect x="0" y="64" width="6" height="104" fill="var(--c)"/><text x="18" y="120.0" font-size="13" font-weight="700" style="fill:var(--c)">Seller</text></g>
+<g class="lane-buyer"><rect x="0" y="168" width="1584" height="104" fill="var(--panel)"/><rect x="0" y="168" width="6" height="104" fill="var(--c)"/><text x="18" y="224.0" font-size="13" font-weight="700" style="fill:var(--c)">Buyer</text></g>
+<g class="lane-financier"><rect x="0" y="272" width="1584" height="104" fill="var(--stripe)"/><rect x="0" y="272" width="6" height="104" fill="var(--c)"/><text x="18" y="328.0" font-size="13" font-weight="700" style="fill:var(--c)">Financier</text></g>
+<g class="lane-staff"><rect x="0" y="376" width="1584" height="104" fill="var(--panel)"/><rect x="0" y="376" width="6" height="104" fill="var(--c)"/><text x="18" y="432.0" font-size="13" font-weight="700" style="fill:var(--c)">Platform / staff</text></g>
+<g class="lane-system"><rect x="0" y="480" width="1584" height="104" fill="var(--stripe)"/><rect x="0" y="480" width="6" height="104" fill="var(--c)"/><text x="18" y="536.0" font-size="13" font-weight="700" style="fill:var(--c)">System</text></g>
+<line x1="112" y1="56" x2="112" y2="584" stroke="var(--grid)"/>
+<text class="m" x="172.0" y="42" font-size="11" text-anchor="middle">step 1</text>
+<text class="m" x="276.0" y="42" font-size="11" text-anchor="middle">step 2</text>
+<text class="m" x="380.0" y="42" font-size="11" text-anchor="middle">step 3</text>
+<text class="m" x="484.0" y="42" font-size="11" text-anchor="middle">step 4</text>
+<text class="m" x="588.0" y="42" font-size="11" text-anchor="middle">step 5</text>
+<text class="m" x="692.0" y="42" font-size="11" text-anchor="middle">step 6</text>
+<text class="m" x="796.0" y="42" font-size="11" text-anchor="middle">step 7</text>
+<text class="m" x="900.0" y="42" font-size="11" text-anchor="middle">step 8</text>
+<text class="m" x="1004.0" y="42" font-size="11" text-anchor="middle">step 9</text>
+<text class="m" x="1108.0" y="42" font-size="11" text-anchor="middle">step 10</text>
+<text class="m" x="1212.0" y="42" font-size="11" text-anchor="middle">step 11</text>
+<text class="m" x="1316.0" y="42" font-size="11" text-anchor="middle">step 12</text>
+<text class="m" x="1420.0" y="42" font-size="11" text-anchor="middle">step 13</text>
+<text class="m" x="1524.0" y="42" font-size="11" text-anchor="middle">step 14</text>
+<path class="edge" d="M216.0 116.0H231.0" marker-end="url(#ah)"/>
+<path class="edge" d="M320.0 116.0H335.0" marker-end="url(#ah)"/>
+<path class="edge" d="M408.0 147.0V532.0H439.0" marker-end="url(#ah)"/>
+<path class="edge" d="M512.0 501.0V220.0H543.0" marker-end="url(#ah)"/>
+<path class="edge" d="M616.0 251.0V532.0H647.0" marker-end="url(#ah)"/>
+<path class="edge" d="M720.0 501.0V324.0H751.0" marker-end="url(#ah)"/>
+<path class="edge" d="M824.0 293.0V116.0H855.0" marker-end="url(#ah)"/>
+<path class="edge" d="M928.0 147.0V532.0H959.0" marker-end="url(#ah)"/>
+<path class="edge" d="M1032.0 501.0V324.0H1063.0" marker-end="url(#ah)"/>
+<path class="edge" d="M1136.0 293.0V220.0H1167.0" marker-end="url(#ah)"/>
+<path class="edge" d="M1240.0 251.0V532.0H1271.0" marker-end="url(#ah)"/>
+<path class="edge" d="M1360.0 532.0H1375.0" marker-end="url(#ah)"/>
+<path class="edge bad" d="M1464.0 428.0H1479.0" marker-end="url(#ahb)"/>
+<path class="edge bad" d="M1256.0 220.0H1375.0" marker-end="url(#ahb)"/>
+<text x="1316.0" y="212.0" font-size="11" text-anchor="middle" style="fill:var(--bad)">late or disputed</text>
+<a href="#step-1" aria-label="Step 1: Verify the company"><g class="lane-seller"><title>Step 1: Verify the company. Who: Seller (+ staff).</title><rect class="node" x="128.0" y="85.0" width="88" height="62" rx="8"/><text x="172.0" y="113.0" font-size="11.5" text-anchor="middle">Verify the</text><text x="172.0" y="127.0" font-size="11.5" text-anchor="middle">company</text><circle class="badge" cx="130.0" cy="87.0" r="10"/><text class="badge-t" x="130.0" y="91.0" font-size="11" text-anchor="middle">1</text><g><path class="cpd" d="M214.0 78.0L223.0 87.0L214.0 96.0L205.0 87.0z"/><text class="cpt" x="214.0" y="90.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<g class="lane-staff"><title>Also involved in step 1: staff</title><rect x="132.0" y="418.0" width="54" height="20" rx="10" fill="var(--panel)" stroke="var(--c)" stroke-dasharray="3 3"/><text x="159.0" y="432.0" font-size="10" text-anchor="middle">staff</text></g>
+<path class="edge dot" style="stroke-width:1.2" d="M152.0 147.0V418.0"/>
+<a href="#step-2" aria-label="Step 2: Add the buyer"><g class="lane-seller"><title>Step 2: Add the buyer. Who: Seller.</title><rect class="node" x="232.0" y="85.0" width="88" height="62" rx="8"/><text x="276.0" y="120.0" font-size="11.5" text-anchor="middle">Add the buyer</text><circle class="badge" cx="234.0" cy="87.0" r="10"/><text class="badge-t" x="234.0" y="91.0" font-size="11" text-anchor="middle">2</text><g><path class="cpd" d="M318.0 78.0L327.0 87.0L318.0 96.0L309.0 87.0z"/><text class="cpt" x="318.0" y="90.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<g class="lane-buyer"><title>Also involved in step 2: buyer</title><rect x="236.0" y="210.0" width="54" height="20" rx="10" fill="var(--panel)" stroke="var(--c)" stroke-dasharray="3 3"/><text x="263.0" y="224.0" font-size="10" text-anchor="middle">buyer</text></g>
+<path class="edge dot" style="stroke-width:1.2" d="M256.0 147.0V210.0"/>
+<a href="#step-3" aria-label="Step 3: Upload the invoice"><g class="lane-seller"><title>Step 3: Upload the invoice. Who: Seller or ERP.</title><rect class="node" x="336.0" y="85.0" width="88" height="62" rx="8"/><text x="380.0" y="113.0" font-size="11.5" text-anchor="middle">Upload the</text><text x="380.0" y="127.0" font-size="11.5" text-anchor="middle">invoice</text><circle class="badge" cx="338.0" cy="87.0" r="10"/><text class="badge-t" x="338.0" y="91.0" font-size="11" text-anchor="middle">3</text><g><path class="cpd" d="M422.0 78.0L431.0 87.0L422.0 96.0L413.0 87.0z"/><text class="cpt" x="422.0" y="90.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<a href="#step-4" aria-label="Step 4: Fraud and eligibility checks"><g class="lane-system"><title>Step 4: Fraud and eligibility checks. Who: System.</title><rect class="node" x="440.0" y="501.0" width="88" height="62" rx="8"/><text x="484.0" y="522.0" font-size="11.5" text-anchor="middle">Fraud and</text><text x="484.0" y="536.0" font-size="11.5" text-anchor="middle">eligibility</text><text x="484.0" y="550.0" font-size="11.5" text-anchor="middle">checks</text><circle class="badge" cx="442.0" cy="503.0" r="10"/><text class="badge-t" x="442.0" y="507.0" font-size="11" text-anchor="middle">4</text></g></a>
+<a href="#step-5" aria-label="Step 5: Buyer acceptance"><g class="lane-buyer"><title>Step 5: Buyer acceptance. Who: Buyer.</title><rect class="node" x="544.0" y="189.0" width="88" height="62" rx="8"/><text x="588.0" y="217.0" font-size="11.5" text-anchor="middle">Buyer</text><text x="588.0" y="231.0" font-size="11.5" text-anchor="middle">acceptance</text><circle class="badge" cx="546.0" cy="191.0" r="10"/><text class="badge-t" x="546.0" y="195.0" font-size="11" text-anchor="middle">5</text><g><path class="cpd" d="M630.0 182.0L639.0 191.0L630.0 200.0L621.0 191.0z"/><text class="cpt" x="630.0" y="194.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<a href="#step-6" aria-label="Step 6: Underwriting"><g class="lane-system"><title>Step 6: Underwriting. Who: System + analysts.</title><rect class="node" x="648.0" y="501.0" width="88" height="62" rx="8"/><text x="692.0" y="536.0" font-size="11.5" text-anchor="middle">Underwriting</text><circle class="badge" cx="650.0" cy="503.0" r="10"/><text class="badge-t" x="650.0" y="507.0" font-size="11" text-anchor="middle">6</text><g><path class="cpd" d="M734.0 494.0L743.0 503.0L734.0 512.0L725.0 503.0z"/><text class="cpt" x="734.0" y="506.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<g class="lane-staff"><title>Also involved in step 6: analysts</title><rect x="652.0" y="418.0" width="54" height="20" rx="10" fill="var(--panel)" stroke="var(--c)" stroke-dasharray="3 3"/><text x="679.0" y="432.0" font-size="10" text-anchor="middle">analysts</text></g>
+<path class="edge dot" style="stroke-width:1.2" d="M672.0 501.0V438.0"/>
+<a href="#step-7" aria-label="Step 7: Offers and bids"><g class="lane-financier"><title>Step 7: Offers and bids. Who: System, financiers, seller.</title><rect class="node" x="752.0" y="293.0" width="88" height="62" rx="8"/><text x="796.0" y="321.0" font-size="11.5" text-anchor="middle">Offers and</text><text x="796.0" y="335.0" font-size="11.5" text-anchor="middle">bids</text><circle class="badge" cx="754.0" cy="295.0" r="10"/><text class="badge-t" x="754.0" y="299.0" font-size="11" text-anchor="middle">7</text><g><path class="cpd" d="M838.0 286.0L847.0 295.0L838.0 304.0L829.0 295.0z"/><text class="cpt" x="838.0" y="298.5" text-anchor="middle" font-size="10">C</text></g><g><circle class="apc" cx="838.0" cy="353.0" r="9"/><path class="apk" d="M834.0 353.0L837.0 356.2L842.2 349.6"/></g></g></a>
+<g class="lane-system"><title>Also involved in step 7: system</title><rect x="756.0" y="522.0" width="54" height="20" rx="10" fill="var(--panel)" stroke="var(--c)" stroke-dasharray="3 3"/><text x="783.0" y="536.0" font-size="10" text-anchor="middle">system</text></g>
+<path class="edge dot" style="stroke-width:1.2" d="M776.0 355.0V522.0"/>
+<g class="lane-seller"><title>Also involved in step 7: seller</title><rect x="756.0" y="106.0" width="54" height="20" rx="10" fill="var(--panel)" stroke="var(--c)" stroke-dasharray="3 3"/><text x="783.0" y="120.0" font-size="10" text-anchor="middle">seller</text></g>
+<path class="edge dot" style="stroke-width:1.2" d="M776.0 293.0V126.0"/>
+<a href="#step-8" aria-label="Step 8: Sign"><g class="lane-seller"><title>Step 8: Sign. Who: Seller Approver.</title><rect class="node" x="856.0" y="85.0" width="88" height="62" rx="8"/><text x="900.0" y="120.0" font-size="11.5" text-anchor="middle">Sign</text><circle class="badge" cx="858.0" cy="87.0" r="10"/><text class="badge-t" x="858.0" y="91.0" font-size="11" text-anchor="middle">8</text><g><path class="cpd" d="M942.0 78.0L951.0 87.0L942.0 96.0L933.0 87.0z"/><text class="cpt" x="942.0" y="90.5" text-anchor="middle" font-size="10">C</text></g><g><circle class="apc" cx="942.0" cy="145.0" r="9"/><path class="apk" d="M938.0 145.0L941.0 148.2L946.2 141.6"/></g></g></a>
+<g class="lane-buyer"><title>Also involved in step 8: buyer</title><rect x="860.0" y="210.0" width="54" height="20" rx="10" fill="var(--panel)" stroke="var(--c)" stroke-dasharray="3 3"/><text x="887.0" y="224.0" font-size="10" text-anchor="middle">buyer</text></g>
+<path class="edge dot" style="stroke-width:1.2" d="M880.0 147.0V210.0"/>
+<a href="#step-9" aria-label="Step 9: Register the assignment"><g class="lane-system"><title>Step 9: Register the assignment. Who: System.</title><rect class="node" x="960.0" y="501.0" width="88" height="62" rx="8"/><text x="1004.0" y="529.0" font-size="11.5" text-anchor="middle">Register the</text><text x="1004.0" y="543.0" font-size="11.5" text-anchor="middle">assignment</text><circle class="badge" cx="962.0" cy="503.0" r="10"/><text class="badge-t" x="962.0" y="507.0" font-size="11" text-anchor="middle">9</text><g><path class="cpd" d="M1046.0 494.0L1055.0 503.0L1046.0 512.0L1037.0 503.0z"/><text class="cpt" x="1046.0" y="506.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<a href="#step-10" aria-label="Step 10: Fund and pay out"><g class="lane-financier"><title>Step 10: Fund and pay out. Who: Financier, platform.</title><rect class="node" x="1064.0" y="293.0" width="88" height="62" rx="8"/><text x="1108.0" y="321.0" font-size="11.5" text-anchor="middle">Fund and pay</text><text x="1108.0" y="335.0" font-size="11.5" text-anchor="middle">out</text><circle class="badge" cx="1066.0" cy="295.0" r="10"/><text class="badge-t" x="1066.0" y="299.0" font-size="11" text-anchor="middle">10</text><g><path class="cpd" d="M1150.0 286.0L1159.0 295.0L1150.0 304.0L1141.0 295.0z"/><text class="cpt" x="1150.0" y="298.5" text-anchor="middle" font-size="10">C</text></g><g><circle class="apc" cx="1150.0" cy="353.0" r="9"/><path class="apk" d="M1146.0 353.0L1149.0 356.2L1154.2 349.6"/></g></g></a>
+<g class="lane-staff"><title>Also involved in step 10: platform</title><rect x="1068.0" y="418.0" width="54" height="20" rx="10" fill="var(--panel)" stroke="var(--c)" stroke-dasharray="3 3"/><text x="1095.0" y="432.0" font-size="10" text-anchor="middle">platform</text></g>
+<path class="edge dot" style="stroke-width:1.2" d="M1088.0 355.0V418.0"/>
+<a href="#step-11" aria-label="Step 11: Maturity: buyer pays"><g class="lane-buyer"><title>Step 11: Maturity: buyer pays. Who: Buyer.</title><rect class="node" x="1168.0" y="189.0" width="88" height="62" rx="8"/><text x="1212.0" y="217.0" font-size="11.5" text-anchor="middle">Maturity:</text><text x="1212.0" y="231.0" font-size="11.5" text-anchor="middle">buyer pays</text><circle class="badge" cx="1170.0" cy="191.0" r="10"/><text class="badge-t" x="1170.0" y="195.0" font-size="11" text-anchor="middle">11</text><g><path class="cpd" d="M1254.0 182.0L1263.0 191.0L1254.0 200.0L1245.0 191.0z"/><text class="cpt" x="1254.0" y="194.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<a href="#step-12" aria-label="Step 12: Settle"><g class="lane-system"><title>Step 12: Settle. Who: System.</title><rect class="node" x="1272.0" y="501.0" width="88" height="62" rx="8"/><text x="1316.0" y="536.0" font-size="11.5" text-anchor="middle">Settle</text><circle class="badge" cx="1274.0" cy="503.0" r="10"/><text class="badge-t" x="1274.0" y="507.0" font-size="11" text-anchor="middle">12</text><g><path class="cpd" d="M1358.0 494.0L1367.0 503.0L1358.0 512.0L1349.0 503.0z"/><text class="cpt" x="1358.0" y="506.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<a href="#step-13" aria-label="Step 13: Late or disputed"><g><title>Step 13: Late or disputed (all parties)</title><rect x="1376.0" y="70" width="88" height="508" rx="8" fill="color-mix(in srgb,var(--bad) 8%,var(--panel))" stroke="var(--bad)" stroke-width="1.6" stroke-dasharray="6 4"/><text x="1420.0" y="110" font-size="11.5" text-anchor="middle">Late or</text><text x="1420.0" y="124" font-size="11.5" text-anchor="middle">disputed</text><text class="m" x="1420.0" y="144" font-size="11" text-anchor="middle">all parties</text><circle cx="1378.0" cy="72" r="10" fill="var(--bad)"/><text class="badge-t" x="1378.0" y="76" font-size="11" text-anchor="middle">13</text><g><path class="cpd" d="M1462.0 63L1471.0 72L1462.0 81L1453.0 72z"/><text class="cpt" x="1462.0" y="75.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+<a href="#step-14" aria-label="Step 14: Close or write off"><g class="lane-staff"><title>Step 14: Close or write off. Who: Staff.</title><rect class="node" x="1480.0" y="397.0" width="88" height="62" rx="8"/><text x="1524.0" y="425.0" font-size="11.5" text-anchor="middle">Close or</text><text x="1524.0" y="439.0" font-size="11.5" text-anchor="middle">write off</text><circle class="badge" cx="1482.0" cy="399.0" r="10"/><text class="badge-t" x="1482.0" y="403.0" font-size="11" text-anchor="middle">14</text><g><path class="cpd" d="M1566.0 390.0L1575.0 399.0L1566.0 408.0L1557.0 399.0z"/><text class="cpt" x="1566.0" y="402.5" text-anchor="middle" font-size="10">C</text></g></g></a>
+</svg></section>
+<p class="hint">Swipe sideways inside the diagram to see all 14 steps.</p>
+<div class="legend" aria-label="Legend">
+<span><svg width="20" height="20" viewBox="-10 -10 20 20" aria-hidden="true"><g><path class="cpd" d="M0 -9L9 0L0 9L-9 0z"/><text class="cpt" x="0" y="3.5" text-anchor="middle" font-size="10">C</text></g></svg> Country pack plugs in here</span>
+<span><svg width="20" height="20" viewBox="-10 -10 20 20" aria-hidden="true"><g><circle class="apc" cx="0" cy="0" r="9"/><path class="apk" d="M-4 0L-1 3.2L4.2 -3.4"/></g></svg> Approver needed (maker-checker)</span>
+<span><svg width="54" height="20" viewBox="0 0 54 20" aria-hidden="true"><rect x="1" y="3" width="52" height="14" rx="7" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/></svg> Also involved in this step</span>
+<span><svg width="30" height="10" viewBox="0 0 30 10" aria-hidden="true"><path class="edge bad" d="M0 5H28"/></svg> Late, disputed or loss path</span>
+</div>
+<p class="note">Reading the diagram: each column is one step, in order. Solid arrows are the main path. Step 11 branches to step 13 when the buyer pays late or disputes. Dashed pills show other parties involved in a step, for example staff review at steps 1 and 6 and platform approval of large payouts at step 10. Select a step to jump to its detail card. On a phone, swipe sideways inside the diagram, or read the step cards below.</p>
+<p class="note"><strong>Standard timings published and tracked:</strong> buyer acknowledgement within 48 hours (reminders at 24h and 48h, human escalation at 72h); decision within 4 hours of acceptance for auto-approved cases; payout T+1; collections reminders from 3 days before due.</p>
+<h2>Step reference</h2>
+<div class="cards"><article class="card lane-seller" id="step-1"><h3>1. Verify the company</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> Seller (+ staff)</p><p><span class="k">What happens</span> Entity data, directors and beneficial owners each verify themselves, bank account is checked.</p><p><span class="k">Country pack plugs in</span> ID types, company registry, beneficial-ownership threshold, bank check method</p></article><article class="card lane-seller" id="step-2"><h3>2. Add the buyer</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> Seller</p><p><span class="k">What happens</span> Seller names the buyer; the buyer receives an invitation link.</p><p><span class="k">Country pack plugs in</span> Buyer identifiers: GSTIN, TPIN, KRA PIN, TIN, VAT number</p></article><article class="card lane-seller" id="step-3"><h3>3. Upload the invoice</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> Seller or ERP</p><p><span class="k">What happens</span> Read from PDF or synced; fields checked.</p><p><span class="k">Country pack plugs in</span> Tax e-invoice check: IRN, Smart Invoice, eTIMS, MBS, E-VAT, EFD</p></article><article class="card lane-system" id="step-4"><h3>4. Fraud and eligibility checks</h3><span class="tag">No country pack hook</span><p><span class="k">Who</span> System</p><p><span class="k">What happens</span> Duplicate detection, age, ticket size, disputes, fraud signals.</p><p><span class="k">Rules</span> From Policy</p></article><article class="card lane-buyer" id="step-5"><h3>5. Buyer acceptance</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> Buyer</p><p><span class="k">What happens</span> One click from the emailed link after one-time verification: accept, dispute or ask. Optional deemed-acceptance is off by default.</p><p><span class="k">Country pack plugs in</span> Acceptance wording, language, statutory clocks</p></article><article class="card lane-system" id="step-6"><h3>6. Underwriting</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> System + analysts</p><p><span class="k">What happens</span> Buyer risk first, then seller and invoice; grade A to E; manual review for exceptions.</p><p><span class="k">Country pack plugs in</span> Credit bureaus, alternative data</p></article><article class="card lane-financier" id="step-7"><h3>7. Offers and bids</h3><span class="tag cp">Country pack</span><span class="tag ap">Approver</span><p><span class="k">Who</span> System, financiers, seller</p><p><span class="k">What happens</span> Platform or partner offer plus competing financier bids, shown as net cash today and discount, with a standard disclosure sheet.</p><p><span class="k">Country pack plugs in</span> Disclosure format, rate caps if any</p><p><span class="k">Approver</span> Accepting an offer or bid binds the company: any Maker prepares, an Approver (not the same person) commits. A financier bid is also Maker then Approver, inside its mandate and limits.</p></article><article class="card lane-seller" id="step-8"><h3>8. Sign</h3><span class="tag cp">Country pack</span><span class="tag ap">Approver</span><p><span class="k">Who</span> Seller Approver</p><p><span class="k">What happens</span> Seller signs the invoice schedule electronically; buyer receives and acknowledges the notice of assignment.</p><p><span class="k">Country pack plugs in</span> E-signature level, stamping, notice law</p><p><span class="k">Approver</span> Signing an agreement needs an Approver with signing authority, named at onboarding.</p></article><article class="card lane-system" id="step-9"><h3>9. Register the assignment</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> System</p><p><span class="k">What happens</span> Registry filing where the country requires or rewards it.</p><p><span class="k">Country pack plugs in</span> CERSAI, PACRA collateral registry, NCR, BRS, BoG registry</p></article><article class="card lane-financier" id="step-10"><h3>10. Fund and pay out</h3><span class="tag cp">Country pack</span><span class="tag ap">Approver</span><p><span class="k">Who</span> Financier, platform</p><p><span class="k">What happens</span> Funds move from the financier&#x27;s account to the seller&#x27;s verified account.</p><p><span class="k">Country pack plugs in</span> Rail, cut-offs, currency</p><p><span class="k">Approver</span> Large payouts on the platform side need a different ops or admin person to approve, above a threshold set in Policy.</p></article><article class="card lane-buyer" id="step-11"><h3>11. Maturity: buyer pays</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> Buyer</p><p><span class="k">What happens</span> Pays the invoice into the collection account named in the notice; auto-debit where available.</p><p><span class="k">Country pack plugs in</span> Direct-debit scheme, mobile money</p></article><article class="card lane-system" id="step-12"><h3>12. Settle</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> System</p><p><span class="k">What happens</span> Payment applied to principal, discount, penal charges; financier repaid; surplus to seller.</p><p><span class="k">Country pack plugs in</span> Withholding tax, VAT on fees</p></article><article class="card lane-staff" id="step-13"><h3>13. Late or disputed</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> All</p><p><span class="k">What happens</span> Reminders; grace period; recourse notice; dispute pauses collections; credit notes handled.</p><p><span class="k">Country pack plugs in</span> Disputes law, interest caps</p></article><article class="card lane-staff" id="step-14"><h3>14. Close or write off</h3><span class="tag cp">Country pack</span><p><span class="k">Who</span> Staff</p><p><span class="k">What happens</span> Loss follows the agreed recourse and sharing rules.</p><p><span class="k">Country pack plugs in</span> Insolvency, collections conduct rules</p></article></div>
+<p class="note">Source: Marichi Labs platform guide, Section 4 (the invoice, end to end) and Section 3.3 (maker-checker). Country packs are the per-country modules in Section 8; this diagram shows only where they plug in. Not legal advice.</p>
+</div>
+<script>(function(){var b=document.getElementById('theme');if(!b)return;
+function cur(){var t=document.documentElement.getAttribute('data-theme');if(t)return t;return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
+function label(){b.textContent=cur()==='dark'?'Switch to light theme':'Switch to dark theme'}
+label();
+b.addEventListener('click',function(){var n=cur()==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);try{localStorage.setItem('marichi-diagram-theme',n)}catch(e){}label()});})();</script>
+</body>
+</html>

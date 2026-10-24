@@ -18,7 +18,8 @@ const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
 export const role = pgEnum("role", ["seller", "buyer", "financier", "admin", "ops", "compliance"]);
-export const orgRole = pgEnum("org_role", ["owner", "manager", "member"]); // a person's level inside their company
+// A person's level inside a company. Stored as text (not a database enum) so roles can change without enum surgery.
+export type OrgRole = "owner" | "admin" | "approver" | "maker" | "viewer";
 export const kycStatus = pgEnum("kyc_status", [
   "draft", "submitted", "under_review", "info_requested", "approved", "rejected", "rekyc_due",
 ]);
@@ -52,6 +53,8 @@ export const businesses = pgTable("businesses", {
   phone: text("phone"),
   city: text("city"),
   industry: text("industry"),
+  kind: text("kind"), // seller | buyer | financier: what kind of company this is (set at signup)
+  dualControl: boolean("dual_control").notNull().default(false), // every commitment of company money needs a second approver
   country: text("country"), // ISO-3166 alpha-2; null means India
   taxId: text("tax_id"), // an overseas company's tax or registration number (no GSTIN)
   createdAt: createdAt(),
@@ -107,7 +110,7 @@ export const users = pgTable("users", {
   businessId: uuid("business_id").references(() => businesses.id),
   kycStatus: kycStatus("kyc_status").notNull().default("draft"),
   tourSeenAt: timestamp("tour_seen_at", { withTimezone: true }), // null = show the guided product tour on next visit
-  orgRole: orgRole("org_role"), // owner | manager | member inside the company; null for platform staff
+  orgRole: text("org_role").$type<OrgRole>(), // role in the ACTIVE company (mirrors memberships); null for platform staff
   mustChangePassword: boolean("must_change_password").notNull().default(false), // set when the owner issued the password
   suspendedAt: timestamp("suspended_at", { withTimezone: true }), // set = cannot sign in or use any page
   invitedBy: uuid("invited_by"), // the owner who created this account
@@ -410,6 +413,61 @@ export const reportRuns = pgTable("report_runs", {
   content: text("content").notNull(), // the CSV
   createdAt: createdAt(),
 }, (t) => [index("rr_user").on(t.userId, t.createdAt)]);
+
+// People and companies are many to many: one login can belong to several companies, with a role in each.
+// `users.businessId` / `users.orgRole` hold the ACTIVE company (the switcher rewrites them from here).
+export const memberships = pgTable("memberships", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  orgRole: text("org_role").$type<OrgRole>().notNull(),
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  invitedBy: uuid("invited_by"),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("mem_user_biz").on(t.userId, t.businessId), index("mem_biz").on(t.businessId)]);
+
+// Joining a company is by emailed link, never by a password someone else typed. Only the hash of the token is stored.
+export const invitations = pgTable("invitations", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  email: text("email").notNull(),
+  orgRole: text("org_role").$type<OrgRole>().notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  status: text("status").notNull().default("pending"), // pending | accepted | cancelled
+  invitedBy: uuid("invited_by").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  acceptedBy: uuid("accepted_by"),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("inv_pending").on(t.businessId, t.email).where(sql`status = 'pending'`)]);
+
+// A commitment of company money prepared by one person and decided by another (maker-checker).
+export const pendingActions = pgTable("pending_actions", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  kind: text("kind").notNull(), // offer.accept | offer.accept_many | bid.accept | bid.place | earlypay.propose
+  payload: jsonb("payload").notNull(),
+  summary: text("summary").notNull(), // what the approver is being asked to approve, in plain words
+  amount: paise("amount").notNull().default(sql`0`),
+  requestedBy: uuid("requested_by").notNull(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected | cancelled | expired | failed
+  decidedBy: uuid("decided_by"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  note: text("note"), // approver's reason, or why execution failed
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("pa_biz").on(t.businessId, t.status)]);
+
+// The owner offers the company to an existing admin or approver; it moves only when they accept.
+export const ownershipTransfers = pgTable("ownership_transfers", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  fromUserId: uuid("from_user_id").notNull(),
+  toUserId: uuid("to_user_id").notNull(),
+  status: text("status").notNull().default("pending"), // pending | accepted | cancelled
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("own_pending").on(t.businessId).where(sql`status = 'pending'`)]);
 
 // master (one per seller) + invoice_schedule (per offer) are e-signed by the seller;
 // assignment_notice (per offer) is sent to the buyer. Disbursement needs all three (Module 8 gate).

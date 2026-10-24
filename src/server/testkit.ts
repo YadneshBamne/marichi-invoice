@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { businesses, invoices, users } from "./db/schema";
+import { businesses, invoices, memberships, users } from "./db/schema";
 import { submitKyb, submitLightKyb } from "./kyb/service";
 import { linkBuyer } from "./relationships/service";
 import { createInvoice } from "./invoices/service";
@@ -32,6 +32,9 @@ export async function world() {
     { name: "Seller", email: "s@seller.com", role: "seller", businessId: sellerId },
     { name: "AP", email: "ap@big.com", role: "buyer", businessId: buyerId },
   ]).returning();
+  await db.insert(memberships).values([{ userId: su.id, businessId: sellerId, orgRole: "owner" }, { userId: bu.id, businessId: buyerId, orgRole: "owner" }]);
+  await db.update(businesses).set({ kind: "seller" }).where(eq(businesses.id, sellerId));
+  await db.update(businesses).set({ kind: "buyer" }).where(eq(businesses.id, buyerId));
   const sellerActor = { id: su.id, email: su.email, role: "seller", businessId: sellerId };
   let n = 0;
   /** Invoice -> eligible -> underwritten -> offered. Returns the open offer and its invoice. */
@@ -69,6 +72,8 @@ export async function world() {
   const financier = async (name = "Capital One", fund = 0n) => {
     const [b] = await db.insert(businesses).values({ legalName: name, entityType: "nbfc", kybStatus: "approved" }).returning();
     const [u] = await db.insert(users).values({ name, email: `${b.id}@fin.com`, role: "financier", businessId: b.id }).returning();
+    await db.insert(memberships).values({ userId: u.id, businessId: b.id, orgRole: "owner" });
+    await db.update(businesses).set({ kind: "financier" }).where(eq(businesses.id, b.id));
     if (fund > 0n) await recordFunding(db, { financierId: b.id, amount: fund, ref: `seed-${b.id}`, staffId: "00000000-0000-0000-0000-0000000000a1", staffRole: "ops" });
     return { id: b.id, actor: { id: u.id, role: "financier", businessId: b.id } };
   };

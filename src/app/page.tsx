@@ -4,7 +4,7 @@ import { PublicFooter, PublicHeader } from "@/components/ui/public";
 import { ROADMAP } from "@/lib/roadmap";
 
 const STEPS = [
-  { icon: "layers", t: "Set up your workspace", d: "Choose the apps your company needs, add your logo, and create logins for your managers and team." },
+  { icon: "layers", t: "Set up your workspace", d: "Choose the apps your company needs, add your logo, and invite your team by email." },
   { icon: "building", t: "Verify your business", d: "A one-time KYB check with PAN, GSTIN, directors and your settlement bank account." },
   { icon: "users", t: "Link your buyers", d: "Invite the companies that owe you money. They verify once and confirm your invoices." },
   { icon: "upload", t: "Upload an invoice", d: "Duplicates and invalid e-invoice numbers are caught immediately. The buyer is asked to confirm." },

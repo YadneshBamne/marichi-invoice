@@ -44,13 +44,15 @@ export function navFor(role: string, o: NavOpts = {}): Section[] {
   if (role === "ops" || role === "compliance") return [...STAFF, { label: "Account", items: [SETTINGS] }];
 
   const on = new Set(o.apps ?? APPS.filter((a) => a.core || a.default).map((a) => a.id)); // default view = core + default apps
-  const owner = (o.orgRole ?? "owner") === "owner";
+  const owner = ["owner", "admin"].includes(o.orgRole ?? "owner"); // the people who run the team and the apps
   const workspace: Item[] = [{ href: "/dashboard", label: "Dashboard", icon: "home", tour: "nav-dashboard" }];
   const account: Item[] = [];
   for (const a of APPS) {
     if (!on.has(a.id) || !a.types.includes(role as never)) continue;
     for (const n of a.nav ?? []) (a.id === "support" ? account : workspace).push(n);
   }
+  // Requests that need a second person. Makers send them, approvers decide them; admins and viewers have nothing to do here.
+  if (!["admin", "viewer"].includes(o.orgRole ?? "owner")) workspace.push({ href: "/approvals", label: "Approvals", icon: "check" });
   if (owner) account.push({ href: "/apps", label: "Apps", icon: "layers", tour: "nav-apps" }, { href: "/settings/team", label: "Team", icon: "users", tour: "nav-team" });
   account.push(SETTINGS);
 
@@ -77,5 +79,5 @@ export const CRUMBS: Record<string, string> = {
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
   system: "System health", policy: "Policy", models: "Model monitor", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
-  apps: "Apps", team: "Team", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
+  apps: "Apps", team: "Team", approvals: "Approvals", invite: "Invitation", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
 };

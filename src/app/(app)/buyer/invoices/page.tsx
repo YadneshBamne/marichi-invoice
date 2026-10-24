@@ -91,7 +91,7 @@ export default async function BuyerInvoices() {
                 <ReviewCard key={i.id} title={`${seller}  ${i.invoiceNumber}`}
                   meta={<><span>Dated {i.invoiceDate}</span><span>due {i.dueDate}</span>{i.poReference && <span>PO {i.poReference}</span>}</>}
                   aside={<p className="text-lg font-semibold">{formatINR(i.amount)}</p>}
-                  actions={!lead ? <p className="text-xs text-s-600">Your role can view this but not confirm. Ask a manager or the owner.</p> : (
+                  actions={!lead ? <p className="text-xs text-s-600">Only an approver or the owner can confirm an invoice. Ask one of them.</p> : (
                     <form action={respond} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="invoiceId" value={i.id} />
                       <input name="note" placeholder="Note (required to dispute or ask)" className="field-inline min-w-48 flex-1 !py-1.5 text-sm" />

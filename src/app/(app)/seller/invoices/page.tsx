@@ -4,11 +4,12 @@ import { after } from "next/server";
 import { desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
-import { businesses, buyerSellerRelationships, financingOffers, invoices, underwritingDecisions } from "@/server/db/schema";
+import { bids, businesses, buyerSellerRelationships, financingOffers, invoices, underwritingDecisions } from "@/server/db/schema";
 import { acceptOffer, acceptOffers, expireOffers, generateOffer, rejectOffer, repriceOffer } from "@/server/offers/service";
 import { describeOffer } from "@/server/offers/pricing";
 import { acceptBid, bidsFor } from "@/server/marketplace/service";
 import { listEarlyPayments, respondEarlyPayment } from "@/server/earlypay/service";
+import { submit } from "@/server/approvals/service";
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { createInvoice } from "@/server/invoices/service";
@@ -66,24 +67,35 @@ async function upload(fd: FormData) {
   });
 }
 
+const actorOf = (u: { id: string; role: string; orgRole: string; businessId: string | null }) => ({ id: u.id, role: u.role, orgRole: u.orgRole, businessId: u.businessId });
+const QUEUED = "Sent for approval. An approver in your company will see it under Approvals, and you will be told when it is decided.";
+
 const OfferForm = z.object({ offerId: z.uuid(), action: z.enum(["accept", "reject"]) });
 async function answerOffer(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
   await attempt(async () => {
-    assertCan(u, "offer.answer");
+    assertCan(u, "offer.prepare");
     const f = OfferForm.parse(Object.fromEntries(fd));
-    await (f.action === "accept" ? acceptOffer : rejectOffer)(db, f.offerId, { id: u.id, role: u.role, businessId: u.businessId });
-    return f.action === "accept" ? "Offer accepted. Sign the agreement to receive the funds." : "Offer declined.";
+    if (f.action === "reject") { await rejectOffer(db, f.offerId, { id: u.id, role: u.role, businessId: u.businessId }); return "Offer declined."; }
+    const [o] = await db.select({ o: financingOffers, no: invoices.invoiceNumber }).from(financingOffers).innerJoin(invoices, eq(invoices.id, financingOffers.invoiceId)).where(eq(financingOffers.id, f.offerId));
+    if (!o) throw new Error("offer not found");
+    const r = await submit(db, actorOf(u), "offer.accept", { offerId: f.offerId }, { summary: `Accept the offer on invoice ${o.no}: ${formatINR(describeOffer(o.o).netDisbursal)} paid to you`, amount: o.o.advanceAmount });
+    return r.status === "queued" ? QUEUED : "Offer accepted. Sign the agreement to receive the funds.";
   });
 }
 async function acceptAll(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
   await attempt(async () => {
-    assertCan(u, "offer.answer");
+    assertCan(u, "offer.prepare");
     const ids = z.array(z.uuid()).min(1).parse(fd.getAll("offerId"));
-    const r = await acceptOffers(db, ids, { id: u.id, role: u.role, businessId: u.businessId });
+    const offers = await db.select().from(financingOffers).where(inArray(financingOffers.id, ids));
+    const total = offers.reduce((a, o) => a + o.advanceAmount, 0n);
+    const net = offers.reduce((a, o) => a + describeOffer(o).netDisbursal, 0n);
+    const sub = await submit(db, actorOf(u), "offer.accept_many", { offerIds: ids }, { summary: `Accept ${ids.length} offers: ${formatINR(net)} paid to you in total`, amount: total });
+    if (sub.status === "queued") return QUEUED;
+    const r = sub.result as { ok: boolean; error?: string }[];
     const ok = r.filter((x) => x.ok).length, bad = r.filter((x) => !x.ok);
     if (ok === 0) throw new Error(bad[0]?.error ?? "no offers could be accepted");
     return `${ok} offer${ok === 1 ? "" : "s"} accepted${bad.length ? `; ${bad.length} could not be (${bad[0].error})` : ""}. Sign the agreements to receive the funds.`;
@@ -114,9 +126,12 @@ async function chooseBid(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
   await attempt(async () => {
-    assertCan(u, "offer.answer");
-    await acceptBid(db, z.uuid().parse(fd.get("bidId")), { id: u.id, role: u.role, businessId: u.businessId });
-    return "Bid accepted. Sign the agreement to receive the funds.";
+    assertCan(u, "offer.prepare");
+    const bidId = z.uuid().parse(fd.get("bidId"));
+    const [b] = await db.select({ b: bids, no: invoices.invoiceNumber, fin: businesses.legalName }).from(bids).innerJoin(invoices, eq(invoices.id, bids.invoiceId)).innerJoin(businesses, eq(businesses.id, bids.financierId)).where(eq(bids.id, bidId));
+    if (!b) throw new Error("bid not found");
+    const r = await submit(db, actorOf(u), "bid.accept", { bidId }, { summary: `Choose ${b.fin}'s bid on invoice ${b.no}: ${formatINR(describeOffer(b.b).netDisbursal)} paid to you`, amount: b.b.advanceAmount });
+    return r.status === "queued" ? QUEUED : "Bid accepted. Sign the agreement to receive the funds.";
   });
 }
 async function answerEarly(fd: FormData) {
@@ -147,7 +162,8 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const u = await requireUser(["seller"]);
   const q = await searchParams;
   await expireOffers(db);
-  const commit = can(u, "offer.answer");
+  const commit = can(u, "offer.answer"); // approver or owner: may commit directly
+  const prepare = can(u, "offer.prepare"); // maker too: may submit for approval
   const [buyers, rows] = await Promise.all([
     db.select({ id: businesses.id, name: businesses.legalName }).from(buyerSellerRelationships)
       .innerJoin(businesses, eq(businesses.id, buyerSellerRelationships.buyerId)).where(eq(buyerSellerRelationships.sellerId, u.businessId!)),
@@ -185,7 +201,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <form action={acceptAll} className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-card bg-p-100 p-5 ring-1 ring-p-400">
           {openOffers.map((o) => <input key={o.id} type="hidden" name="offerId" value={o.id} />)}
           <div><p className="font-semibold">{openOffers.length} offers are waiting for you</p><p className="text-muted">Accept them together to receive {formatINR(bulkNet)} in total once signed. Each offer stays its own agreement.</p></div>
-          {commit ? <button className="btn btn-primary">Accept all {openOffers.length}</button> : <p className="max-w-xs text-xs text-s-600">Ask a manager or the owner to accept offers.</p>}
+          {prepare ? <button className="btn btn-primary">{commit ? `Accept all ${openOffers.length}` : `Submit all ${openOffers.length} for approval`}</button> : <p className="max-w-xs text-xs text-s-600">Your role can view offers but not act on them.</p>}
         </form>
       )}
 
@@ -201,7 +217,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
               { h: "Answer by", cell: (e) => <span className="font-normal text-muted">{e.e.expiresAt.toLocaleString("en-IN")}</span> },
               { h: "", align: "right", cell: (e) => commit
                 ? <form action={answerEarly} className="inline-flex gap-2"><input type="hidden" name="id" value={e.e.id} /><button name="action" value="accept" className="btn btn-primary btn-sm">Accept</button><button name="action" value="decline" className="btn btn-ghost btn-sm">Decline</button></form>
-                : <span className="text-xs text-s-600">Manager or owner</span> },
+                : <span className="text-xs text-s-600">Approver or owner</span> },
             ]} />
         </Panel>
       )}
@@ -255,11 +271,11 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                   <dt className="text-muted">Recourse</dt><dd className="text-right">{o.recourse ? "Yes: you repay if the buyer doesn't" : "No"}</dd>
                 </dl>
                 <div className="flex flex-col justify-end gap-3">
-                  {o.status === "open" && (commit ? (
+                  {o.status === "open" && (prepare ? (
                     <>
                       <form action={answerOffer} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="offerId" value={o.id} />
-                        <button name="action" value="accept" className="btn btn-primary">Accept offer</button>
+                        <button name="action" value="accept" className="btn btn-primary">{commit ? "Accept offer" : "Submit for approval"}</button>
                         <button name="action" value="reject" className="btn btn-ghost">Decline</button>
                         <span className="w-full text-xs text-muted">Valid until {o.expiresAt.toLocaleString("en-IN")}</span>
                       </form>
@@ -273,7 +289,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                         </form>
                       </details>
                     </>
-                  ) : <p className="max-w-xs rounded-lg bg-s-100 p-3 text-xs text-s-600">Accepting an offer commits the company. Ask a manager or the owner to answer it. Valid until {o.expiresAt.toLocaleString("en-IN")}.</p>)}
+                  ) : <p className="max-w-xs rounded-lg bg-s-100 p-3 text-xs text-s-600">Your role can view this offer but not act on it. Valid until {o.expiresAt.toLocaleString("en-IN")}.</p>)}
                   {o.status === "accepted" && o.financierId && <p className="text-muted">Funded by {bidders.get(o.financierId) ?? "a financier"}.</p>}
                   {o.status === "accepted" && <p className="text-p-700">Accepted. Next: <a className="font-semibold underline" href="/seller/agreements">sign the agreement</a>.</p>}
                   {(o.status === "expired" || o.status === "rejected") && r.status === "eligible" && (
@@ -293,9 +309,9 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                     { h: "Discount", align: "right", cell: (b) => `${b.discountBps / 100}% p.a.` },
                     { h: "All-in rate", align: "right", cell: (b) => `${(b.effectiveAprBps / 100).toFixed(2)}% p.a.` },
                     { h: "Valid until", cell: (b) => <span className="text-muted">{b.expiresAt.toLocaleString("en-IN")}</span> },
-                    { h: "", align: "right", cell: (b) => commit
-                      ? <form action={chooseBid}><input type="hidden" name="bidId" value={b.id} /><button className="btn btn-primary btn-sm">Choose this bid</button></form>
-                      : <span className="text-xs text-s-600">Manager or owner</span> },
+                    { h: "", align: "right", cell: (b) => prepare
+                      ? <form action={chooseBid}><input type="hidden" name="bidId" value={b.id} /><button className="btn btn-primary btn-sm">{commit ? "Choose this bid" : "Submit for approval"}</button></form>
+                      : <span className="text-xs text-s-600">View only</span> },
                   ]} />
               </div>
             )}

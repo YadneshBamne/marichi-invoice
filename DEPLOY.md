@@ -70,7 +70,7 @@ Run it on any always-on host (Railway, Render, Fly, a small VM) as a **worker se
 
 ## 6. Before you go live: migrations
 Run `npm run db:migrate` against the production database before the first deploy and after every update that adds a file under
-`drizzle/` (the latest are `0010_marketplace` to `0014_analytics`). Then create the first admin with `scripts/seed-staff.ts`.
+`drizzle/` (the latest are `0010_marketplace` to `0015_roles_memberships`; 0015 converts the old manager/member roles to approver/maker and creates a membership for every existing user). Then create the first admin with `scripts/seed-staff.ts`.
 
 ## 7. What is real and what is simulated
 Everything below runs end to end in the product, but the outside world is stood in for until you sign the provider:

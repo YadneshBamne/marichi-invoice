@@ -53,7 +53,7 @@ export default async function Programme({ searchParams }: { searchParams: Promis
   const banner = (<>
     {q.ok && <div className="mb-4"><Notice tone="good">{q.ok}</Notice></div>}
     {q.error && <div className="mb-4"><Notice tone="bad">{q.error}</Notice></div>}
-    {!may && <div className="mb-4"><Notice tone="warn">Running a programme commits the company. Ask a manager or the owner.</Notice></div>}
+    {!may && <div className="mb-4"><Notice tone="warn">Running a programme commits the company. Ask an approver or the owner.</Notice></div>}
   </>);
 
   if (!r) return (

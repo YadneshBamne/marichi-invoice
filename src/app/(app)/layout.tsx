@@ -4,7 +4,9 @@ import { db } from "@/server/db/client";
 import { notifications } from "@/server/db/schema";
 import { getMe } from "@/server/me";
 import { getSession } from "@/server/session";
-import { roleOf } from "@/server/permissions";
+import { can, roleOf } from "@/server/permissions";
+import { myCompanies } from "@/server/company/service";
+import { waitingCount } from "@/server/approvals/service";
 import { navBadges } from "@/server/reports/badges";
 import { effectivePicks, enabledApps } from "@/lib/apps";
 import { AppShell } from "@/components/shell/app-shell";
@@ -18,16 +20,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await getSession();
   if (!session) redirect("/login");
   const su = session.user as typeof session.user & { role: string; businessId: string | null };
-  const [me, badges, inbox] = await Promise.all([
+  const [me, badges, inbox, companies] = await Promise.all([
     getMe(), // authoritative role, suspension and company branding
     navBadges(db, { role: su.role, businessId: su.businessId }), // cosmetic counters: fine to use the cookie's view
     // The email copy of each message is the in-app inbox (SMS rows would just duplicate it).
     db.select().from(notifications).where(and(eq(notifications.userId, su.id), eq(notifications.channel, "email"))).orderBy(desc(notifications.createdAt)).limit(8),
+    ["seller", "buyer", "financier"].includes(su.role) ? myCompanies(db, su.id) : Promise.resolve([]),
   ]);
   if (!me) redirect("/login");
   if (me.suspendedAt) redirect("/account-suspended");
 
   const biz = me.biz && me.businessId ? me.biz : null;
+  // Requests waiting for this person to decide (someone else's, for people who may decide).
+  const waiting = biz && me.businessId && can(me, "approval.decide") ? await waitingCount(db, me.businessId, me.id) : 0;
   const company = biz ? { name: biz.displayName ?? biz.legalName, kyb: biz.kybStatus, logoUrl: biz.logoRef ? `/api/company/logo?v=${biz.logoRef.slice(0, 12)}` : null } : null;
   return (
     <AppShell
@@ -36,7 +41,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       apps={biz ? [...enabledApps(me.role, effectivePicks(biz, me.role))] : undefined}
       picked={biz?.apps}
       sandbox={(process.env.INTEGRATIONS_MODE ?? "mock") === "mock"}
-      badges={badges}
+      badges={waiting ? { ...badges, "/approvals": waiting } : badges}
+      companies={companies.filter((c) => !c.suspendedAt).map((c) => ({ id: c.id, name: c.name ?? c.legalName, kind: c.kind, active: c.id === me.businessId }))}
       inbox={inbox.map((n) => ({ id: n.id, subject: n.subject ?? n.template.replaceAll("_", " "), body: n.body ?? "", at: n.createdAt.toISOString() }))}
       tourSeen={Boolean(me.tourSeenAt)}
     >

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db/client";
-import { businesses, users } from "@/server/db/schema";
+import { businesses, memberships, users } from "@/server/db/schema";
 
 const Form = z.object({
   name: z.string().trim().min(2, "Enter your full name."),
@@ -25,8 +25,9 @@ export async function signUp(_: SignUpState, fd: FormData): Promise<SignUpState>
   const f = parsed.data;
   try {
     const { user } = await auth.api.signUpEmail({ body: { name: f.name, email: f.email, password: f.password } });
-    const [biz] = await db.insert(businesses).values({ legalName: f.legalName, entityType: f.entityType }).returning();
-    await db.update(users).set({ role: f.role, businessId: biz.id }).where(eq(users.id, user.id));
+    const [biz] = await db.insert(businesses).values({ legalName: f.legalName, entityType: f.entityType, kind: f.role }).returning();
+    await db.update(users).set({ role: f.role, businessId: biz.id, orgRole: "owner" }).where(eq(users.id, user.id));
+    await db.insert(memberships).values({ userId: user.id, businessId: biz.id, orgRole: "owner" });
   } catch (e) {
     const m = e instanceof Error ? e.message : "";
     return { error: /exist|already/i.test(m) ? "An account with this email already exists. Try logging in instead." : "We couldn't create your account. Please try again." };

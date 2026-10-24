@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icons";
 import { useDropdown } from "./use-dropdown";
+import { switchTo } from "@/app/(app)/switch-company";
 
 export type InboxItem = { id: string; subject: string; body: string; at: string };
 
@@ -76,7 +77,7 @@ export function HelpMenu({ staff, onTour, onShortcuts }: { staff: boolean; onTou
   );
 }
 
-export function UserMenu({ user, roleLabel, business, onTour }: { user: { name: string; email: string }; roleLabel: string; business: string | null; onTour: () => void }) {
+export function UserMenu({ user, roleLabel, business, companies, onTour }: { user: { name: string; email: string }; roleLabel: string; business: string | null; companies: { id: string; name: string; kind: string | null; active: boolean }[]; onTour: () => void }) {
   return (
     <Menu
       label="Account menu" tour="user-menu" width="w-72"
@@ -89,6 +90,18 @@ export function UserMenu({ user, roleLabel, business, onTour }: { user: { name: 
             <p className="truncate text-[13px] text-muted">{user.email}</p>
             <p className="mt-2 flex items-center gap-2"><span className="pill bg-p-100 text-p-700">{roleLabel}</span>{business && <span className="truncate text-xs text-muted">{business}</span>}</p>
           </div>
+          {companies.length > 1 && (
+            <div className="border-b border-hair p-1.5">
+              <p className="px-3 pt-1 pb-1 text-xs font-semibold tracking-wide text-faint uppercase">Your companies</p>
+              {companies.map((c) => (
+                <button key={c.id} disabled={c.active} className={`${row} ${c.active ? "font-semibold" : ""}`}
+                  onClick={async () => { const r = await switchTo(c.id); if (r.ok) { close(); window.location.href = "/dashboard"; } }}>
+                  <Icon name="building" className="h-4 w-4 text-p-600" /><span className="min-w-0 flex-1 truncate text-left">{c.name}</span>
+                  {c.active ? <Icon name="check" className="h-4 w-4 text-g-600" /> : <span className="text-xs text-faint capitalize">{c.kind}</span>}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="p-1.5">
             <Link className={row} href="/settings/profile" onClick={close}><Icon name="user" className="h-4 w-4 text-p-600" />Profile</Link>
             <Link className={row} href="/settings/security" onClick={close}><Icon name="lock" className="h-4 w-4 text-p-600" />Security</Link>

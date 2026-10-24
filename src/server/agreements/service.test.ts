@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { agreements, businesses, invoices, users } from "../db/schema";
+import { agreements, businesses, invoices, users, memberships } from "../db/schema";
 import { gw, T0, world } from "../testkit";
 import {
   assertReadyToDisburse, canViewDocument, completeSignature, prepareAgreements, prepareAllAccepted, readiness, signInApp, verifyWebhook,
@@ -40,6 +40,7 @@ describe("prepareAgreements", () => {
   });
 
   it("notice stays pending while the buyer has no login, and goes out on the next sweep", async () => {
+    await w.db.delete(memberships).where(eq(memberships.userId, w.buyerUserId));
     await w.db.delete(users).where(eq(users.id, w.buyerUserId));
     const offer = await w.acceptedOffer();
     await prepareAgreements(w.db, offer, gw, T0);

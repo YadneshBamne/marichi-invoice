@@ -86,7 +86,7 @@ export default async function Buyers() {
             ]} />
         </Panel>
 
-        {!can(u, "buyer.invite") ? <Notice tone="warn">Your role can view buyers but not link them. Ask a manager or the owner.</Notice> : (
+        {!can(u, "buyer.invite") ? <Notice tone="warn">Your role can view buyers but not link them.</Notice> : (
           <Panel title="Add a buyer">
             <form action={add} className="space-y-4">
               <Field label="Buyer GSTIN"><input name="buyerGstin" required className={input} /></Field>

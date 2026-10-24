@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
-import { addMember, completeSetup, setApps, setCompanyLogo, updateCompany } from "@/server/company/service";
-import { hashPassword } from "@/server/company/credentials";
+import { completeSetup, setApps, setCompanyLogo, updateCompany } from "@/server/company/service";
+import { inviteMember } from "@/server/company/invitations";
+import { ORG_ROLES } from "@/server/permissions";
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -29,11 +30,11 @@ export async function saveProfile(fd: FormData) {
   });
 }
 
-export async function addTeamMember(p: { name: string; email: string; orgRole: "manager" | "member" }) {
+export async function inviteTeamMember(p: { email: string; orgRole: string }) {
   return guarded(async (a) => {
-    const f = z.object({ name: z.string(), email: z.email("Enter a valid email address."), orgRole: z.enum(["manager", "member"]) }).parse(p);
-    const { password } = await addMember(db, hashPassword, a, f);
-    return { email: f.email.toLowerCase(), password };
+    const f = z.object({ email: z.email("Enter a valid email address."), orgRole: z.enum(ORG_ROLES).exclude(["owner"]) }).parse(p);
+    const r = await inviteMember(db, a, f);
+    return { email: f.email.toLowerCase(), emailed: r.emailed };
   });
 }
 

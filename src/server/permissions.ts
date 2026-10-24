@@ -1,27 +1,43 @@
 // Who inside a company may do what. Platform staff (ops/admin/compliance) have their own checks and are not covered here.
-export type OrgRole = "owner" | "manager" | "member";
+//
+// Principles (see docs/PLATFORM-GUIDE.md section 3):
+//  - one owner; a few fixed roles;
+//  - managing people is separate from moving money: an Admin can run the team but cannot commit company money;
+//  - a Maker prepares, an Approver commits, and nobody approves their own request when a second approver is required.
+export type OrgRole = "owner" | "admin" | "approver" | "maker" | "viewer";
 
-const ALL: OrgRole[] = ["owner", "manager", "member"];
-const LEAD: OrgRole[] = ["owner", "manager"];
+const ALL: OrgRole[] = ["owner", "admin", "approver", "maker", "viewer"];
+const WORK: OrgRole[] = ["owner", "approver", "maker"]; // people who prepare work
+const COMMIT: OrgRole[] = ["owner", "approver"]; // people who may commit company money
+const PEOPLE: OrgRole[] = ["owner", "admin"];
 
 export const PERMS = {
-  "team.manage": ["owner"],
-  "company.edit": ["owner"],
-  "apps.manage": ["owner"],
-  "invoice.upload": ALL,
+  // people and company
+  "team.manage": PEOPLE, // invite, suspend, change maker/viewer access
+  "team.grant": ["owner"], // give or take away approver and admin access: this is money power, so only the owner
+  "company.edit": PEOPLE,
+  "apps.manage": PEOPLE,
+  "integrations.manage": PEOPLE, // API keys and webhooks give outside systems access to the company's data
+  "approval.settings": ["owner"], // dual control on or off
+  "approval.decide": COMMIT,
+  // preparing work
+  "invoice.upload": WORK,
   "invoice.view": ALL,
-  "buyer.invite": LEAD,
-  "offer.answer": LEAD, // accepting an offer is a financial commitment
-  "agreement.sign": LEAD,
-  "invoice.confirm": LEAD, // a buyer's confirmation is a legal acknowledgement
-  "creditnote.issue": LEAD, // changes what the buyer owes
-  "offer.reprice": LEAD,
-  "programme.manage": LEAD, // a programme commits the buyer to its suppliers
-  "programme.join": LEAD, // joining changes how the supplier is priced
-  "earlypay.propose": LEAD, // paying early commits company cash
-  "bid.place": LEAD, // a bid commits the financier's capital
-  "integrations.manage": ["owner"], // API keys and webhooks give outside systems access to the company's data
-  "ticket.open": ALL,
+  "buyer.invite": WORK,
+  "offer.reprice": WORK,
+  "offer.prepare": WORK, // a maker submits an acceptance for approval
+  "bid.prepare": WORK,
+  "earlypay.prepare": WORK,
+  "ticket.open": ["owner", "admin", "approver", "maker"],
+  // committing money or the company's name
+  "offer.answer": COMMIT, // accepting an offer or a bid is a financial commitment
+  "agreement.sign": COMMIT,
+  "invoice.confirm": COMMIT, // a buyer's confirmation is a legal acknowledgement
+  "creditnote.issue": COMMIT, // changes what the buyer owes
+  "bid.place": COMMIT,
+  "earlypay.propose": COMMIT,
+  "programme.manage": COMMIT,
+  "programme.join": COMMIT,
 } as const satisfies Record<string, OrgRole[]>;
 export type Permission = keyof typeof PERMS;
 
@@ -32,9 +48,17 @@ export const can = (u: { orgRole?: string | null }, p: Permission) => (PERMS[p] 
 export class ForbiddenError extends Error { constructor(p: Permission) { super(`Your role is not allowed to do this (${p}).`); } }
 export function assertCan(u: { orgRole?: string | null }, p: Permission) { if (!can(u, p)) throw new ForbiddenError(p); }
 
-export const ORG_ROLE_LABEL: Record<OrgRole, string> = { owner: "Owner", manager: "Manager", member: "Member" };
+export const ORG_ROLES = ["owner", "admin", "approver", "maker", "viewer"] as const;
+/** Roles an invitation can grant. There is exactly one owner, so "owner" is never invitable. */
+export const INVITABLE: readonly OrgRole[] = ["admin", "approver", "maker", "viewer"];
+/** Roles that carry money or admin power. Only the owner may hand these out. */
+export const POWERFUL: readonly OrgRole[] = ["admin", "approver"];
+
+export const ORG_ROLE_LABEL: Record<OrgRole, string> = { owner: "Owner", admin: "Admin", approver: "Approver", maker: "Maker", viewer: "Viewer" };
 export const ORG_ROLE_BLURB: Record<OrgRole, string> = {
-  owner: "Full control: team, company settings, apps, and every action.",
-  manager: "Runs day-to-day finance: accepts offers, signs agreements, links buyers, confirms invoices.",
-  member: "Prepares work: uploads and views invoices, raises support requests. Cannot commit the company.",
+  owner: "Full control. The only person who can hand out approver or admin access, switch dual control, transfer ownership or close the company.",
+  admin: "Runs the team and company settings. Cannot commit company money.",
+  approver: "Commits company money: accepts offers, signs agreements, approves other people's requests. Never their own, when a second approver is required.",
+  maker: "Prepares the work: uploads invoices, links buyers, drafts requests. An approver decides before anything binding happens.",
+  viewer: "Read-only. Suited to an accountant or auditor.",
 };

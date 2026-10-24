@@ -6,6 +6,12 @@ import { authClient } from "@/lib/auth-client";
 import { AuthLayout } from "@/components/ui/public";
 import { Alert, PasswordInput, SubmitButton } from "@/components/ui/forms";
 
+/** Where to go after signing in: a same-site path the page asked for (such as an invitation), otherwise the dashboard. */
+const landing = () => {
+  const n = new URLSearchParams(window.location.search).get("next");
+  return n && n.startsWith("/") && !n.startsWith("//") ? n : "/dashboard";
+};
+
 export default function Login() {
   const router = useRouter();
   const [step, setStep] = useState<"password" | "totp">("password");
@@ -20,7 +26,7 @@ export default function Login() {
     setPending(false);
     if (error) return setErr(error.message ?? "Sign-in failed. Check your details and try again.");
     if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) return setStep("totp");
-    router.push("/dashboard"); // the guard sends people on to whatever they still owe: new password, two-factor, company setup
+    router.push(landing()); // the guard sends people on to whatever they still owe: two-factor, company setup
   }
   async function onCode(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setErr(""); setPending(true);
@@ -28,7 +34,7 @@ export default function Login() {
     const { error } = backup ? await authClient.twoFactor.verifyBackupCode({ code }) : await authClient.twoFactor.verifyTotp({ code });
     setPending(false);
     if (error) return setErr(error.message ?? "That code didn't work. Try again.");
-    router.push("/dashboard");
+    router.push(landing());
   }
 
   return (

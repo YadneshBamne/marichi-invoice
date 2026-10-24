@@ -19,6 +19,7 @@ export type ShellProps = {
   sandbox: boolean;
   badges: Record<string, number>;
   inbox: InboxItem[];
+  companies?: { id: string; name: string; kind: string | null; active: boolean }[];
   tourSeen: boolean;
   children: ReactNode;
 };
@@ -49,7 +50,7 @@ function Crumbs({ home, homeLabel }: { home: string; homeLabel: string }) {
   );
 }
 
-export function AppShell({ user, business, apps, picked, sandbox, badges, inbox, tourSeen, children }: ShellProps) {
+export function AppShell({ user, business, apps, picked, sandbox, badges, inbox, companies, tourSeen, children }: ShellProps) {
   const router = useRouter();
   const path = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -115,7 +116,7 @@ export function AppShell({ user, business, apps, picked, sandbox, badges, inbox,
             {sandbox && <span title="Integrations are simulated. No real money moves and no real KYC checks run." className="pill hidden bg-s-100 text-s-600 md:inline-flex" data-tour="sandbox">Sandbox</span>}
             <NotificationMenu items={inbox} />
             <HelpMenu staff={staff} onTour={startTour} onShortcuts={() => setKeys(true)} />
-            <UserMenu user={user} roleLabel={roleLabel} business={business?.name ?? null} onTour={startTour} />
+            <UserMenu user={user} roleLabel={roleLabel} business={business?.name ?? null} companies={companies ?? []} onTour={startTour} />
           </div>
         </header>
 

@@ -26,7 +26,7 @@ export function Autopay({ mandate, canManage, mock }: { mandate: MandateView; ca
           )}
         </div>
       ) : !canManage ? (
-        <p className="text-sm text-muted">Auto-pay is not set up. A manager or the owner can turn it on.</p>
+        <p className="text-sm text-muted">Auto-pay is not set up. An approver or the owner can turn it on.</p>
       ) : (
         <form key={JSON.stringify(v)} action={action} className="grid gap-4 text-sm sm:grid-cols-2">
           {mandate && <p className="text-muted sm:col-span-2">Your last auto-pay mandate was {mandate.status}. You can set it up again.</p>}

@@ -1,92 +1,150 @@
-// Company workspace: profile, apps, and the people inside it (owner -> managers -> members) with owner-issued credentials.
-import { randomInt } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+// Company workspace: profile, apps, and the people inside it. People join by invitation (see invitations.ts); here we run the
+// team afterwards: roles, suspension, ownership transfer, and switching between companies.
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { account, auditLog, businesses, session, users } from "../db/schema";
+import { auditLog, businesses, memberships, ownershipTransfers, session, users, type OrgRole } from "../db/schema";
 import { cleanSelection } from "../../lib/apps";
-import { assertCan } from "../permissions";
+import { assertCan, INVITABLE, POWERFUL, roleOf } from "../permissions";
 import { putLogo } from "../vault";
 
 export type Actor = { id: string; role: string; orgRole: string; businessId: string | null };
-export type Hash = (password: string) => Promise<string>;
-type Staffer = "manager" | "member";
-
-const ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alikes (0/O, 1/l/I)
-/** Temporary password the owner hands over. Cryptographically random, 12 characters. */
-export const tempPassword = () => Array.from({ length: 12 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
 
 const need = (a: Actor) => { if (!a.businessId) throw new Error("no company linked to this account"); return a.businessId; };
+const TRANSFER_DAYS = 7;
 
+/** Everyone in the company, with the role they hold HERE (a person can hold a different role in another company). */
 export const listTeam = (db: Database, businessId: string) =>
-  db.select({ id: users.id, name: users.name, email: users.email, orgRole: users.orgRole, suspendedAt: users.suspendedAt, mustChangePassword: users.mustChangePassword, createdAt: users.createdAt })
-    .from(users).where(eq(users.businessId, businessId)).orderBy(asc(users.createdAt));
+  db.select({
+    id: users.id, name: users.name, email: users.email, orgRole: memberships.orgRole,
+    suspendedAt: memberships.suspendedAt, joinedAt: memberships.createdAt, twoFactor: users.twoFactorEnabled,
+  }).from(memberships).innerJoin(users, eq(users.id, memberships.userId)).where(eq(memberships.businessId, businessId)).orderBy(asc(memberships.createdAt));
 
-/** The target must belong to the actor's company, not be the actor, and not be an owner. */
+/** The target must belong to the actor's company, not be the actor, and not be the owner. */
 async function target(db: Database, a: Actor, userId: string) {
   const businessId = need(a);
   if (userId === a.id) throw new Error("you cannot change your own access here");
-  const [u] = await db.select().from(users).where(and(eq(users.id, userId), eq(users.businessId, businessId)));
-  if (!u) throw new Error("person not found in your company");
-  if (u.orgRole === "owner") throw new Error("the owner access cannot be changed");
-  return u;
+  const [m] = await db.select().from(memberships).where(and(eq(memberships.userId, userId), eq(memberships.businessId, businessId)));
+  if (!m) throw new Error("person not found in your company");
+  if (m.orgRole === "owner") throw new Error("the owner access cannot be changed");
+  return m;
 }
 
-export async function addMember(db: Database, hash: Hash, actor: Actor, p: { name: string; email: string; orgRole: Staffer; password?: string }) {
-  assertCan(actor, "team.manage");
-  const businessId = need(actor);
-  const email = p.email.trim().toLowerCase();
-  if (p.name.trim().length < 2) throw new Error("enter the person name");
-  if (!["manager", "member"].includes(p.orgRole)) throw new Error("choose manager or member");
-  const password = p.password?.trim() || tempPassword();
-  if (password.length < 10) throw new Error("the password must be at least 10 characters");
-  const [clash] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
-  if (clash) throw new Error("someone already has an account with this email");
-  const passwordHash = await hash(password);
-  const created = await db.transaction(async (tx) => {
-    const [u] = await tx.insert(users).values({
-      name: p.name.trim(), email, emailVerified: true, role: actor.role as never, businessId, orgRole: p.orgRole, mustChangePassword: true, invitedBy: actor.id,
-    }).returning();
-    await tx.insert(account).values({ accountId: u.id, providerId: "credential", userId: u.id, password: passwordHash });
-    await tx.insert(auditLog).values({ actorId: actor.id, action: "member.added", entity: "user", entityId: u.id, after: { email, orgRole: p.orgRole } });
-    return u;
-  });
-  return { user: created, password };
+/** Keep the user row's "active company" mirror in step when the membership it points at changes. */
+async function mirror(tx: Pick<Database, "update">, userId: string, businessId: string, orgRole: OrgRole) {
+  await tx.update(users).set({ orgRole }).where(and(eq(users.id, userId), eq(users.businessId, businessId)));
 }
 
-export async function resetMemberPassword(db: Database, hash: Hash, actor: Actor, userId: string, password?: string) {
+export async function setMemberRole(db: Database, actor: Actor, userId: string, orgRole: OrgRole) {
   assertCan(actor, "team.manage");
-  const u = await target(db, actor, userId);
-  const pw = password?.trim() || tempPassword();
-  if (pw.length < 10) throw new Error("the password must be at least 10 characters");
-  const passwordHash = await hash(pw);
+  if (!INVITABLE.includes(orgRole)) throw new Error("choose admin, approver, maker or viewer");
+  const m = await target(db, actor, userId);
+  if (m.orgRole === orgRole) return;
+  // Approver and admin access is money power: only the owner gives it or takes it away.
+  if (POWERFUL.includes(orgRole) || POWERFUL.includes(m.orgRole)) assertCan(actor, "team.grant");
   await db.transaction(async (tx) => {
-    await tx.update(account).set({ password: passwordHash }).where(and(eq(account.userId, u.id), eq(account.providerId, "credential")));
-    await tx.update(users).set({ mustChangePassword: true }).where(eq(users.id, u.id));
-    await tx.delete(session).where(eq(session.userId, u.id)); // sign them out everywhere
-    await tx.insert(auditLog).values({ actorId: actor.id, action: "member.password_reset", entity: "user", entityId: u.id });
+    await tx.update(memberships).set({ orgRole }).where(eq(memberships.id, m.id));
+    await mirror(tx, userId, m.businessId, orgRole);
+    await tx.insert(auditLog).values({ actorId: actor.id, action: "member.role_changed", entity: "user", entityId: userId, before: { orgRole: m.orgRole }, after: { orgRole, businessId: m.businessId } });
   });
-  return { password: pw };
 }
 
-export async function setMemberRole(db: Database, actor: Actor, userId: string, orgRole: Staffer) {
-  assertCan(actor, "team.manage");
-  if (!["manager", "member"].includes(orgRole)) throw new Error("choose manager or member");
-  const u = await target(db, actor, userId);
-  if (u.orgRole === orgRole) return;
-  await db.update(users).set({ orgRole }).where(eq(users.id, u.id));
-  await db.insert(auditLog).values({ actorId: actor.id, action: "member.role_changed", entity: "user", entityId: u.id, before: { orgRole: u.orgRole }, after: { orgRole } });
-}
-
-/** Suspending blocks every page immediately and ends their sessions. Their history stays intact. */
+/**
+ * Suspending takes the person out of THIS company at once. If they belong to another, they stay signed in and land there;
+ * if not, their sessions end. Their history stays intact.
+ */
 export async function setSuspended(db: Database, actor: Actor, userId: string, suspended: boolean, now = new Date()) {
   assertCan(actor, "team.manage");
-  const u = await target(db, actor, userId);
+  const m = await target(db, actor, userId);
+  if (POWERFUL.includes(m.orgRole)) assertCan(actor, "team.grant");
   await db.transaction(async (tx) => {
-    await tx.update(users).set({ suspendedAt: suspended ? now : null }).where(eq(users.id, u.id));
-    if (suspended) await tx.delete(session).where(eq(session.userId, u.id));
-    await tx.insert(auditLog).values({ actorId: actor.id, action: suspended ? "member.suspended" : "member.reactivated", entity: "user", entityId: u.id });
+    await tx.update(memberships).set({ suspendedAt: suspended ? now : null }).where(eq(memberships.id, m.id));
+    if (suspended) {
+      const [other] = await tx.select().from(memberships).where(and(eq(memberships.userId, userId), ne(memberships.businessId, m.businessId)));
+      const live = other && !other.suspendedAt ? other : undefined;
+      if (live) await activate(tx, userId, live.businessId, live.orgRole);
+      else await tx.delete(session).where(eq(session.userId, userId));
+    }
+    await tx.insert(auditLog).values({ actorId: actor.id, action: suspended ? "member.suspended" : "member.reactivated", entity: "user", entityId: userId, after: { businessId: m.businessId } });
   });
 }
+
+/** Make a company the one the person is working in. The business's kind decides whether they are acting as seller, buyer or financier. */
+async function activate(tx: Pick<Database, "select" | "update">, userId: string, businessId: string, orgRole: OrgRole) {
+  const [b] = await tx.select({ kind: businesses.kind }).from(businesses).where(eq(businesses.id, businessId));
+  const kind = b?.kind && ["seller", "buyer", "financier"].includes(b.kind) ? (b.kind as "seller" | "buyer" | "financier") : undefined;
+  await tx.update(users).set({ businessId, orgRole, ...(kind ? { role: kind } : {}) }).where(eq(users.id, userId));
+}
+
+export async function switchCompany(db: Database, userId: string, businessId: string) {
+  const [m] = await db.select().from(memberships).where(and(eq(memberships.userId, userId), eq(memberships.businessId, businessId)));
+  if (!m || m.suspendedAt) throw new Error("you do not have access to that company");
+  const [u] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
+  if (!["seller", "buyer", "financier"].includes(u.role)) throw new Error("platform staff do not belong to companies");
+  await db.transaction(async (tx) => {
+    await activate(tx, userId, businessId, m.orgRole);
+    await tx.insert(auditLog).values({ actorId: userId, action: "member.switched_company", entity: "business", entityId: businessId });
+  });
+}
+
+/** The companies this person can work in, for the switcher. */
+export const myCompanies = (db: Database, userId: string) =>
+  db.select({ id: businesses.id, name: businesses.displayName, legalName: businesses.legalName, kind: businesses.kind, orgRole: memberships.orgRole, suspendedAt: memberships.suspendedAt })
+    .from(memberships).innerJoin(businesses, eq(businesses.id, memberships.businessId)).where(eq(memberships.userId, userId)).orderBy(asc(memberships.createdAt));
+
+/** A person who is locked out gets a reset link at their OWN email. Nobody ever types another person's password. */
+export async function requestMemberReset(db: Database, actor: Actor, userId: string, send: (email: string) => Promise<void>) {
+  assertCan(actor, "team.manage");
+  const m = await target(db, actor, userId);
+  if (POWERFUL.includes(m.orgRole)) assertCan(actor, "team.grant");
+  const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
+  await send(u.email);
+  await db.insert(auditLog).values({ actorId: actor.id, action: "member.reset_link_sent", entity: "user", entityId: userId });
+}
+
+// ---- ownership: offered by the owner, accepted by the recipient ----
+
+export async function offerOwnership(db: Database, actor: Actor, toUserId: string, now = new Date()) {
+  const businessId = need(actor);
+  if (roleOf(actor) !== "owner") throw new Error("only the owner can transfer ownership");
+  const m = await target(db, actor, toUserId);
+  if (m.suspendedAt) throw new Error("that person is suspended");
+  if (!POWERFUL.includes(m.orgRole)) throw new Error("ownership can be offered to an admin or an approver");
+  await db.transaction(async (tx) => {
+    await tx.update(ownershipTransfers).set({ status: "cancelled" }).where(and(eq(ownershipTransfers.businessId, businessId), eq(ownershipTransfers.status, "pending")));
+    await tx.insert(ownershipTransfers).values({ businessId, fromUserId: actor.id, toUserId, expiresAt: new Date(now.getTime() + TRANSFER_DAYS * 86_400_000) });
+    await tx.insert(auditLog).values({ actorId: actor.id, action: "ownership.offered", entity: "business", entityId: businessId, after: { toUserId } });
+  });
+}
+
+export async function cancelOwnershipOffer(db: Database, actor: Actor) {
+  const businessId = need(actor);
+  if (roleOf(actor) !== "owner") throw new Error("only the owner can cancel the offer");
+  await db.update(ownershipTransfers).set({ status: "cancelled" }).where(and(eq(ownershipTransfers.businessId, businessId), eq(ownershipTransfers.status, "pending")));
+}
+
+/** The recipient accepts: they become the owner, the previous owner becomes an admin. Exactly one owner at all times. */
+export async function acceptOwnership(db: Database, actor: Actor, now = new Date()) {
+  const businessId = need(actor);
+  await db.transaction(async (tx) => {
+    const [t] = await tx.select().from(ownershipTransfers).where(and(eq(ownershipTransfers.businessId, businessId), eq(ownershipTransfers.toUserId, actor.id), eq(ownershipTransfers.status, "pending"))).for("update");
+    if (!t || t.expiresAt <= now) throw new Error("there is no ownership offer waiting for you");
+    const [from] = await tx.select().from(memberships).where(and(eq(memberships.userId, t.fromUserId), eq(memberships.businessId, businessId)));
+    if (!from || from.orgRole !== "owner") throw new Error("the owner has changed since this was offered");
+    await tx.update(memberships).set({ orgRole: "owner" }).where(and(eq(memberships.userId, actor.id), eq(memberships.businessId, businessId)));
+    await tx.update(memberships).set({ orgRole: "admin" }).where(eq(memberships.id, from.id));
+    await mirror(tx, actor.id, businessId, "owner");
+    await mirror(tx, t.fromUserId, businessId, "admin");
+    await tx.update(ownershipTransfers).set({ status: "accepted" }).where(eq(ownershipTransfers.id, t.id));
+    await tx.insert(auditLog).values({ actorId: actor.id, action: "ownership.accepted", entity: "business", entityId: businessId, before: { owner: t.fromUserId }, after: { owner: actor.id } });
+  });
+}
+
+export async function pendingOwnership(db: Database, businessId: string, now = new Date()) {
+  const [t] = await db.select().from(ownershipTransfers).where(and(eq(ownershipTransfers.businessId, businessId), eq(ownershipTransfers.status, "pending"))).orderBy(desc(ownershipTransfers.createdAt));
+  return t && t.expiresAt > now ? t : null;
+}
+
+// ---- company profile ----
 
 export async function updateCompany(db: Database, actor: Actor, p: { displayName: string; phone?: string; city?: string; industry?: string }) {
   assertCan(actor, "company.edit");
@@ -112,4 +170,14 @@ export async function completeSetup(db: Database, actor: Actor, now = new Date()
   const [b] = await db.select({ name: businesses.displayName }).from(businesses).where(eq(businesses.id, need(actor)));
   if (!b?.name) throw new Error("set the company name first");
   await db.update(businesses).set({ setupCompletedAt: now }).where(eq(businesses.id, need(actor)));
+}
+
+/** Dual control: when on, even an approver's own commitments wait for a different approver. Owner only; audited. */
+export async function setDualControl(db: Database, actor: Actor, on: boolean) {
+  assertCan(actor, "approval.settings");
+  const businessId = need(actor);
+  await db.transaction(async (tx) => {
+    await tx.update(businesses).set({ dualControl: on }).where(eq(businesses.id, businessId));
+    await tx.insert(auditLog).values({ actorId: actor.id, action: "company.dual_control", entity: "business", entityId: businessId, after: { on } });
+  });
 }

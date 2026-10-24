@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Company roles and the agreement stack</title>
+<meta name="description" content="Company roles, invitation flow and the ten-document agreement stack on a lifecycle timeline.">
+<script>(function(){var t=null;try{t=localStorage.getItem('marichi-diagram-theme')}catch(e){}
+if(t!=='light'&&t!=='dark'){t=null}
+if(t){document.documentElement.setAttribute('data-theme',t)}})();</script>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#14202b;--muted:#566474;--line:#8a97a5;--grid:#dde2e8;--stripe:#eef1f4;
+--seller:#2563eb;--buyer:#15803d;--financier:#7c3aed;--staff:#475569;--system:#0e7490;
+--cp:#d97706;--cp-ink:#3b2300;--appr:#14202b;--appr-ink:#fff;--bad:#c2282d;--trust:#0f766e;--shadow:0 1px 2px rgba(20,32,43,.08)}
+:root[data-theme=dark]{--bg:#0f151b;--panel:#18212a;--ink:#e8edf2;--muted:#9fadbb;--line:#6f7d8b;--grid:#2a3540;--stripe:#141c24;
+--seller:#6ea0ff;--buyer:#4ade80;--financier:#b69bff;--staff:#a9b6c4;--system:#4fd1e6;
+--cp:#f5a524;--cp-ink:#2a1900;--appr:#e8edf2;--appr-ink:#0f151b;--bad:#ff7b80;--trust:#2dd4bf;--shadow:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){--bg:#0f151b;--panel:#18212a;--ink:#e8edf2;--muted:#9fadbb;--line:#6f7d8b;--grid:#2a3540;--stripe:#141c24;
+--seller:#6ea0ff;--buyer:#4ade80;--financier:#b69bff;--staff:#a9b6c4;--system:#4fd1e6;
+--cp:#f5a524;--cp-ink:#2a1900;--appr:#e8edf2;--appr-ink:#0f151b;--bad:#ff7b80;--trust:#2dd4bf;--shadow:none}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1680px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:1.45rem;line-height:1.25;margin:0 0 4px}
+.sub{margin:0;color:var(--muted);max-width:80ch}
+button.theme{font:inherit;font-size:.85rem;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:36px}
+button.theme:focus-visible,a:focus-visible{outline:2px solid var(--system);outline-offset:2px}
+.board{background:var(--panel);border:1px solid var(--grid);border-radius:12px;box-shadow:var(--shadow);padding:8px}
+svg.d{display:block;width:100%;height:auto}
+svg.d text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--ink)}
+svg.d .m{fill:var(--muted)}
+svg.d a{cursor:pointer}
+svg.d a:hover .node,svg.d a:focus .node{stroke-width:3}
+.node{fill:color-mix(in srgb,var(--c) 13%,var(--panel));stroke:var(--c);stroke-width:1.6}
+.lane-seller{--c:var(--seller)}.lane-buyer{--c:var(--buyer)}.lane-financier{--c:var(--financier)}.lane-staff{--c:var(--staff)}.lane-system{--c:var(--system)}
+.cpd{fill:var(--cp);stroke:var(--panel);stroke-width:1.5}
+.cpt{fill:var(--cp-ink)!important;font-weight:700}
+.apc{fill:var(--appr);stroke:var(--panel);stroke-width:1.5}
+.apk{fill:none;stroke:var(--appr-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.edge{fill:none;stroke:var(--line);stroke-width:1.7}
+.edge.bad{stroke:var(--bad);stroke-dasharray:6 4}
+.edge.dot{stroke-dasharray:2 3}
+.ah{fill:var(--line)}.ah-bad{fill:var(--bad)}
+.badge{fill:var(--c)}
+.badge-t{fill:var(--panel)!important;font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin:12px 2px 0;color:var(--muted);font-size:.85rem;align-items:center}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend svg{flex:none}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:18px}
+.card{background:var(--panel);border:1px solid var(--grid);border-left:4px solid var(--c,var(--line));border-radius:10px;padding:10px 14px;box-shadow:var(--shadow);scroll-margin-top:12px}
+.card:target{outline:3px solid var(--cp);outline-offset:1px}
+.card h3{margin:0 0 4px;font-size:1rem;line-height:1.3}
+.card p{margin:2px 0;font-size:.9rem}
+.card .k{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+.tag{display:inline-block;font-size:.78rem;border-radius:999px;padding:1px 9px;margin:2px 4px 2px 0;border:1px solid var(--line);color:var(--ink)}
+.tag.cp{background:color-mix(in srgb,var(--cp) 22%,var(--panel));border-color:var(--cp)}
+.tag.ap{background:var(--appr);color:var(--appr-ink);border-color:var(--appr)}
+.tag.bad{border-color:var(--bad);color:var(--bad)}
+h2{font-size:1.05rem;margin:26px 0 0}
+.note{color:var(--muted);font-size:.85rem;margin:10px 2px 0;max-width:110ch}
+.hint{display:none;color:var(--muted);font-size:.8rem;margin:6px 2px 0}
+.board{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:899px){svg.d{min-width:var(--minw,1000px)}.hint{display:block}.cards{grid-template-columns:1fr}}
+@media print{button.theme{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div><h1>Company roles and the agreement stack</h1><p class="sub">Left: who can do what inside a company and how people join. Right: the ten agreements placed on the invoice lifecycle, with who signs each one.</p></div>
+<button class="theme" id="theme" type="button">Switch theme</button>
+</header>
+<section class="board" aria-label="Company model and agreement stack" tabindex="0"><svg class="d" style="--minw:1200px" viewBox="0 0 1670 880" role="img" aria-labelledby="t3 d3" xmlns="http://www.w3.org/2000/svg">
+<title id="t3">Company model and agreement stack</title>
+<desc id="d3">Left: the five company roles and the invitation flow. Right: the ten agreements placed on a timeline of the invoice lifecycle, with who signs each one.</desc>
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+<marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah-bad"/></marker>
+</defs>
+<text x="10" y="26" font-size="16" font-weight="700">Company model</text>
+<text class="m" x="10" y="44" font-size="12">One company, several people. Roles are held per company.</text>
+<g class="lane-staff"><rect class="node" x="10" y="58" width="480" height="74" rx="10"/><text x="26" y="82" font-size="14" font-weight="700">Owner</text><text class="m" x="81.0" y="82" font-size="11.5">exactly one</text><text x="26" y="102" font-size="12.5">Everything. Transfers ownership;</text><text x="26" y="118" font-size="12.5">closes the company.</text>
+</g>
+<g class="lane-staff"><rect class="node" x="10" y="154" width="480" height="74" rx="10"/><text x="26" y="178" font-size="14" font-weight="700">Admin</text><text class="m" x="81.0" y="178" font-size="11.5">people, not money</text><text x="26" y="198" font-size="12.5">Invites and removes people, edits company details.</text>
+<rect x="358" y="164" width="122" height="22" rx="11" fill="color-mix(in srgb,var(--bad) 10%,var(--panel))" stroke="var(--bad)"/><text x="419" y="179" font-size="11" text-anchor="middle" style="fill:var(--bad);font-weight:700">Cannot move money</text>
+</g>
+<g class="lane-staff"><rect class="node" x="10" y="250" width="480" height="74" rx="10"/><text x="26" y="274" font-size="14" font-weight="700">Maker</text><text class="m" x="81.0" y="274" font-size="11.5">prepares</text><text x="26" y="294" font-size="12.5">Uploads invoices, drafts bids, proposes early payment,</text><text x="26" y="310" font-size="12.5">requests payouts.</text>
+</g>
+<g class="lane-staff"><rect class="node" x="10" y="346" width="480" height="74" rx="10"/><text x="26" y="370" font-size="14" font-weight="700">Approver</text><text class="m" x="106.8" y="370" font-size="11.5">commits</text><text x="26" y="390" font-size="12.5">Accepts offers, signs agreements, approves bids and</text><text x="26" y="406" font-size="12.5">early payments. Never their own.</text>
+<g><circle class="apc" cx="468" cy="366" r="11"/><path class="apk" d="M464 366L467 369.2L472.2 362.6"/></g>
+</g>
+<g class="lane-staff"><rect class="node" x="10" y="442" width="480" height="74" rx="10"/><text x="26" y="466" font-size="14" font-weight="700">Viewer / Accountant</text><text class="m" x="201.4" y="466" font-size="11.5">read only</text><text x="26" y="486" font-size="12.5">Reads and exports. Can belong to several companies.</text>
+</g>
+<path class="edge" style="stroke-width:2.2" d="M430 324V345" marker-end="url(#ah)"/>
+<text class="m" x="420" y="340" font-size="11" text-anchor="end">a different person approves</text>
+<text x="10" y="552" font-size="14" font-weight="700">How people join</text>
+<g class="lane-seller"><rect class="node" x="10" y="566" width="480" height="36" rx="8"/><text x="24" y="588" font-size="12.5">1  Owner or Admin enters an email and a role.</text></g>
+<path class="edge" d="M250 602V615" marker-end="url(#ah)"/>
+<g class="lane-seller"><rect class="node" x="10" y="616" width="480" height="52" rx="8"/><text x="24" y="638" font-size="12.5">2  The system emails a single-use link.</text><text x="24" y="654" font-size="12.5">It expires in 10 days and can be resent or cancelled.</text></g>
+<path class="edge" d="M250 668V681" marker-end="url(#ah)"/>
+<g class="lane-seller"><rect class="node" x="10" y="682" width="480" height="52" rx="8"/><text x="24" y="704" font-size="12.5">3  The invitee sets their own password and enrols</text><text x="24" y="720" font-size="12.5">a second factor. Nobody else ever knows it.</text></g>
+<path class="edge" d="M250 734V747" marker-end="url(#ah)"/>
+<g class="lane-seller"><rect class="node" x="10" y="748" width="480" height="52" rx="8"/><text x="24" y="770" font-size="12.5">4  Invite, role change and approval are written to the</text><text x="24" y="786" font-size="12.5">audit log. Role or approval-limit changes need a second factor.</text></g>
+<text class="m" x="10" y="828" font-size="12">Ownership transfer: the owner offers, the recipient accepts.</text>
+<text class="m" x="10" y="846" font-size="12">One login, a company switcher, roles held per company.</text>
+<line x1="512" y1="12" x2="512" y2="868" stroke="var(--grid)" stroke-width="2"/>
+<text x="540" y="26" font-size="16" font-weight="700">Agreement stack on the lifecycle</text>
+<text class="m" x="540" y="44" font-size="12">Ten documents, in time order. Columns are grouped by when the document is signed.</text>
+<rect x="671" y="60" width="92" height="26" rx="6" fill="var(--stripe)" stroke="var(--line)"/><text x="717.0" y="77" font-size="12.5" font-weight="700" text-anchor="middle">Signup</text>
+<rect x="769" y="60" width="386" height="26" rx="6" fill="var(--stripe)" stroke="var(--line)"/><text x="962.0" y="77" font-size="12.5" font-weight="700" text-anchor="middle">Once, at approval</text>
+<rect x="1161" y="60" width="386" height="26" rx="6" fill="var(--stripe)" stroke="var(--line)"/><text x="1354.0" y="77" font-size="12.5" font-weight="700" text-anchor="middle">Per invoice</text>
+<rect x="1553" y="60" width="92" height="26" rx="6" fill="var(--stripe)" stroke="var(--line)"/><text x="1599.0" y="77" font-size="12.5" font-weight="700" text-anchor="middle">Per mandate</text>
+<text class="m" x="540" y="106" font-size="11.5">Lifecycle step</text>
+<text class="m" x="1207.0" y="106" font-size="11.5" text-anchor="middle">step 5</text>
+<text class="m" x="1305.0" y="106" font-size="11.5" text-anchor="middle">step 7</text>
+<text class="m" x="1403.0" y="106" font-size="11.5" text-anchor="middle">step 8</text>
+<text class="m" x="1501.0" y="106" font-size="11.5" text-anchor="middle">step 8</text>
+<text class="m" x="1599.0" y="106" font-size="11.5" text-anchor="middle">step 11</text>
+<a href="#doc-1" aria-label="Document 1: Platform terms and privacy notice"><g class="lane-system"><title>1. Platform terms and privacy notice (Signup). Signed by: Every user.</title><rect class="node" x="672.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="674.0" cy="118" r="10"/><text class="badge-t" x="674.0" y="122" font-size="11" text-anchor="middle">1</text><text x="717.0" y="142" font-size="10.5" text-anchor="middle">Platform terms</text><text x="717.0" y="156" font-size="10.5" text-anchor="middle">and privacy</text><text x="717.0" y="170" font-size="10.5" text-anchor="middle">notice</text></g></a>
+<a href="#doc-2" aria-label="Document 2: Seller master receivables agreement"><g class="lane-system"><title>2. Seller master receivables agreement (Once, at approval). Signed by: Seller and funder (or platform as agent).</title><rect class="node" x="770.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="772.0" cy="118" r="10"/><text class="badge-t" x="772.0" y="122" font-size="11" text-anchor="middle">2</text><text x="815.0" y="142" font-size="10.5" text-anchor="middle">Seller master</text><text x="815.0" y="156" font-size="10.5" text-anchor="middle">receivables</text><text x="815.0" y="170" font-size="10.5" text-anchor="middle">agreement</text></g></a>
+<a href="#doc-3" aria-label="Document 3: Invoice schedule / offer letter"><g class="lane-system"><title>3. Invoice schedule / offer letter (Per invoice). Signed by: Seller and funder.</title><rect class="node" x="1358.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="1360.0" cy="118" r="10"/><text class="badge-t" x="1360.0" y="122" font-size="11" text-anchor="middle">3</text><text x="1403.0" y="142" font-size="10.5" text-anchor="middle">Invoice</text><text x="1403.0" y="156" font-size="10.5" text-anchor="middle">schedule /</text><text x="1403.0" y="170" font-size="10.5" text-anchor="middle">offer letter</text></g></a>
+<a href="#doc-4" aria-label="Document 4: Notice of assignment and debtor acknowledgement"><g class="lane-system"><title>4. Notice of assignment and debtor acknowledgement (Per invoice (or per master)). Signed by: Sent by seller or funder; buyer acknowledges.</title><rect class="node" x="1456.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="1458.0" cy="118" r="10"/><text class="badge-t" x="1458.0" y="122" font-size="11" text-anchor="middle">4</text><text x="1501.0" y="142" font-size="10.5" text-anchor="middle">Notice of</text><text x="1501.0" y="156" font-size="10.5" text-anchor="middle">assignment and</text><text x="1501.0" y="170" font-size="10.5" text-anchor="middle">debtor</text><text x="1501.0" y="184" font-size="10.5" text-anchor="middle">acknowledgement</text></g></a>
+<a href="#doc-5" aria-label="Document 5: Buyer acceptance / confirmation"><g class="lane-system"><title>5. Buyer acceptance / confirmation (Per invoice). Signed by: Buyer (one click, recorded).</title><rect class="node" x="1162.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="1164.0" cy="118" r="10"/><text class="badge-t" x="1164.0" y="122" font-size="11" text-anchor="middle">5</text><text x="1207.0" y="142" font-size="10.5" text-anchor="middle">Buyer</text><text x="1207.0" y="156" font-size="10.5" text-anchor="middle">acceptance /</text><text x="1207.0" y="170" font-size="10.5" text-anchor="middle">confirmation</text></g></a>
+<a href="#doc-6" aria-label="Document 6: Buyer programme agreement"><g class="lane-system"><title>6. Buyer programme agreement (Once). Signed by: Buyer and funder or agent.</title><rect class="node" x="868.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="870.0" cy="118" r="10"/><text class="badge-t" x="870.0" y="122" font-size="11" text-anchor="middle">6</text><text x="913.0" y="142" font-size="10.5" text-anchor="middle">Buyer</text><text x="913.0" y="156" font-size="10.5" text-anchor="middle">programme</text><text x="913.0" y="170" font-size="10.5" text-anchor="middle">agreement</text></g></a>
+<a href="#doc-7" aria-label="Document 7: Financier funding agreement and mandate"><g class="lane-system"><title>7. Financier funding agreement and mandate (Once). Signed by: Platform and financier.</title><rect class="node" x="966.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="968.0" cy="118" r="10"/><text class="badge-t" x="968.0" y="122" font-size="11" text-anchor="middle">7</text><text x="1011.0" y="142" font-size="10.5" text-anchor="middle">Financier</text><text x="1011.0" y="156" font-size="10.5" text-anchor="middle">funding</text><text x="1011.0" y="170" font-size="10.5" text-anchor="middle">agreement and</text><text x="1011.0" y="184" font-size="10.5" text-anchor="middle">mandate</text></g></a>
+<a href="#doc-8" aria-label="Document 8: Collection account / trust agreement"><g class="lane-system"><title>8. Collection account / trust agreement (Once). Signed by: Platform or funder, account bank, seller.</title><rect class="node" x="1064.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="1066.0" cy="118" r="10"/><text class="badge-t" x="1066.0" y="122" font-size="11" text-anchor="middle">8</text><text x="1109.0" y="142" font-size="10.5" text-anchor="middle">Collection</text><text x="1109.0" y="156" font-size="10.5" text-anchor="middle">account /</text><text x="1109.0" y="170" font-size="10.5" text-anchor="middle">trust agreement</text></g></a>
+<a href="#doc-9" aria-label="Document 9: Direct-debit or e-mandate consent"><g class="lane-system"><title>9. Direct-debit or e-mandate consent (Per mandate). Signed by: Payer.</title><rect class="node" x="1554.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="1556.0" cy="118" r="10"/><text class="badge-t" x="1556.0" y="122" font-size="11" text-anchor="middle">9</text><text x="1599.0" y="142" font-size="10.5" text-anchor="middle">Direct-debit or</text><text x="1599.0" y="156" font-size="10.5" text-anchor="middle">e-mandate</text><text x="1599.0" y="170" font-size="10.5" text-anchor="middle">consent</text></g></a>
+<a href="#doc-10" aria-label="Document 10: Key facts / rate disclosure sheet"><g class="lane-system"><title>10. Key facts / rate disclosure sheet (Before accepting any offer). Signed by: Given to seller; seller acknowledges.</title><rect class="node" x="1260.0" y="116" width="90" height="84" rx="8"/><circle class="badge" cx="1262.0" cy="118" r="10"/><text class="badge-t" x="1262.0" y="122" font-size="11" text-anchor="middle">10</text><text x="1305.0" y="142" font-size="10.5" text-anchor="middle">Key facts /</text><text x="1305.0" y="156" font-size="10.5" text-anchor="middle">rate disclosure</text><text x="1305.0" y="170" font-size="10.5" text-anchor="middle">sheet</text></g></a>
+<rect x="540" y="222" width="1108" height="46" fill="var(--stripe)"/>
+<text x="550" y="249.0" font-size="12.5" font-weight="700">Every user</text>
+<rect x="540" y="268" width="1108" height="46" fill="var(--panel)"/>
+<text x="550" y="295.0" font-size="12.5" font-weight="700">Seller</text>
+<rect x="540" y="314" width="1108" height="46" fill="var(--stripe)"/>
+<text x="550" y="341.0" font-size="12.5" font-weight="700">Buyer</text>
+<rect x="540" y="360" width="1108" height="46" fill="var(--panel)"/>
+<text x="550" y="387.0" font-size="12.5" font-weight="700">Funder / financier</text>
+<rect x="540" y="406" width="1108" height="46" fill="var(--stripe)"/>
+<text x="550" y="433.0" font-size="12.5" font-weight="700">Platform</text>
+<rect x="540" y="452" width="1108" height="46" fill="var(--panel)"/>
+<text x="550" y="479.0" font-size="12.5" font-weight="700">Account bank</text>
+<rect x="540" y="498" width="1108" height="46" fill="var(--stripe)"/>
+<text x="550" y="525.0" font-size="12.5" font-weight="700">Payer</text>
+<path d="M717.0 200V245.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Every user: signs (document 1)</title><circle cx="717.0" cy="245.0" r="9" fill="var(--appr)"/></g>
+<path d="M815.0 200V429.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Seller: signs (document 2)</title><circle cx="815.0" cy="291.0" r="9" fill="var(--appr)"/></g>
+<g><title>Funder / financier: signs (document 2)</title><circle cx="815.0" cy="383.0" r="9" fill="var(--appr)"/></g>
+<g><title>Platform: signs, as one of two options or as agent (document 2)</title><circle cx="815.0" cy="429.0" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2" stroke-dasharray="3 2.5"/></g>
+<path d="M1403.0 200V383.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Seller: signs (document 3)</title><circle cx="1403.0" cy="291.0" r="9" fill="var(--appr)"/></g>
+<g><title>Funder / financier: signs (document 3)</title><circle cx="1403.0" cy="383.0" r="9" fill="var(--appr)"/></g>
+<path d="M1501.0 200V383.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Seller: sends the notice (document 4)</title><rect x="1493.0" y="283.0" width="16" height="16" rx="3" fill="var(--appr)"/><path d="M1497.0 291.0H1505.0M1502.0 288.0L1505.0 291.0L1502.0 294.0" fill="none" stroke="var(--appr-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g><title>Funder / financier: sends the notice (document 4)</title><rect x="1493.0" y="375.0" width="16" height="16" rx="3" fill="var(--appr)"/><path d="M1497.0 383.0H1505.0M1502.0 380.0L1505.0 383.0L1502.0 386.0" fill="none" stroke="var(--appr-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g><title>Buyer: acknowledges (document 4)</title><circle cx="1501.0" cy="337.0" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2"/><path class="edge" style="stroke:var(--appr);stroke-width:2;stroke-linecap:round" d="M1497.0 337.0L1500.0 340.2L1505.2 333.6"/></g>
+<path d="M1207.0 200V337.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Buyer: signs (document 5)</title><circle cx="1207.0" cy="337.0" r="9" fill="var(--appr)"/></g>
+<path d="M913.0 200V429.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Buyer: signs (document 6)</title><circle cx="913.0" cy="337.0" r="9" fill="var(--appr)"/></g>
+<g><title>Funder / financier: signs (document 6)</title><circle cx="913.0" cy="383.0" r="9" fill="var(--appr)"/></g>
+<g><title>Platform: signs, as one of two options or as agent (document 6)</title><circle cx="913.0" cy="429.0" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2" stroke-dasharray="3 2.5"/></g>
+<path d="M1011.0 200V429.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Funder / financier: signs (document 7)</title><circle cx="1011.0" cy="383.0" r="9" fill="var(--appr)"/></g>
+<g><title>Platform: signs (document 7)</title><circle cx="1011.0" cy="429.0" r="9" fill="var(--appr)"/></g>
+<path d="M1109.0 200V475.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Platform: signs, as one of two options or as agent (document 8)</title><circle cx="1109.0" cy="429.0" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2" stroke-dasharray="3 2.5"/></g>
+<g><title>Funder / financier: signs, as one of two options or as agent (document 8)</title><circle cx="1109.0" cy="383.0" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2" stroke-dasharray="3 2.5"/></g>
+<g><title>Account bank: signs (document 8)</title><circle cx="1109.0" cy="475.0" r="9" fill="var(--appr)"/></g>
+<g><title>Seller: signs (document 8)</title><circle cx="1109.0" cy="291.0" r="9" fill="var(--appr)"/></g>
+<path d="M1599.0 200V521.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Payer: signs (document 9)</title><circle cx="1599.0" cy="521.0" r="9" fill="var(--appr)"/></g>
+<path d="M1305.0 200V291.0" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="2 3"/>
+<g><title>Seller: acknowledges (document 10)</title><circle cx="1305.0" cy="291.0" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2"/><path class="edge" style="stroke:var(--appr);stroke-width:2;stroke-linecap:round" d="M1301.0 291.0L1304.0 294.2L1309.2 287.6"/></g>
+<circle cx="550" cy="566" r="9" fill="var(--appr)"/><text x="566" y="570" font-size="12">Signs</text>
+<circle cx="634.0" cy="566" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2"/><path class="edge" style="stroke:var(--appr);stroke-width:2;stroke-linecap:round" d="M630.0 566L633.0 569.2L638.2 562.6"/><text x="650.0" y="570" font-size="12">Acknowledges</text>
+<circle cx="762.8" cy="566" r="9" fill="var(--panel)" stroke="var(--appr)" stroke-width="2" stroke-dasharray="3 2.5"/><text x="778.8" y="570" font-size="12">Either party, or platform as agent</text>
+<rect x="1024.4" y="558" width="16" height="16" rx="3" fill="var(--appr)"/><path d="M1028.4 566H1036.4M1033.4 563L1036.4 566L1033.4 569" fill="none" stroke="var(--appr-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="1048.4" y="570" font-size="12">Sends the notice</text>
+<rect x="540" y="602" width="1108" height="168" rx="10" fill="var(--panel)" stroke="var(--line)"/>
+<text x="556" y="626" font-size="13.5" font-weight="700">Five clauses not to leave to a template</text>
+<text x="556" y="652" font-size="12.5">1  True sale, recourse and perfection: what is sold, what triggers repurchase, and which notice and registry steps are needed.</text>
+<text x="556" y="676" font-size="12.5">2  Dispute, dilution and set-off allocation, with the buyer&#x27;s waiver: a signed writing that says exactly what the buyer undertakes.</text>
+<text x="556" y="700" font-size="12.5">3  Collection account, proceeds and priority: misdirected payments, the trust declaration, the waterfall, funder versus seller.</text>
+<text x="556" y="724" font-size="12.5">4  Pricing consistency: one formula, one day-count basis, one late-charge rule, the same figures in the offer and the disclosure sheet.</text>
+<text x="556" y="748" font-size="12.5">5  Electronic execution and evidence: signature level per country, audit trail, timestamps, consent record, governing law and forum.</text>
+</svg></section>
+<p class="hint">Swipe sideways inside the diagram. The document cards below hold the same facts as text.</p>
+<p class="note">Placement on the timeline follows the guide's "when" column. The step references (5, 7, 8, 11) tie a document to the 14-step lifecycle where the guide's step table names the event; the other documents are signed once, outside any single invoice. Each country's lawyer adapts all ten; nothing here is a template to copy blindly.</p>
+<h2>The ten documents</h2>
+<div class="cards"><article class="card lane-system" id="doc-1"><h3>1. Platform terms and privacy notice</h3><span class="tag">Signup</span><p><span class="k">Signed by</span> Every user</p><p><span class="k">Must do</span> Roles, eligibility, e-signature and e-records consent, data sharing with financiers, consent withdrawal, complaints route.</p></article><article class="card lane-system" id="doc-2"><h3>2. Seller master receivables agreement</h3><span class="tag">Once, at approval</span><p><span class="k">Signed by</span> Seller and funder (or platform as agent)</p><p><span class="k">Must do</span> True-sale or financing characterisation, eligible and excluded invoices, seller warranties, recourse and repurchase events, reserve, pricing, authority to notify and register, audit rights, termination, governing law.</p></article><article class="card lane-system" id="doc-3"><h3>3. Invoice schedule / offer letter</h3><span class="tag">Per invoice</span><p><span class="k">Signed by</span> Seller and funder</p><p><span class="k">Must do</span> Invoice identifiers, face value, advance, reserve, fee, discount rate, day-count basis and days, due date, payee account, recourse status, acceptance timestamp, incorporation of document 2.</p></article><article class="card lane-system" id="doc-4"><h3>4. Notice of assignment and debtor acknowledgement</h3><span class="tag">Per invoice (or per master)</span><p><span class="k">Signed by</span> Sent by seller or funder; buyer acknowledges</p><p><span class="k">Must do</span> Identifies the invoice and the new owner, payment instruction, effective on receipt, buyer states known set-off or claims, no change to currency or place of payment, proof of transfer on request.</p></article><article class="card lane-system" id="doc-5"><h3>5. Buyer acceptance / confirmation</h3><span class="tag">Per invoice</span><p><span class="k">Signed by</span> Buyer (one click, recorded)</p><p><span class="k">Must do</span> Binding if it is an unconditional payment undertaking that waives defences and set-off in a signed writing; fraud and incapacity carved out; consent to assignment; dispute procedure.</p></article><article class="card lane-system" id="doc-6"><h3>6. Buyer programme agreement</h3><span class="tag">Once</span><p><span class="k">Signed by</span> Buyer and funder or agent</p><p><span class="k">Must do</span> Authority to pay, unconditional payment on the due date without set-off, acknowledgement of assignment and registry filing, information exchange, adverse-claims notice.</p></article><article class="card lane-system" id="doc-7"><h3>7. Financier funding agreement and mandate</h3><span class="tag">Once</span><p><span class="k">Signed by</span> Platform and financier</p><p><span class="k">Must do</span> Eligibility criteria, per-buyer limits, funding commitments, servicing and collections, reporting, repurchase pass-through, fees, licence warranty.</p></article><article class="card lane-system" id="doc-8"><h3>8. Collection account / trust agreement</h3><span class="tag">Once</span><p><span class="k">Signed by</span> Platform or funder, account bank, seller</p><p><span class="k">Must do</span> Account title and ring-fencing, who may pay in, sweep timing, waterfall, trust declaration, no set-off by the bank, reconciliation, seller insolvency, signatories.</p></article><article class="card lane-system" id="doc-9"><h3>9. Direct-debit or e-mandate consent</h3><span class="tag">Per mandate</span><p><span class="k">Signed by</span> Payer</p><p><span class="k">Must do</span> Strong authentication at registration, validity period, maximum amount, pre-debit notice, opt-out.</p></article><article class="card lane-system" id="doc-10"><h3>10. Key facts / rate disclosure sheet</h3><span class="tag">Before accepting any offer</span><p><span class="k">Signed by</span> Given to seller; seller acknowledges</p><p><span class="k">Must do</span> One standard format, all-in rate (APR), every charge including contingent ones listed separately, validity of the quote, language the seller understands.</p></article></div>
+<p class="note">Source: Marichi Labs platform guide, Section 3 (people, companies and logins), Section 6 (the agreement stack) and Section 4 (the invoice, end to end). Not legal advice.</p>
+</div>
+<script>(function(){var b=document.getElementById('theme');if(!b)return;
+function cur(){var t=document.documentElement.getAttribute('data-theme');if(t)return t;return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
+function label(){b.textContent=cur()==='dark'?'Switch to light theme':'Switch to dark theme'}
+label();
+b.addEventListener('click',function(){var n=cur()==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);try{localStorage.setItem('marichi-diagram-theme',n)}catch(e){}label()});})();</script>
+</body>
+</html>

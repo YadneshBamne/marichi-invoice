@@ -2,12 +2,12 @@
 import { useRef, useState, useTransition } from "react";
 import { Icon, Logo } from "@/components/ui/icons";
 import { Alert, Spinner } from "@/components/ui/forms";
-import { ORG_ROLE_BLURB } from "@/server/permissions";
-import { addTeamMember, finishSetup, saveApps, saveProfile } from "./actions";
+import { INVITABLE, ORG_ROLE_BLURB, ORG_ROLE_LABEL, type OrgRole } from "@/server/permissions";
+import { finishSetup, inviteTeamMember, saveApps, saveProfile } from "./actions";
 
 type App = { id: string; name: string; icon: string; blurb: string; core: boolean; on: boolean };
 type Soon = { slug: string; title: string; icon: string; phase: number; summary: string };
-type Added = { name: string; email: string; password: string; orgRole: string };
+type Added = { email: string; orgRole: OrgRole; emailed: boolean };
 
 const STEPS = ["Apps", "Company", "Team", "Finish"];
 const INDUSTRIES = ["Manufacturing", "Textiles and apparel", "Food and agriculture", "Pharma and healthcare", "Electronics", "Logistics", "Construction", "Retail and distribution", "IT and services", "Other"];
@@ -39,16 +39,16 @@ export function SetupWizard({ type, firstName, legalName, hasLogo, catalog, soon
     if (!f.reportValidity()) return;
     run(() => saveProfile(new FormData(f)), 2);
   };
-  const addOne = () => {
+  const inviteOne = () => {
     const f = member.current!;
     if (!f.reportValidity()) return;
     const fd = new FormData(f);
-    const p = { name: String(fd.get("name")), email: String(fd.get("email")), orgRole: String(fd.get("orgRole")) as "manager" | "member" };
+    const p = { email: String(fd.get("email")), orgRole: String(fd.get("orgRole")) as OrgRole };
     start(async () => {
       setErr("");
-      const r = await addTeamMember(p);
+      const r = await inviteTeamMember(p);
       if (!r.ok) return setErr(r.error);
-      setTeam((t) => [...t, { name: p.name, email: r.email, password: r.password, orgRole: p.orgRole }]);
+      setTeam((t) => [...t, { email: r.email, orgRole: p.orgRole, emailed: r.emailed }]);
       f.reset();
     });
   };
@@ -137,40 +137,36 @@ export function SetupWizard({ type, firstName, legalName, hasLogo, catalog, soon
 
           {step === 2 && (
             <section>
-              <h1 className="page-title">Add your team</h1>
-              <p className="page-sub max-w-2xl">Create a login for each person. You set their first password, and they must replace it the first time they sign in. You can do this later from Settings, Team.</p>
+              <h1 className="page-title">Invite your team</h1>
+              <p className="page-sub max-w-2xl">Each person gets an emailed link, chooses their own password and sets up two-step verification. Nobody else ever knows it. You can do this later from Settings, Team. Only you can invite approvers and admins, because they carry money and access power.</p>
               <div className="mt-7 grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
-                <form ref={member} onSubmit={(e) => { e.preventDefault(); addOne(); }} className="space-y-4 rounded-card bg-card p-5 shadow-card sm:p-6">
-                  <label className="block text-sm font-medium">Full name<input name="name" required minLength={2} className="field font-normal" /></label>
-                  <label className="block text-sm font-medium">Work email<input name="email" type="email" required className="field font-normal" /></label>
+                <form ref={member} onSubmit={(e) => { e.preventDefault(); inviteOne(); }} className="space-y-4 rounded-card bg-card p-5 shadow-card sm:p-6">
+                  <label className="block text-sm font-medium">Work email<input name="email" type="email" required className="field font-normal" placeholder="name@company.com" /></label>
                   <fieldset>
                     <legend className="text-sm font-medium">Role</legend>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      {(["manager", "member"] as const).map((r, n) => (
+                      {INVITABLE.map((r) => (
                         <label key={r} className="flex cursor-pointer items-start gap-3 rounded-xl p-3 ring-1 ring-hair transition-all has-[:checked]:bg-p-100 has-[:checked]:ring-2 has-[:checked]:ring-p-700">
-                          <input type="radio" name="orgRole" value={r} defaultChecked={n === 1} className="mt-1" />
-                          <span className="text-sm"><b className="capitalize">{r}</b><span className="mt-0.5 block text-xs text-muted">{ORG_ROLE_BLURB[r]}</span></span>
+                          <input type="radio" name="orgRole" value={r} defaultChecked={r === "maker"} className="mt-1" />
+                          <span className="text-sm"><b>{ORG_ROLE_LABEL[r]}</b><span className="mt-0.5 block text-xs text-muted">{ORG_ROLE_BLURB[r]}</span></span>
                         </label>
                       ))}
                     </div>
                   </fieldset>
-                  <button disabled={pending} className="btn btn-ghost w-full">{pending ? <Spinner /> : <Icon name="plus" className="h-4 w-4" />}Add person</button>
+                  <button disabled={pending} className="btn btn-ghost w-full">{pending ? <Spinner /> : <Icon name="email" className="h-4 w-4" />}Send invitation</button>
                 </form>
                 <div className="rounded-card bg-card p-5 shadow-card sm:p-6">
-                  <h2 className="text-[15px] font-semibold">Added ({team.length})</h2>
-                  {team.length === 0 ? <p className="mt-3 text-sm text-muted">Nobody yet. You can skip this and add people later.</p> : (
+                  <h2 className="text-[15px] font-semibold">Invited ({team.length})</h2>
+                  {team.length === 0 ? <p className="mt-3 text-sm text-muted">Nobody yet. You can skip this and invite people later.</p> : (
                     <ul className="mt-3 space-y-3">
                       {team.map((t) => (
                         <li key={t.email} className="anim-pop rounded-xl bg-panel p-3 text-sm">
-                          <p className="font-semibold">{t.name} <span className="pill ml-1 bg-card text-muted capitalize ring-1 ring-hair">{t.orgRole}</span></p>
-                          <p className="text-muted">{t.email}</p>
-                          <p className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-card px-3 py-2 font-mono text-[13px]"><span>{t.password}</span>
-                            <button type="button" className="font-sans text-xs font-semibold text-p-700 hover:underline" onClick={() => navigator.clipboard?.writeText(`${t.email}\n${t.password}`)}>Copy</button></p>
+                          <p className="font-semibold">{t.email} <span className="pill ml-1 bg-card text-muted ring-1 ring-hair">{ORG_ROLE_LABEL[t.orgRole]}</span></p>
+                          <p className="text-muted">{t.emailed ? "Invitation emailed. The link works once for 10 days." : "Saved, but the email could not be sent. Use Resend under Settings, Team."}</p>
                         </li>
                       ))}
                     </ul>
                   )}
-                  {team.length > 0 && <p className="mt-3 text-xs text-muted">Share these privately. They are shown only now, and each person must choose their own password at first sign-in.</p>}
                 </div>
               </div>
             </section>
@@ -180,7 +176,7 @@ export function SetupWizard({ type, firstName, legalName, hasLogo, catalog, soon
             <section className="mx-auto max-w-xl text-center">
               <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-p-700 text-white"><Icon name="check" className="h-8 w-8" /></span>
               <h1 className="page-title mt-5">{name} is ready</h1>
-              <p className="page-sub">Your workspace has {appCount} app{appCount === 1 ? "" : "s"}{team.length ? ` and ${team.length} team member${team.length === 1 ? "" : "s"}` : ""} switched on.</p>
+              <p className="page-sub">Your workspace has {appCount} app{appCount === 1 ? "" : "s"}{team.length ? ` and ${team.length} invitation${team.length === 1 ? "" : "s"} sent` : ""}.</p>
               <ul className="mx-auto mt-6 max-w-sm space-y-2 text-left text-sm">
                 <li className="flex gap-3 rounded-xl bg-card p-3 shadow-card"><Icon name="shield" className="h-5 w-5 shrink-0 text-p-600" />{type === "buyer" ? "Verify your company so suppliers can be paid against your confirmations." : "Verify your business (KYB) to start getting offers."}</li>
                 <li className="flex gap-3 rounded-xl bg-card p-3 shadow-card"><Icon name="play" className="h-5 w-5 shrink-0 text-p-600" />A short tour will show you around the first time.</li>

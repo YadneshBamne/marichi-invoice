@@ -69,7 +69,7 @@ export default async function Agreements() {
             <ReviewCard key={o.id} title={`Invoice ${inv.invoiceNumber}`}
               meta={ready.ready ? <StatusPill status="signed" label="Fully signed" /> : <StatusPill status="pending" label="Waiting for signature" />}
               aside={<><p className="text-xs text-muted">To be paid out</p><p className="text-lg font-semibold">{formatINR(o.advanceAmount - o.feeAmount)}</p></>}
-              actions={ready.ready ? undefined : !signer ? <p className="text-xs text-s-600">Your role can view this but not sign. Ask a manager or the owner.</p> : (
+              actions={ready.ready ? undefined : !signer ? <p className="text-xs text-s-600">Only an approver or the owner can sign. Ask one of them.</p> : (
                 <form action={sign} className="flex flex-wrap items-center justify-between gap-3">
                   <input type="hidden" name="offerId" value={o.id} />
                   <label className="flex items-center gap-2.5 text-sm"><input name="agree" type="checkbox" required />I have read and agree to the agreements above.</label>

@@ -31,7 +31,7 @@ describe("API keys", () => {
     await expect(revokeApiKey(w.db, owner, id)).rejects.toThrow(/already revoked/);
   });
   it("only an owner can create or revoke keys, and keys belong to one company", async () => {
-    await expect(createApiKey(w.db, { ...owner, orgRole: "manager" }, "x key")).rejects.toThrow(/not allowed/);
+    await expect(createApiKey(w.db, { ...owner, orgRole: "approver" }, "x key")).rejects.toThrow(/not allowed/);
     const { id } = await createApiKey(w.db, owner, "Mine");
     await expect(revokeApiKey(w.db, { ...owner, businessId: w.buyerId }, id)).rejects.toThrow(/not found/);
   });

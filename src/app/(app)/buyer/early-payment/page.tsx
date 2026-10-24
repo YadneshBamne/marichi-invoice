@@ -4,7 +4,9 @@ import { db } from "@/server/db/client";
 import { businesses, financingOffers, invoices } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
-import { DD, listEarlyPayments, proposeEarlyPayment, withdrawEarlyPayment } from "@/server/earlypay/service";
+import { DD, listEarlyPayments, withdrawEarlyPayment } from "@/server/earlypay/service";
+import { quoteEarly } from "@/server/earlypay/quote";
+import { submit } from "@/server/approvals/service";
 import { DataTable, EmptyState, KV, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
 import { formatINR } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
@@ -18,17 +20,22 @@ async function propose(fd: FormData) {
   "use server";
   const u = await requireUser(["buyer"]);
   await attempt(PATH, async () => {
-    assertCan(u, "earlypay.propose");
+    assertCan(u, "earlypay.prepare");
     const f = z.object({ invoiceId: z.uuid(), discountPct: z.coerce.number() }).parse(Object.fromEntries(fd));
-    await proposeEarlyPayment(db, { id: u.id, role: u.role, businessId: u.businessId }, { invoiceId: f.invoiceId, discountBps: Math.round(f.discountPct * 100) });
-    return "Sent to your supplier. They have 72 hours to answer.";
+    const discountBps = Math.round(f.discountPct * 100);
+    const [inv] = await db.select().from(invoices).where(eq(invoices.id, f.invoiceId));
+    if (!inv) throw new Error("invoice not found");
+    const q = quoteEarly(inv.amount, Math.max(1, day(inv.dueDate) - day(new Date().toISOString())), discountBps);
+    const r = await submit(db, { id: u.id, role: u.role, orgRole: u.orgRole, businessId: u.businessId }, "earlypay.propose", { invoiceId: f.invoiceId, discountBps },
+      { summary: `Pay invoice ${inv.invoiceNumber} early: ${formatINR(q.net)} now, saving ${formatINR(q.discount)}`, amount: q.net });
+    return r.status === "queued" ? "Sent for approval. An approver in your company will see it under Approvals. Nothing goes to your supplier until they approve." : "Sent to your supplier. They have 72 hours to answer.";
   });
 }
 async function withdraw(fd: FormData) {
   "use server";
   const u = await requireUser(["buyer"]);
   await attempt(PATH, async () => {
-    assertCan(u, "earlypay.propose");
+    assertCan(u, "earlypay.prepare");
     await withdrawEarlyPayment(db, { id: u.id, role: u.role, businessId: u.businessId }, z.uuid().parse(fd.get("id")));
     return "Proposal withdrawn.";
   });
@@ -37,7 +44,7 @@ async function withdraw(fd: FormData) {
 export default async function EarlyPayment({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const u = await requireUser(["buyer"]);
   const q = await searchParams;
-  const may = can(u, "earlypay.propose");
+  const may = can(u, "earlypay.prepare");
   const today = day(new Date().toISOString());
   const [list, mine] = await Promise.all([
     db.select({ i: invoices, seller: businesses.legalName }).from(invoices).innerJoin(businesses, eq(businesses.id, invoices.sellerId))
@@ -52,7 +59,7 @@ export default async function EarlyPayment({ searchParams }: { searchParams: Pro
       <PageHead title="Pay early" sub="Pay confirmed invoices before they are due and keep a discount that grows with how early you pay. Your supplier decides whether to accept." />
       {q.ok && <div className="mb-4"><Notice tone="good">{q.ok}</Notice></div>}
       {q.error && <div className="mb-4"><Notice tone="bad">{q.error}</Notice></div>}
-      {!may && <div className="mb-4"><Notice tone="warn">Paying early commits company cash. Ask a manager or the owner to send proposals.</Notice></div>}
+      {!may && <div className="mb-4"><Notice tone="warn">Your role can view this page but not propose early payments.</Notice></div>}
 
       {mine.filter((m) => m.e.status === "accepted").map((m) => (
         <Panel key={m.e.id} title={`Pay ${formatINR(m.e.netAmount)} for invoice ${m.inv.invoiceNumber}`} sub={`Accepted. Pay exactly this amount by ${m.e.expiresAt.toLocaleDateString("en-IN")} or the offer lapses.`} className="mb-5">
@@ -70,7 +77,7 @@ export default async function EarlyPayment({ searchParams }: { searchParams: Pro
               { h: "Due", cell: (r) => <>{r.i.dueDate}<span className="block text-xs font-normal text-muted">{day(r.i.dueDate) - today} days away</span></> },
               { h: "", align: "right", cell: (r) => may && (
                 <Pop id={`pe-${r.i.id}`} label="Pay early">
-                  <QuoteForm amount={r.i.amount.toString()} days={day(r.i.dueDate) - today} minBps={DD.minBps} maxBps={DD.maxBps} feeBps={DD.feeBps} action={propose} invoiceId={r.i.id} />
+                  <QuoteForm amount={r.i.amount.toString()} days={day(r.i.dueDate) - today} minBps={DD.minBps} maxBps={DD.maxBps} feeBps={DD.feeBps} action={propose} invoiceId={r.i.id} cta={can(u, "earlypay.propose") ? "Send to supplier" : "Submit for approval"} />
                 </Pop>
               ) },
             ]} />
