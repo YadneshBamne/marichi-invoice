@@ -9,7 +9,7 @@
 import { and, asc, desc, eq, inArray, notExists, sql } from "drizzle-orm";
 import type { Database, Tx } from "../db/client";
 import {
-  auditLog, bids, businesses, financingOffers, invoiceCollections, invoices, ledgerAccounts, ledgerEntries, ledgerTransactions,
+  auditLog, bids, businesses, financierBuyerLimits, financingOffers, invoiceCollections, invoices, ledgerAccounts, ledgerEntries, ledgerTransactions,
   underwritingDecisions, users,
 } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
@@ -19,6 +19,7 @@ import { postEntry, type Line } from "../ledger/post";
 import { describeOffer, priceOffer } from "../offers/pricing";
 import { notifyBusiness } from "../notify";
 import { assertNoEarlyPayment } from "../earlypay/service";
+import { assertActiveFinancier, assertWithinMandate, exposureToBuyer } from "./financier";
 import { formatINR } from "../../lib/money";
 
 export const MARKET = {
@@ -77,6 +78,7 @@ async function mustBeFinancier(db: Database | Tx, financierId: string) {
   const [u] = await db.select({ id: users.id }).from(users).where(and(eq(users.businessId, financierId), eq(users.role, "financier"))).limit(1);
   if (!b || !u) throw new Error("not a financier");
   if (b.kybStatus !== "approved") throw new Error("the financier's verification is not approved yet");
+  await assertActiveFinancier(db, financierId, null).catch((e) => { throw new Error(`the financier is not approved to hold funds: ${(e as Error).message}`); });
   return b;
 }
 
@@ -151,6 +153,9 @@ export async function placeBid(db: Database, actor: FinancierActor, p: { invoice
     if (tenorDays < 1) throw new Error("this invoice is due; too late to bid");
     if (!Number.isInteger(p.advanceBps) || p.advanceBps <= 0 || p.advanceBps > uw.advanceRateBps) throw new Error(`the advance can be at most ${uw.advanceRateBps / 100}% of the invoice`);
     const price = priceOffer({ amount: inv.amount, advanceBps: p.advanceBps, discountBps: p.discountBps, tenorDays });
+    const [seller] = await tx.select({ country: businesses.country, industry: businesses.industry }).from(businesses).where(eq(businesses.id, inv.sellerId));
+    await assertActiveFinancier(tx, fid, seller?.country ?? "IN", now); // licensed where the seller is
+    await assertWithinMandate(tx, fid, { buyerId: inv.buyerId, sellerId: inv.sellerId, grade: uw.riskGrade, advance: price.advanceAmount, tenorDays, industry: seller?.industry ?? null });
     if ((await position(tx, fid)).available < price.advanceAmount) throw new Error("you do not have enough available funds for this bid");
     await tx.update(bids).set({ status: "withdrawn", decidedAt: now }).where(and(eq(bids.invoiceId, inv.id), eq(bids.financierId, fid), eq(bids.status, "open")));
     const [bid] = await tx.insert(bids).values({
@@ -205,6 +210,10 @@ export async function acceptBid(db: Database, bidId: string, actor: SellerActor,
     await assertNoEarlyPayment(tx, inv.id);
     const [live] = await tx.select().from(financingOffers).where(and(eq(financingOffers.invoiceId, inv.id), inArray(financingOffers.status, ["open", "accepted"])));
     if (live?.status === "accepted") throw new Error("this invoice has already been funded");
+    const [seller] = await tx.select({ country: businesses.country }).from(businesses).where(eq(businesses.id, inv.sellerId));
+    await assertActiveFinancier(tx, bid.financierId, seller?.country ?? "IN", now).catch(() => { throw new Error("that financier can no longer fund this invoice; choose another"); });
+    const [lim] = await tx.select().from(financierBuyerLimits).where(and(eq(financierBuyerLimits.financierId, bid.financierId), eq(financierBuyerLimits.buyerId, inv.buyerId)));
+    if (!lim || lim.status !== "active" || (await exposureToBuyer(tx, bid.financierId, inv.buyerId)) + bid.advanceAmount > lim.limit) throw new Error("that financier's limit on this buyer no longer covers this bid; choose another");
     if ((await position(tx, bid.financierId)).available < bid.advanceAmount) throw new Error("that financier no longer has the funds for this bid; choose another");
     if (live) await tx.update(financingOffers).set({ status: "rejected" }).where(eq(financingOffers.id, live.id));
     const [offer] = await tx.insert(financingOffers).values({

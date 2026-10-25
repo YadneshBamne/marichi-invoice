@@ -12,6 +12,7 @@ import { assertPreviousDayReconciled } from "../recon/service";
 import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
 import { platformCash, position } from "../marketplace/service";
+import { assertActiveFinancier } from "../marketplace/financier";
 import { formatINR } from "../../lib/money";
 
 export const DISBURSE = {
@@ -153,7 +154,10 @@ export async function executeDisbursement(db: Database, id: string, gw: Adapters
       const [{ inflight }] = await tx.select({ inflight: sql<string>`coalesce(sum(${disbursements.amount}), 0)` }).from(disbursements).where(eq(disbursements.status, "processing"));
       if ((await balance(tx, ACCOUNTS.escrow)) - BigInt(inflight) < d.amount) throw new Error("ESCROW_INSUFFICIENT");
       if (!offer.financierId && (await platformCash(tx)) - BigInt(inflight) < d.amount) throw new Error("ESCROW_INSUFFICIENT"); // financiers' cash is not ours to lend
-      if (offer.financierId && (await position(tx, offer.financierId)).funds < offer.advanceAmount) throw new Error("FINANCIER_FUNDS_INSUFFICIENT");
+      if (offer.financierId) {
+        await assertActiveFinancier(tx, offer.financierId, null).catch((e) => { throw new Error(`FINANCIER_NOT_ACTIVE: ${(e as Error).message}`); }); // a lapsed or suspended licence stops the payout
+        if ((await position(tx, offer.financierId)).funds < offer.advanceAmount) throw new Error("FINANCIER_FUNDS_INSUFFICIENT");
+      }
       await tx.update(disbursements).set({ status: "processing", rail }).where(eq(disbursements.id, id));
     }
     return { done: false as const, d, rail, acct };

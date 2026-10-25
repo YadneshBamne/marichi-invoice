@@ -28,6 +28,8 @@ export const APPS: AppDef[] = [
       { href: "/financier/bids", label: "My bids", icon: "handshake", tour: "nav-bids" },
       { href: "/financier/portfolio", label: "Portfolio", icon: "chart", tour: "nav-portfolio" },
       { href: "/financier/statement", label: "Statement", icon: "receipt", tour: "nav-statement" },
+      { href: "/financier/mandate", label: "Mandate and limits", icon: "target", tour: "nav-mandate" },
+      { href: "/financier/application", label: "Application", icon: "shield", tour: "nav-application" },
     ],
   },
   {

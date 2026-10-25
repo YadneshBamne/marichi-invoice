@@ -111,3 +111,10 @@ Added by the Africa and India research: partner-led entry in each country, and a
 - **Rebuild** the checklist-first dashboards and navigation after the above, then the visual redesign.
 
 Suggested order: roles, invitations and approvals first (everything depends on them), then buyer link acceptance, then financier mandate, then the shell and visuals.
+
+## 7. Build progress
+
+- Done: invitations, five roles, maker-checker approvals, several companies per login (`6e20778`).
+- Done: buyer one-click acceptance by emailed link with a one-time code, recorded acceptance wording, pending buyers a supplier names, and the account claim afterwards.
+- Done: financier application with a licence record and staff review, mandate, per-buyer credit limits, standing bids, and a switch for the platform's own balance sheet.
+- Next: the full agreement stack and key-facts sheet, then the country-pack framework (India, Zambia), then the shell and visual redesign.

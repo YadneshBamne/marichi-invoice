@@ -11,6 +11,7 @@ import { scanPending } from "../server/fraud/engine";
 import { deliverWebhooks } from "../server/erp/events";
 import { expireBids } from "../server/marketplace/service";
 import { runDueReports } from "../server/analytics/service";
+import { runAutoBids } from "../server/marketplace/auto";
 import { expireEarlyPayments } from "../server/earlypay/service";
 import { runReconciliation } from "../server/recon/service";
 import { runCollectionsSweep, runSurplusPayouts } from "../server/collections/service";
@@ -43,6 +44,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "webhooks.deliver": { cron: "* * * * *", run: async () => { await deliverWebhooks(db); } },               // Phase 2: push status changes to companies' systems
   "earlypay.expire": { cron: "*/10 * * * *", run: async () => { await expireEarlyPayments(db); } },              // Phase 3: lapse unanswered or unpaid early-payment proposals
   "reports.run": { cron: "0 6 * * *", run: async () => { await runDueReports(db); } },                          // Phase 3: build the scheduled reports that are due
+  "bids.auto": { cron: "*/5 * * * *", run: async () => { await runAutoBids(db); } },                              // standing bids from financiers that switched them on
   "bids.expire": { cron: "*/10 * * * *", run: async () => { await expireBids(db); } },                         // Phase 2: close marketplace bids that ran out of time
   "fraud.scan": { cron: "*/5 * * * *", run: async () => { await scanPending(db); } },                         // Phase 2: score every new invoice for fraud signals
   "fraud.notify-new-cases": { cron: "*/5 * * * *", run: async () => { await notifyNewCases(db); } },     // Module 12

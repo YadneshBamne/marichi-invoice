@@ -79,5 +79,5 @@ export const CRUMBS: Record<string, string> = {
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
   system: "System health", policy: "Policy", models: "Model monitor", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
-  apps: "Apps", team: "Team", approvals: "Approvals", invite: "Invitation", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
+  apps: "Apps", team: "Team", approvals: "Approvals", mandate: "Mandate and limits", application: "Application", invite: "Invitation", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
 };

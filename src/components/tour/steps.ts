@@ -65,6 +65,8 @@ export function stepsFor(role: string, first: string): Step[] {
     nav("nav-bids", "My bids", "Every bid you placed. Withdraw an open one any time before the seller accepts."),
     nav("nav-portfolio", "Portfolio", "Invoices you funded: what is outstanding, what is late, and what has been returned."),
     nav("nav-statement", "Statement", "Every movement on your funds from the ledger, with a CSV download for your books."),
+    nav("nav-mandate", "Mandate and limits", "What you will fund: ticket size, tenor, grade, industries, and a credit limit for each buyer. Every bid, yours or automatic, is checked against it.", true),
+    nav("nav-application", "Application", "Financiers are licensed institutions. Send your licence for review here; you can fund invoices once it is approved.", true),
     nav("nav-support", "Support", "Raise a query and follow it by ticket.", true),
     nav("nav-apps", "Apps", "Your company runs on apps. As the owner you can switch them on or off here, and follow upcoming modules.", true),
     nav("nav-team", "Team", "Invite people by email. Each person sets their own password and two-step verification. Makers prepare work; approvers and the owner commit company money, and large amounts always need a second person.", true),

@@ -35,6 +35,8 @@ export const PERMS = {
   "invoice.confirm": COMMIT, // a buyer's confirmation is a legal acknowledgement
   "creditnote.issue": COMMIT, // changes what the buyer owes
   "bid.place": COMMIT,
+  "financier.apply": COMMIT, // the licence application speaks for the institution
+  "mandate.manage": COMMIT, // what the financier will fund, and its limits on each buyer
   "earlypay.propose": COMMIT,
   "programme.manage": COMMIT,
   "programme.join": COMMIT,

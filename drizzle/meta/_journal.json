@@ -120,6 +120,13 @@
       "when": 1792892001079,
       "tag": "0016_buyer_link_acceptance",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792894377227,
+      "tag": "0017_financier_onboarding",
+      "breakpoints": true
     }
   ]
 }

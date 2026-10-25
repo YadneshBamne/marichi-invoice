@@ -3,6 +3,7 @@ export const OFFER = {
   validityHours: 24, // PRD Module 6: offer expiry window
   processingFeeBps: 50, // 0.5% of invoice value, deducted upfront (PRD Module 8)
   defaultPlatformCapital: 5_00_00_000_00n, // ₹5 Cr balance sheet available for Phase 1 (override: PLATFORM_CAPITAL_PAISE)
+  platformFunds: 1, // 1 = the platform's own balance sheet may make offers. Set 0 where we are not licensed to lend: only financiers' bids fund invoices
   minPartialAdvance: 10_000_00n, // a seller may finance part of an invoice, but not less than ₹10,000
 };
 

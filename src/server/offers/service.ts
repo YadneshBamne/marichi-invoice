@@ -41,6 +41,7 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
   await assertNoEarlyPayment(db, invoiceId);
   const [uw] = await db.select().from(underwritingDecisions).where(eq(underwritingDecisions.invoiceId, invoiceId));
   if (uw?.decision !== "approved") throw new Error("invoice is not approved by underwriting");
+  if (!OFFER.platformFunds) return { unfunded: true as const, awaitingBids: true as const }; // marketplace only: the seller waits for financiers' bids
 
   const tenorDays = dayOf(inv.dueDate) - dayOf(now);
   if (tenorDays < 1) throw new Error("invoice is due; too late to finance");

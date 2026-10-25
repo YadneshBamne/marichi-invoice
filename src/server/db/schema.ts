@@ -484,6 +484,60 @@ export const ownershipTransfers = pgTable("ownership_transfers", {
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("own_pending").on(t.businessId).where(sql`status = 'pending'`)]);
 
+// A financier is an institution, not a self-service account. This is its application: who regulates it, the licence it works under,
+// the countries it is licensed in, and where its money goes. Staff verify the licence before it can bid or hold funds.
+export const financierProfiles = pgTable("financier_profiles", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  institutionType: text("institution_type").notNull(), // bank | nbfc_factor | nbfc | mfi | fund | other
+  countries: text("countries").array().notNull().default(sql`'{}'::text[]`), // ISO-2 codes it is licensed to lend or factor in
+  regulator: text("regulator").notNull(),
+  licenceType: text("licence_type").notNull(),
+  licenceNumber: text("licence_number").notNull(),
+  licenceValidUntil: date("licence_valid_until"), // null = the licence states no expiry
+  licenceDocRef: text("licence_doc_ref"),
+  settlementAccount: encrypted("settlement_account"), // where its repayments and withdrawals are paid
+  settlementIfsc: text("settlement_ifsc"),
+  settlementName: text("settlement_name"),
+  settlementVerified: boolean("settlement_verified").notNull().default(false),
+  status: text("status").notNull().default("draft"), // draft | submitted | info_requested | approved | rejected | suspended
+  note: text("note"), // the reviewer's note to the applicant
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  reviewedBy: uuid("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("fp_business").on(t.businessId)]);
+
+// What a financier is willing to fund. Every bid, manual or automatic, is checked against it.
+export const financierMandates = pgTable("financier_mandates", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  status: text("status").notNull().default("active"), // active | paused
+  minTicket: paise("min_ticket").notNull().default(sql`0`),
+  maxTicket: paise("max_ticket"), // null = no cap
+  minTenorDays: integer("min_tenor_days").notNull().default(1),
+  maxTenorDays: integer("max_tenor_days").notNull().default(365),
+  minGrade: text("min_grade").notNull().default("C"), // the worst grade it accepts (A is best)
+  maxPerSeller: paise("max_per_seller"), // cap on what it has out to any one seller; null = no cap
+  sectors: text("sectors").array().notNull().default(sql`'{}'::text[]`), // empty = any industry
+  autoBid: boolean("auto_bid").notNull().default(false),
+  autoDiscountBps: integer("auto_discount_bps"),
+  autoAdvanceBps: integer("auto_advance_bps"),
+  updatedBy: uuid("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("fm_business").on(t.businessId)]);
+
+// A financier may only bid on a buyer it has given a credit limit. Blocking a buyer is a limit with status "blocked".
+export const financierBuyerLimits = pgTable("financier_buyer_limits", {
+  id: id(),
+  financierId: uuid("financier_id").notNull().references(() => businesses.id),
+  buyerId: uuid("buyer_id").notNull().references(() => businesses.id),
+  limit: paise("limit").notNull(),
+  status: text("status").notNull().default("active"), // active | blocked
+  updatedBy: uuid("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("fbl_pair").on(t.financierId, t.buyerId)]);
+
 // master (one per seller) + invoice_schedule (per offer) are e-signed by the seller;
 // assignment_notice (per offer) is sent to the buyer. Disbursement needs all three (Module 8 gate).
 export const agreements = pgTable("agreements", {

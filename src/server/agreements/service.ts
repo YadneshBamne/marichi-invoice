@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, asc, eq, or } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { agreements, auditLog, businesses, financingOffers, invoices, users } from "../db/schema";
+import { agreements, auditLog, businesses, financingOffers, invoices, users, financierProfiles } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { ensureVirtualAccount } from "../collections/virtual-accounts";
 import { notifyBusiness } from "../notify";
@@ -154,9 +154,11 @@ export async function assertReadyToDisburse(db: Database, offerId: string) {
 export async function canViewDocument(db: Database, user: { role: string; businessId: string | null }, ref: string) {
   const [ag] = await db.select().from(agreements).where(eq(agreements.documentRef, ref));
   const [iv] = await db.select().from(invoices).where(eq(invoices.documentRef, ref));
-  if (!ag && !iv) return false;
+  const [lic] = await db.select({ b: financierProfiles.businessId }).from(financierProfiles).where(eq(financierProfiles.licenceDocRef, ref));
+  if (!ag && !iv && !lic) return false;
   if (STAFF.includes(user.role)) return true;
   if (!user.businessId) return false;
+  if (lic) return user.role === "financier" && lic.b === user.businessId; // a financier's licence copy: its own company and staff only
   if (user.role === "seller") return ag?.businessId === user.businessId || iv?.sellerId === user.businessId;
   if (user.role === "buyer") {
     if (iv?.buyerId === user.businessId) return true;

@@ -70,7 +70,10 @@ Run it on any always-on host (Railway, Render, Fly, a small VM) as a **worker se
 
 ## 6. Before you go live: migrations
 Run `npm run db:migrate` against the production database before the first deploy and after every update that adds a file under
-`drizzle/` (the latest are `0010_marketplace` to `0016_buyer_link_acceptance`; 0015 converts the old manager/member roles to approver/maker and creates a membership for every existing user). Then create the first admin with `scripts/seed-staff.ts`.
+`drizzle/` (the latest are `0010_marketplace` to `0017_financier_onboarding`; 0015 converts the old manager/member roles to approver/maker and creates a membership for every existing user). Then create the first admin with `scripts/seed-staff.ts`.
+
+### Financiers must apply
+Since `0017`, a financier company cannot hold funds or bid until staff approve its licence application (**Admin > Financiers**), even if it was verified before. Existing financier accounts must send an application. The platform's own balance sheet can be switched off per country with the Policy setting **Platform balance sheet makes offers** (`offer.platformFunds`); set it to 0 wherever we are not licensed to lend, and invoices then wait for financiers' bids.
 
 ## 7. What is real and what is simulated
 Everything below runs end to end in the product, but the outside world is stood in for until you sign the provider:

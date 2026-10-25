@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { businesses, invoices, memberships, users } from "./db/schema";
+import { businesses, financierBuyerLimits, financierMandates, financierProfiles, invoices, memberships, users } from "./db/schema";
 import { submitKyb, submitLightKyb } from "./kyb/service";
 import { linkBuyer } from "./relationships/service";
 import { createInvoice } from "./invoices/service";
@@ -74,6 +74,10 @@ export async function world() {
     const [u] = await db.insert(users).values({ name, email: `${b.id}@fin.com`, role: "financier", businessId: b.id }).returning();
     await db.insert(memberships).values({ userId: u.id, businessId: b.id, orgRole: "owner" });
     await db.update(businesses).set({ kind: "financier" }).where(eq(businesses.id, b.id));
+    // Approved by staff, licensed in India, an open mandate and a generous limit on the buyer: tests tighten what they need to test.
+    await db.insert(financierProfiles).values({ businessId: b.id, institutionType: "nbfc_factor", countries: ["IN"], regulator: "RBI", licenceType: "NBFC-Factor", licenceNumber: `N-${b.id.slice(0, 6)}`, licenceValidUntil: "2030-12-31", settlementAccount: "123456789012", settlementIfsc: "HDFC0001234", settlementName: name, settlementVerified: true, status: "approved" });
+    await db.insert(financierMandates).values({ businessId: b.id, minGrade: "E", maxTicket: null });
+    await db.insert(financierBuyerLimits).values({ financierId: b.id, buyerId, limit: 1_000_00_00_000_00n });
     if (fund > 0n) await recordFunding(db, { financierId: b.id, amount: fund, ref: `seed-${b.id}`, staffId: "00000000-0000-0000-0000-0000000000a1", staffRole: "ops" });
     return { id: b.id, actor: { id: u.id, role: "financier", businessId: b.id } };
   };

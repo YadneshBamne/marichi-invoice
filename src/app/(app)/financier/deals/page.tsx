@@ -4,6 +4,7 @@ import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { dealFlow, MARKET, position } from "@/server/marketplace/service";
 import { submit } from "@/server/approvals/service";
+import { profileOf } from "@/server/marketplace/financier";
 import { invoices } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { priceOffer } from "@/server/offers/pricing";
@@ -38,7 +39,7 @@ async function bid(fd: FormData) {
 export default async function Deals({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const u = await requireUser(["financier"]);
   const q = await searchParams;
-  const [deals, pos] = await Promise.all([dealFlow(db, u.businessId!), position(db, u.businessId!)]);
+  const [deals, pos, prof] = await Promise.all([dealFlow(db, u.businessId!), position(db, u.businessId!), profileOf(db, u.businessId!)]);
   const may = can(u, "bid.prepare");
   const direct = can(u, "bid.place"); // approver or owner commit on their own; a maker sends it for approval
   return (
@@ -52,6 +53,7 @@ export default async function Deals({ searchParams }: { searchParams: Promise<{ 
         <Stat label="Open deals" value={String(deals.length)} note="waiting for a bid" />
       </div>
       {!may && <div className="mb-4"><Notice tone="warn">Your role can view deal flow but not bid.</Notice></div>}
+      {prof?.status !== "approved" && <div className="mb-4"><Notice tone="warn">You can look at deals, but you can bid once your licence is approved. <a className="font-semibold underline" href="/financier/application">Go to your application</a>.</Notice></div>}
       {deals.length === 0 ? <EmptyState icon="layers" title="No deals right now">New approved invoices appear here as sellers upload them.</EmptyState> : (
         <Panel title={`${deals.length} open`} flush>
           <DataTable rows={deals} rowKey={(d) => d.invoiceId}

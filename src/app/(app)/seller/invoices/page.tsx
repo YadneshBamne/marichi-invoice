@@ -259,7 +259,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
               </div>
             )}
             {d.decision === "referred" && <p className="text-s-600">Under review by our credit team.</p>}
-            {d.decision === "approved" && !o && <p className="text-muted">Preparing your offer…</p>}
+            {d.decision === "approved" && !o && <p className="text-muted">Your invoice is open to financiers. Offers and bids appear here as they come in.</p>}
             {o && p && (
               <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 sm:max-w-lg sm:gap-x-8">

@@ -82,6 +82,7 @@ export const DEFS: Def[] = [
   def("approval.alwaysAbove", "Approvals", "A commitment of this size always needs a second approver", "rupees", 0, rupeesToPaise("1000000000"), AP, "alwaysAbove", "Applies whatever the company's own dual-control setting is."),
   def("approval.expiryHours", "Approvals", "A request nobody decides lapses after (hours)", "hours", 1, 336, AP, "expiryHours"),
 
+  def("offer.platformFunds", "Offers", "Platform balance sheet makes offers: 1 yes, 0 no (financiers only)", "int", 0, 1, O, "platformFunds", "Set to 0 in any country where we are not licensed to lend. Invoices then wait for financiers' bids."),
   def("offer.validityHours", "Offers", "Offer stays open for (hours)", "hours", 1, 168, O, "validityHours"),
   def("offer.processingFeeBps", "Offers", "Processing fee (before GST)", "percent", 0, 1000, O, "processingFeeBps"),
   def("offer.defaultPlatformCapital", "Offers", "Platform capital available", "rupees", 0, rupeesToPaise("1000000000000"), O, "defaultPlatformCapital", "Ignored when the PLATFORM_CAPITAL_PAISE environment variable is set."),
