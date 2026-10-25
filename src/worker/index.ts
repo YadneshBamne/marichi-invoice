@@ -3,6 +3,7 @@
 import { PgBoss } from "pg-boss";
 import { db } from "../server/db/client";
 import { refreshPolicy } from "../server/config/policy";
+import { refreshFlags } from "../server/flags/service";
 import { revalidatePendingIrns } from "../server/invoices/service";
 import { runTicketSla } from "../server/support/service";
 import { deliverQueued } from "../server/notify";
@@ -19,6 +20,7 @@ import { presentDebits, sendPreDebitNotices } from "../server/collections/nach";
 import { runDisbursements } from "../server/disbursements/service";
 import { prepareAllAccepted } from "../server/agreements/service";
 import { runRegistryFilings } from "../server/registry/service";
+import { rescoreLimits } from "../server/underwriting/rescore";
 import { recheckIrns, remindDocuments, remindLicences, rescreenParties, runRekyc } from "../server/compliance/monitoring";
 import { expireOffers, generateOffers } from "../server/offers/service";
 import { underwriteEligible } from "../server/underwriting/service";
@@ -54,6 +56,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "irn.retry-pending": { cron: "*/15 * * * *", run: async () => { await revalidatePendingIrns(db); } }, // PRD 12.4
   "irn.recheck": { cron: "0 3 * * *", run: async () => { await recheckIrns(db); } },          // PRD 12.4: detect post-financing cancellation
   "aml.rescreen": { cron: "0 2 * * *", run: async () => { await rescreenParties(db); } },     // PRD 12.10: ongoing sanctions monitoring (each company again after a week, a batch a night)
+  "limits.rescore": { cron: "0 5 * * *", run: async () => { await rescoreLimits(db); } },          // PRD Module 5: periodic review of seller credit limits
   "kyb.rekyc": { cron: "0 4 * * *", run: async () => { await runRekyc(db); } },               // PRD Module 1: periodic re-verification
   "licences.expiry": { cron: "30 4 * * *", run: async () => { await remindLicences(db); await remindDocuments(db); } },  // financier licence and company document expiry notices
 };
@@ -63,7 +66,7 @@ async function main() {
   await boss.start();
   for (const [name, j] of Object.entries(jobs)) {
     await boss.createQueue(name);
-    await boss.work(name, async () => { await refreshPolicy(db, true); await j.run(); }); // always run with the latest policy
+    await boss.work(name, async () => { await refreshPolicy(db, true); await refreshFlags(db, true); await j.run(); }); // always run with the latest policy
     await boss.schedule(name, j.cron);
   }
   console.log("worker up:", Object.keys(jobs).join(", "));

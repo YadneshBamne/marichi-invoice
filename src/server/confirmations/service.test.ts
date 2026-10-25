@@ -6,7 +6,7 @@ import { submitKyb, submitLightKyb } from "../kyb/service";
 import { linkBuyer } from "../relationships/service";
 import { createInvoice } from "../invoices/service";
 import { mock } from "../integrations/mock";
-import { dispatchValidated, respondToInvoice, runConfirmationSla, sendForConfirmation, type Actor } from "./service";
+import { dispatchValidated, respondToInvoice, respondViaApi, runConfirmationSla, sendForConfirmation, type Actor } from "./service";
 import type { Database } from "../db/client";
 
 const T0 = new Date("2026-10-06T00:00:00Z");
@@ -120,5 +120,31 @@ describe("SLA sweep", () => {
     expect((await runConfirmationSla(db, gw, hrs(24 * 5))).deemed).toBe(1);
     expect(await conf()).toMatchObject({ status: "confirmed", method: "deemed" });
     expect((await inv()).status).toBe("eligible");
+  });
+});
+
+describe("the buyer's own system answers through the API", () => {
+  beforeEach(async () => { await sendForConfirmation(db, invoiceId, gw, T0); });
+  const api = (o: Partial<Parameters<typeof respondViaApi>[1]> = {}) => respondViaApi(db, { businessId: buyerId, keyId: "abcdef1234567890", invoiceNumber: "INV-1", decision: "confirm", ip: "9.9.9.9", ...o }, gw, T0);
+
+  it("a confirmation is recorded as an API answer with the same wording, and the invoice moves on", async () => {
+    expect((await api()).status).toBe("eligible");
+    expect(await conf()).toMatchObject({ status: "confirmed", method: "api", respondedByEmail: "API key abcdef12", ip: "9.9.9.9" });
+    expect((await conf()).acceptanceText).toMatch(/INV-1/);
+    expect((await inv()).status).toBe("eligible");
+  });
+
+  it("a dispute needs a note and pauses the invoice; a question needs one too", async () => {
+    await expect(api({ decision: "dispute" })).rejects.toThrow(/note is required/);
+    expect((await api({ decision: "dispute", note: "wrong quantity" })).status).toBe("disputed");
+    expect((await inv()).disputeFlag).toBe(true);
+  });
+
+  it("it cannot answer another company's invoice, an unknown number, or an invoice twice", async () => {
+    const [other] = await db.insert(businesses).values({ legalName: "Other Buyer", entityType: "pvt_ltd" }).returning();
+    await expect(api({ businessId: other.id })).rejects.toThrow(/NOT_FOUND/);
+    await expect(api({ invoiceNumber: "NOPE" })).rejects.toThrow(/NOT_FOUND/);
+    await api();
+    await expect(api()).rejects.toThrow(/not awaiting confirmation/);
   });
 });

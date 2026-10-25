@@ -63,6 +63,28 @@ export const businesses = pgTable("businesses", {
   createdAt: createdAt(),
 });
 
+// Each time a seller's credit limit is looked at again: what it was, what it became, and why. Unchanged reviews are kept too, so the
+// date of the last review is always known.
+export const limitReviews = pgTable("limit_reviews", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  before: paise("before").notNull(),
+  after: paise("after").notNull(),
+  reason: text("reason").notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("limitrev_business").on(t.businessId, t.createdAt)]);
+
+// Switches for capabilities. No row means on. See server/flags/service.ts.
+export const featureFlags = pgTable("feature_flags", {
+  key: text("key").primaryKey(),
+  enabled: boolean("enabled").notNull().default(true),
+  rolloutPct: integer("rollout_pct").notNull().default(100), // share of companies that get it, chosen by a stable hash of the company
+  onlyBusinesses: uuid("only_businesses").array().notNull().default(sql`'{}'::uuid[]`), // companies that always get it, ahead of the rollout
+  note: text("note"),
+  updatedBy: uuid("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // A document a company uploaded for verification (certificate, PAN card, bank letter). We read it, compare it with what the company
 // declared, and show staff the result and any doubts. A newer upload of the same kind replaces the older one, which is kept.
 export const businessDocuments = pgTable("business_documents", {

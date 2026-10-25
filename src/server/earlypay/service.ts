@@ -15,6 +15,7 @@ import { formatMoney } from "../../lib/money";
 import { market } from "../../lib/countries";
 
 import { DD, quoteEarly } from "./quote";
+import { assertFlag } from "../flags/service";
 export { DD, quoteEarly };
 
 const dayOf = (d: Date | string) => Math.floor(new Date(d).getTime() / 86_400_000);
@@ -28,6 +29,7 @@ export async function assertNoEarlyPayment(db: Database | Tx, invoiceId: string)
 
 export async function proposeEarlyPayment(db: Database, actor: Actor, p: { invoiceId: string; discountBps: number }, gw: Adapters = gateway, now = new Date()) {
   if (actor.role !== "buyer" || !actor.businessId) throw new Error("FORBIDDEN");
+  assertFlag("earlypay", actor.businessId);
   if (!Number.isInteger(p.discountBps) || p.discountBps < DD.minBps || p.discountBps > DD.maxBps)
     throw new Error(`the discount must be between ${DD.minBps / 100}% and ${DD.maxBps / 100}% a year`);
   const out = await db.transaction(async (tx) => {

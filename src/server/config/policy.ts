@@ -51,6 +51,11 @@ export const DEFS: Def[] = [
   def("uw.maxTenorDays", "Underwriting", "Longest time to due date (days)", "int", 1, 365, P, "maxTenorDays"),
   def("uw.defaultSellerLimit", "Underwriting", "Default seller limit", "rupees", rupeesToPaise("100000"), rupeesToPaise("100000000000"), P, "defaultSellerLimit", "Used for sellers with no individual limit."),
   def("uw.defaultBuyerCap", "Underwriting", "Default exposure cap per seller and buyer pair", "rupees", rupeesToPaise("100000"), rupeesToPaise("100000000000"), P, "defaultBuyerCap"),
+  def("uw.maxBuyerExposure", "Underwriting", "Most outstanding to one buyer across all sellers", "rupees", rupeesToPaise("100000"), rupeesToPaise("100000000000"), P, "maxBuyerExposure", "Beyond this an analyst decides, instead of the invoice being approved automatically."),
+  def("uw.maxSectorExposure", "Underwriting", "Most outstanding in one industry across all sellers", "rupees", rupeesToPaise("100000"), rupeesToPaise("100000000000"), P, "maxSectorExposure", "Needs the seller to have named its industry."),
+  def("uw.rescoreDays", "Underwriting", "Each seller's credit limit is reviewed every (days)", "int", 7, 180, P, "rescoreDays", "Limits rise with a clean repayment record and fall after late payment."),
+  def("uw.limitStepBps", "Underwriting", "A review moves a limit by", "percent", 0, 5000, P, "limitStepBps"),
+  def("uw.maxLimitMultiple", "Underwriting", "A limit never grows past this many times the default", "int", 1, 20, P, "maxLimitMultiple"),
   def("uw.noIrnAdvanceCutBps", "Underwriting", "Advance reduction when there is no e-invoice number", "percent", 0, 5000, P, "noIrnAdvanceCutBps", "Percentage points taken off the advance rate."),
   ...GRADES.flatMap((g) => {
     const m = POLICY.matrix[g] as unknown as Bag;

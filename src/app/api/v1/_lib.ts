@@ -1,6 +1,7 @@
 import { db } from "@/server/db/client";
 import { authenticateKey, bearer } from "@/server/erp/keys";
 import { ApiError } from "@/server/erp/invoices";
+import { flagOn, refreshFlags } from "@/server/flags/service";
 
 export const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store" } });
 export const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) => reply({ error: { code, message, ...extra } }, status);
@@ -14,6 +15,8 @@ const LIMIT = 120; // requests per minute per key
 export async function authed(req: Request) {
   const who = await authenticateKey(db, bearer(req));
   if (!who) return { res: fail(401, "UNAUTHORIZED", "send your API key as: Authorization: Bearer <key>") } as const;
+  await refreshFlags(db);
+  if (!flagOn("api", who.businessId)) return { res: fail(503, "API_OFF", "API access is switched off for your company right now") } as const;
   const now = Date.now(), h = hits.get(who.keyId);
   if (!h || now > h.reset) hits.set(who.keyId, { n: 1, reset: now + 60_000 });
   else if (++h.n > LIMIT) return { res: fail(429, "RATE_LIMITED", `limit is ${LIMIT} requests a minute`, { retryAfterSeconds: Math.ceil((h.reset - now) / 1000) }) } as const;

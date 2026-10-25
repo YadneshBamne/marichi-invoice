@@ -6,6 +6,7 @@ import type { Database } from "../db/client";
 import { financierMandates, financierProfiles } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { dealFlow, placeBid } from "./service";
+import { flagOn } from "../flags/service";
 
 export async function runAutoBids(db: Database, gw: Adapters = gateway, now = new Date()) {
   const rows = await db.select({ m: financierMandates }).from(financierMandates).innerJoin(financierProfiles, eq(financierProfiles.businessId, financierMandates.businessId))
@@ -13,6 +14,7 @@ export async function runAutoBids(db: Database, gw: Adapters = gateway, now = ne
   let placed = 0;
   for (const { m } of rows) {
     if (!m.updatedBy || !m.autoDiscountBps) continue; // a standing rule belongs to the person who set it
+    if (!flagOn("autobid", m.businessId)) continue; // switched off by staff
     for (const d of await dealFlow(db, m.businessId, now)) {
       if (d.myBid) continue; // already bidding on it
       const advanceBps = Math.min(d.maxAdvanceBps, m.autoAdvanceBps ?? d.maxAdvanceBps);

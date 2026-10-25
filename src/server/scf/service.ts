@@ -9,6 +9,7 @@ import { notifyBusiness } from "../notify";
 import { formatMoney } from "../../lib/money";
 import { market } from "../../lib/countries";
 import { PROGRAMME_TERMS_VERSION } from "../agreements/templates";
+import { assertFlag } from "../flags/service";
 
 export const SCF = {
   minDiscountBps: 400, // 4% a year
@@ -29,6 +30,7 @@ export async function programmeOf(db: Database | Tx, buyerId: string) {
 
 export async function applyForProgramme(db: Database, actor: Actor, p: { name: string; limit: bigint; acceptTerms?: boolean }, now = new Date()) {
   if (actor.role !== "buyer" || !actor.businessId) throw new Error("FORBIDDEN");
+  assertFlag("scf", actor.businessId);
   if (!p.name.trim()) throw new Error("name the programme");
   if (p.limit <= 0n || p.limit > SCF.maxLimit) throw new Error("the requested limit is outside what a programme can be");
   if (!p.acceptTerms) throw new Error("read and accept the supplier finance programme terms");
@@ -75,6 +77,7 @@ export type InviteResult = { gstin: string; result: "invited" | "already" | "not
 /** Invite suppliers by tax registration number (GSTIN, TPIN), in bulk. Only suppliers already on the platform and verified can be invited; the rest are reported back. */
 export async function inviteSuppliers(db: Database, actor: Actor, gstins: string[], gw: Adapters = gateway): Promise<InviteResult[]> {
   if (actor.role !== "buyer" || !actor.businessId) throw new Error("FORBIDDEN");
+  assertFlag("scf", actor.businessId);
   const prog = await programmeOf(db, actor.businessId);
   if (!prog || prog.status !== "active") throw new Error("your programme is not active");
   const list = [...new Set(gstins.map((g) => g.trim().toUpperCase()).filter(Boolean))];

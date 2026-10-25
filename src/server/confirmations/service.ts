@@ -51,7 +51,7 @@ async function applyConfirmed(tx: Tx, inv: Invoice, now: Date) {
   return status as "confirmed" | "eligible";
 }
 
-export type Who = { userId: string | null; email: string; ip?: string; userAgent?: string; method: "buyer" | "link" };
+export type Who = { userId: string | null; email: string; ip?: string; userAgent?: string; method: "buyer" | "link" | "api" };
 
 /**
  * The one place an invoice response is applied, whether it came from a signed-in buyer user or from the emailed link.
@@ -118,6 +118,22 @@ export async function respondToInvoice(
     invoiceId: p.invoiceId, decision: p.decision, note: p.note,
     who: { userId: p.actor.id, email: p.actor.email, ip: p.actor.ip, userAgent: p.actor.userAgent, method: "buyer" },
     authorise: (inv) => { if (p.actor.role !== "buyer" || p.actor.businessId !== inv.buyerId) throw new Error("FORBIDDEN"); },
+  }, gw, now);
+}
+
+/**
+ * The buyer's own accounts-payable system answers through the API (straight-through processing). The key belongs to the buyer company
+ * and cannot answer for anyone else's invoice; the answer is recorded with the same wording and audit trail as one given on screen.
+ */
+export async function respondViaApi(
+  db: Database, p: { businessId: string; keyId: string; invoiceNumber: string; decision: Decision; note?: string; ip?: string }, gw: Adapters = gateway, now = new Date(),
+) {
+  const [inv] = await db.select().from(invoices).where(and(eq(invoices.buyerId, p.businessId), eq(invoices.invoiceNumber, p.invoiceNumber)));
+  if (!inv) throw new Error("NOT_FOUND");
+  return applyResponse(db, {
+    invoiceId: inv.id, decision: p.decision, note: p.note,
+    who: { userId: null, email: `API key ${p.keyId.slice(0, 8)}`, ip: p.ip, method: "api" },
+    authorise: (i) => { if (i.buyerId !== p.businessId) throw new Error("FORBIDDEN"); },
   }, gw, now);
 }
 

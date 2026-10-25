@@ -12,6 +12,11 @@ export const POLICY = {
   defaultSellerLimit: 1_00_00_000_00n, // ₹1 Cr total outstanding per seller
   defaultBuyerCap: 50_00_000_00n, // ₹50 L outstanding per seller-buyer pair
   noIrnAdvanceCutBps: 500, // compensating control when no e-invoice IRN (PRD 12.4)
+  maxBuyerExposure: 2_00_00_000_00n, // ₹2 Cr outstanding to one buyer across ALL sellers: beyond it an analyst decides (PRD Module 2 concentration limits)
+  maxSectorExposure: 3_00_00_000_00n, // ₹3 Cr outstanding in one industry across all sellers
+  rescoreDays: 30, // each seller's limit is looked at again this often
+  limitStepBps: 2500, // a review moves a limit up or down by this much
+  maxLimitMultiple: 5, // a limit never grows past this many times the default
   // grade -> pricing. discount is annualised. autoMax = largest invoice auto-approved at that grade.
   matrix: {
     A: { advanceBps: 9000, discountBps: 1200, pd: "0.0050", autoMax: 25_00_000_00n },
@@ -34,6 +39,8 @@ export type Inputs = {
   irnStatus: string;
   seller: Party & { outstanding: bigint; limit: bigint };
   buyer: Party & { outstandingForSeller: bigint; cap: bigint };
+  /** Outstanding across every seller, before this invoice: to this buyer, and in the seller's industry (null when the seller has not named one). */
+  concentration?: { buyerTotal: bigint; sector: string | null; sectorTotal: bigint };
 };
 export type Reason = { code: string; text: string };
 export type Outcome = {
@@ -89,7 +96,13 @@ export function decide(i: Inputs): Outcome {
   }
 
   // 4. Auto-approve only inside the grade's ticket threshold; the rest goes to a credit analyst.
-  const auto = i.invoiceAmount <= m.autoMax;
-  if (!auto) reasons.push({ code: "MANUAL_REVIEW", text: grade === "D" ? "Grade D always needs analyst review" : "Invoice above auto-approval limit for this grade" });
+  // Concentration is a platform limit, not the seller's fault, so it sends the invoice to an analyst rather than declining it.
+  const c = i.concentration;
+  const buyerCrowded = !!c && c.buyerTotal + i.invoiceAmount > POLICY.maxBuyerExposure;
+  const sectorCrowded = !!c && !!c.sector && c.sectorTotal + i.invoiceAmount > POLICY.maxSectorExposure;
+  if (buyerCrowded) reasons.push({ code: "BUYER_CONCENTRATION", text: "Too much is already outstanding to this buyer across all sellers" });
+  if (sectorCrowded) reasons.push({ code: "SECTOR_CONCENTRATION", text: `Too much is already outstanding in the ${c!.sector} industry` });
+  const auto = i.invoiceAmount <= m.autoMax && !buyerCrowded && !sectorCrowded;
+  if (!auto && !buyerCrowded && !sectorCrowded) reasons.push({ code: "MANUAL_REVIEW", text: grade === "D" ? "Grade D always needs analyst review" : "Invoice above auto-approval limit for this grade" });
   return { decision: auto ? "approved" : "referred", grade, pd: m.pd, advanceRateBps, discountRateBps: m.discountBps, reasons };
 }

@@ -15,6 +15,12 @@ curl "https://YOUR-DOMAIN/api/v1/invoices?status=financed" \\
 
 # one invoice
 curl https://YOUR-DOMAIN/api/v1/invoices/INV-001 -H "Authorization: Bearer mk_live_..."`;
+const CURL_BUYER = `
+
+# answer an invoice raised on you: confirm, dispute or clarify (a note is needed for the last two)
+curl -X POST https://YOUR-DOMAIN/api/v1/invoices/INV-001/response \\
+  -H "Authorization: Bearer mk_live_..." -H "content-type: application/json" \\
+  -d '{"decision":"confirm"}'`;
 const CURL_WRITE = `
 
 # raise an invoice
@@ -33,7 +39,7 @@ export default async function Integrations() {
     <div className="space-y-5">
       {!owner && <Notice tone="warn">Only the company owner can create keys or webhooks. You can see what is set up.</Notice>}
 
-      <Panel title="API keys" sub={`Let your accounting system or a script read your invoices${seller ? " and raise new ones" : ""}. A key works for this company only.`} flush={keys.length > 0}>
+      <Panel title="API keys" sub={`Let your accounting system or a script read your invoices${seller ? " and raise new ones" : " and answer them"}. A key works for this company only.`} flush={keys.length > 0}>
         {owner && <div className={keys.length ? "border-b border-hair p-5 sm:p-6" : ""}><NewKeyForm /></div>}
         {keys.length > 0 && (
           <DataTable rows={keys} rowKey={(k) => k.id}
@@ -81,7 +87,7 @@ export default async function Integrations() {
       <Panel title="Using the API" sub="Plain JSON over HTTPS. Amounts are rupees as text, for example 118000.00.">
         <div className="space-y-4 text-sm">
           {seller && <p>Prefer a spreadsheet? <a className="font-semibold text-p-700 underline" href="/seller/invoices/import">Import invoices from a CSV file</a>, with the exports Tally, Zoho Books and Excel produce.</p>}
-          <pre className="overflow-x-auto rounded-lg bg-panel p-4 text-xs leading-relaxed">{CURL_READ + (seller ? CURL_WRITE : "")}</pre>
+          <pre className="overflow-x-auto rounded-lg bg-panel p-4 text-xs leading-relaxed">{CURL_READ + (seller ? CURL_WRITE : CURL_BUYER)}</pre>
           <div>
             <p className="font-semibold">Checking a webhook</p>
             <p className="mt-1 text-muted">Each call carries <code>x-marichi-signature: t=&lt;time&gt;,v1=&lt;hash&gt;</code>. Compute HMAC-SHA256 of <code>&lt;time&gt;.&lt;raw body&gt;</code> with your signing secret, compare it to <code>v1</code>, and reject calls older than five minutes. Answer with any 2xx to confirm; an event is not sent again after a 2xx.</p>

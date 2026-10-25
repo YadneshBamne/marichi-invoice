@@ -6,6 +6,7 @@ import { auth } from "@/server/auth";
 import { db } from "@/server/db/client";
 import { businesses, memberships, users } from "@/server/db/schema";
 import { PLATFORM_TERMS_VERSION } from "@/server/agreements/templates";
+import { flagOn, refreshFlags } from "@/server/flags/service";
 
 const Form = z.object({
   name: z.string().trim().min(2, "Enter your full name."),
@@ -21,6 +22,8 @@ const Form = z.object({
 export type SignUpState = { error?: string };
 
 export async function signUp(_: SignUpState, fd: FormData): Promise<SignUpState> {
+  await refreshFlags(db);
+  if (!flagOn("signup")) return { error: "New accounts are paused for the moment. Please try again later." };
   const parsed = Form.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const f = parsed.data;

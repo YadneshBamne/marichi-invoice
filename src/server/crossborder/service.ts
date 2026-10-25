@@ -15,12 +15,13 @@ import { notifyBusiness } from "../notify";
 
 import { CROSS } from "./rules";
 import { market } from "../../lib/countries";
+import { assertFlag } from "../flags/service";
 export { CROSS };
 const COUNTRY = /^[A-Z]{2}$/;
 const PURPOSE = /^P\d{4}$/;
 
 /** Export financing follows Indian rules (shipping bill, FEMA purpose codes, bank conversion), so it runs only in the Indian market for now. */
-function assertSupported() { if (market().code !== "IN") throw new Error(`export financing is not available in ${market().name} yet`); }
+function assertSupported(businessId?: string | null) { if (market().code !== "IN") throw new Error(`export financing is not available in ${market().name} yet`); assertFlag("export", businessId); }
 
 function checkCountry(country: string) {
   assertSupported();
@@ -98,7 +99,7 @@ export type ExportInvoice = {
 
 /** Capture an export invoice. The rate is locked now and stored with the invoice; the rupee amount goes through the usual checks. */
 export async function createExportInvoice(db: Database, p: ExportInvoice, gw: Adapters = gateway, now = new Date()) {
-  assertSupported();
+  assertSupported(p.sellerId);
   const [buyer] = await db.select().from(businesses).where(eq(businesses.id, p.buyerId));
   if (!buyer?.country) throw new Error("this buyer is not an overseas company");
   checkCountry(buyer.country);

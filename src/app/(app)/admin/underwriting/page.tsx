@@ -1,12 +1,12 @@
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
-import { underwritingDecisions } from "@/server/db/schema";
+import { businesses, limitReviews, underwritingDecisions } from "@/server/db/schema";
 import { generateOffer } from "@/server/offers/service";
 import { requireUser } from "@/server/rbac";
 import { pendingReviews, reviewUnderwriting } from "@/server/underwriting/service";
-import { EmptyState, KV, PageHead, ReviewCard } from "@/components/ui/page";
+import { DataTable, EmptyState, KV, PageHead, Panel, ReviewCard } from "@/components/ui/page";
 import { formatMoney } from "@/lib/money";
 
 export const metadata = { title: "Underwriting" };
@@ -29,7 +29,10 @@ const GRADE: Record<string, string> = { A: "bg-g-100 text-g-600", B: "bg-g-100 t
 
 export default async function UnderwritingQueue() {
   await requireUser(["ops", "admin"]);
-  const rows = await pendingReviews(db);
+  const [rows, reviews] = await Promise.all([
+    pendingReviews(db),
+    db.select({ r: limitReviews, name: businesses.legalName }).from(limitReviews).innerJoin(businesses, eq(businesses.id, limitReviews.businessId)).orderBy(desc(limitReviews.createdAt)).limit(15),
+  ]);
   return (
     <>
       <PageHead title="Underwriting" sub="Invoices the policy could not decide on its own. Approve to release an offer, or decline with a reason." />
@@ -54,6 +57,16 @@ export default async function UnderwritingQueue() {
           ))}
         </div>
       )}
+      <Panel title="Recent credit limit reviews" sub="Every seller's limit is reviewed regularly: lowered after late payment, raised after a clean record. Unchanged reviews are listed too." className="mt-5" flush>
+        <DataTable rows={reviews} rowKey={(x) => x.r.id} empty="No reviews yet. A seller is first reviewed after a full review period."
+          cols={[
+            { h: "Seller", cell: (x) => x.name },
+            { h: "Before", align: "right", cell: (x) => formatMoney(x.r.before) },
+            { h: "After", align: "right", cell: (x) => formatMoney(x.r.after) },
+            { h: "Why", cell: (x) => <span className="font-normal text-muted">{x.r.reason}</span> },
+            { h: "When", cell: (x) => <span className="font-normal text-muted">{x.r.createdAt.toISOString().slice(0, 10)}</span> },
+          ]} />
+      </Panel>
     </>
   );
 }

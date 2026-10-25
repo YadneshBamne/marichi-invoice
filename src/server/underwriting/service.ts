@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { auditLog, businesses, buyerSellerRelationships, consents, invoices, mlScores, underwritingDecisions } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
@@ -11,7 +11,7 @@ const dayOf = (d: Date | string) => Math.floor(new Date(d).getTime() / 86_400_00
 
 type Who = { col: "sellerId" | "buyerId"; id: string };
 /** On-platform repayment behaviour for one party (PRD 5: seller/buyer risk inputs). */
-async function behaviour(db: Database, who: Who, now: Date) {
+export async function behaviour(db: Database, who: Who, now: Date) {
   const rows = await db.select({ s: invoices.status, due: invoices.dueDate, amt: invoices.amount, sellerId: invoices.sellerId })
     .from(invoices).where(eq(invoices[who.col], who.id));
   const today = dayOf(now);
@@ -71,6 +71,12 @@ export async function underwriteInvoice(db: Database, invoiceId: string, gw: Ada
     bureauScore(db, gw, seller.id, seller.pan, true),
     bureauScore(db, gw, buyer.id, buyer.pan, false),
   ]);
+  // Outstanding in the seller's industry across all sellers, for the platform's concentration limit
+  const sector = seller.industry?.trim() || null;
+  const sectorRows = sector
+    ? await db.select({ a: invoices.amount }).from(invoices).innerJoin(businesses, eq(businesses.id, invoices.sellerId))
+      .where(and(sql`lower(${businesses.industry}) = ${sector.toLowerCase()}`, inArray(invoices.status, [...OUTSTANDING])))
+    : [];
   const party = (b: typeof sb, score: number | null): Party => ({ bureauScore: score, paidCount: b.paidCount, overdueCount: b.overdueCount, maxDpd: b.maxDpd });
   const inputs: Inputs = {
     invoiceAmount: inv.amount,
@@ -82,6 +88,7 @@ export async function underwriteInvoice(db: Database, invoiceId: string, gw: Ada
       outstandingForSeller: bb.rows.filter((r) => r.sellerId === seller.id && (OUTSTANDING as readonly string[]).includes(r.s)).reduce((a, r) => a + r.amt, 0n),
       cap: rel.maxExposure ?? POLICY.defaultBuyerCap,
     },
+    concentration: { buyerTotal: bb.outstanding, sector, sectorTotal: sectorRows.reduce((a, r) => a + r.a, 0n) },
   };
   const rules = decide(inputs);
   let out = rules;
