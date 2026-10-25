@@ -17,7 +17,8 @@ import { APPROVAL } from "../approvals/service";
 import { CROSS } from "../crossborder/rules";
 import { SLA_HOURS } from "../support/policy";
 import { POLICY, type Grade } from "../underwriting/policy";
-import { formatINR, rupeesToPaise, toDecimal } from "../../lib/money";
+import { formatMoney, rupeesToPaise, toDecimal } from "../../lib/money";
+import { market } from "../../lib/countries";
 
 /** int = whole number, hours = whole hours, percent = stored as basis points, rupees = stored as paise. */
 export type Kind = "int" | "hours" | "percent" | "rupees";
@@ -67,7 +68,7 @@ export const DEFS: Def[] = [
   def("dd.minBps", "Dynamic discounting", "Lowest yearly discount a buyer may propose", "percent", 0, 6000, E, "minBps"),
   def("dd.maxBps", "Dynamic discounting", "Highest yearly discount a buyer may propose", "percent", 0, 6000, E, "maxBps"),
   def("dd.minDaysEarly", "Dynamic discounting", "Fewest days before the due date", "int", 1, 365, E, "minDaysEarly"),
-  def("dd.feeBps", "Dynamic discounting", "Platform fee on the invoice (GST-inclusive)", "percent", 0, 1000, E, "feeBps", "Deducted from what the seller receives."),
+  def("dd.feeBps", "Dynamic discounting", "Platform fee on the invoice (tax-inclusive)", "percent", 0, 1000, E, "feeBps", "Deducted from what the seller receives."),
   def("dd.proposalHours", "Dynamic discounting", "Seller's time to answer (hours)", "hours", 1, 168, E, "proposalHours"),
 
   def("scf.minDiscountBps", "Supplier finance", "Lowest yearly discount a programme can be priced at", "percent", 0, 6000, S, "minDiscountBps"),
@@ -84,7 +85,7 @@ export const DEFS: Def[] = [
 
   def("offer.platformFunds", "Offers", "Platform balance sheet makes offers: 1 yes, 0 no (financiers only)", "int", 0, 1, O, "platformFunds", "Set to 0 in any country where we are not licensed to lend. Invoices then wait for financiers' bids."),
   def("offer.validityHours", "Offers", "Offer stays open for (hours)", "hours", 1, 168, O, "validityHours"),
-  def("offer.processingFeeBps", "Offers", "Processing fee (before GST)", "percent", 0, 1000, O, "processingFeeBps"),
+  def("offer.processingFeeBps", "Offers", "Processing fee (before tax)", "percent", 0, 1000, O, "processingFeeBps"),
   def("offer.defaultPlatformCapital", "Offers", "Platform capital available", "rupees", 0, rupeesToPaise("1000000000000"), O, "defaultPlatformCapital", "Ignored when the PLATFORM_CAPITAL_PAISE environment variable is set."),
 
   def("offer.minPartialAdvance", "Offers", "Smallest advance when financing part of an invoice", "rupees", 0, rupeesToPaise("1000000"), O, "minPartialAdvance"),
@@ -104,10 +105,36 @@ export const DEFS: Def[] = [
 
   ...(["query", "complaint", "dispute", "grievance"] as const).flatMap((k) => [
     def(`sla.${k}.firstResponse`, "Support timers", `${k[0].toUpperCase()}${k.slice(1)}: first response (hours)`, "hours", 1, 720, SLA_HOURS[k] as unknown as Bag, "firstResponse"),
-    def(`sla.${k}.resolve`, "Support timers", `${k[0].toUpperCase()}${k.slice(1)}: resolve within (hours)`, "hours", 1, 2160, SLA_HOURS[k] as unknown as Bag, "resolve", k === "grievance" ? "RBI expects grievances to be resolved within 30 days (720 hours)." : undefined),
+    def(`sla.${k}.resolve`, "Support timers", `${k[0].toUpperCase()}${k.slice(1)}: resolve within (hours)`, "hours", 1, 2160, SLA_HOURS[k] as unknown as Bag, "resolve", k === "grievance" ? `${market().ombudsman.name} expects grievances to be resolved within 30 days (720 hours). Confirm the period with counsel.` : undefined),
   ]),
 ];
 export const DEF_BY_KEY = new Map(DEFS.map((d) => [d.key, d]));
+
+// The code defaults above are written in rupees. A deployment in another currency scales every money value (and its allowed range)
+// to that currency's size, so a kwacha deployment does not start with limits sized for rupees. The platform's own balance sheet
+// starts off where the market pack says we cannot lend from it.
+const BASE = new Map(DEFS.map((d) => [d.key, { min: d.min, max: d.max, fallback: d.fallback }]));
+/** Two significant figures, whole major units: 30,000 not 29,973. Zero stays zero. */
+function scaleMoney(value: Num, [n, d]: [number, number]): bigint {
+  const v = BigInt(value); // a lower bound of 0 is written as a plain number
+  if (n === d || v === 0n) return v;
+  const major = (v * BigInt(n)) / BigInt(d) / 100n;
+  const digits = major.toString().length;
+  if (digits <= 2) return major * 100n;
+  const unit = 10n ** BigInt(digits - 2);
+  return (major / unit) * unit * 100n;
+}
+/** Set every default for the current market. Runs at load; tests call it again after switching the market. */
+export function applyMarketPolicy() {
+  const m = market();
+  for (const d of DEFS) {
+    const b = BASE.get(d.key)!;
+    if (d.kind === "rupees") { d.min = scaleMoney(b.min, m.policyScale); d.max = scaleMoney(b.max, m.policyScale); d.fallback = scaleMoney(b.fallback, m.policyScale); }
+    else if (d.key === "offer.platformFunds") d.fallback = m.platformFunds ? b.fallback : 0;
+    d.set(d.fallback);
+  }
+}
+applyMarketPolicy();
 
 // ---- value conversion -------------------------------------------------------------------------------------------------
 const toJson = (v: Num) => (typeof v === "bigint" ? v.toString() : v);
@@ -121,7 +148,7 @@ export function toInput(d: Def, v: Num): string {
 }
 export function display(d: Def, v: Num): string {
   if (d.kind === "percent") return `${Number(v) / 100}%`;
-  if (d.kind === "rupees") return formatINR(v as bigint);
+  if (d.kind === "rupees") return formatMoney(v as bigint);
   if (d.kind === "hours") return `${v} h`;
   return String(v);
 }

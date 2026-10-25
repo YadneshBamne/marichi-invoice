@@ -10,7 +10,7 @@ import { ACCOUNTS, ensureAccounts } from "../ledger/accounts";
 import { postEntry, type Line } from "../ledger/post";
 import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
 import { repaymentLegs } from "../marketplace/service";
 import { settleEarlyPayment } from "../earlypay/service";
 import { accrue, applyPayment, bucketOf, COLLECTIONS, daysBetween, isoDay, type State } from "./waterfall";
@@ -97,7 +97,7 @@ async function settle(db: Database, invoiceId: string, c: Credit, now: Date, gw:
   });
 
   if (out.status === "applied") {
-    const d = { invoiceNumber: out.invoiceNumber!, amount: formatINR(c.amount) };
+    const d = { invoiceNumber: out.invoiceNumber!, amount: formatMoney(c.amount) };
     await notifyBusiness(db, out.buyerId!, "payment_received", d, gw);
     await notifyBusiness(db, out.sellerId!, out.closed ? "invoice_settled" : "payment_received_partial", d, gw);
     const ev = { invoiceNumber: out.invoiceNumber, amountPaise: c.amount.toString(), utr: c.utr, receivedAt: c.receivedAt.toISOString(), settled: out.closed, surplusToSellerPaise: out.surplus.toString() };
@@ -163,7 +163,7 @@ export async function runCollectionsSweep(db: Database, gw: Adapters = gateway, 
     if (disputed.has(i.id)) continue; // open dispute: no reminders, no overdue/recourse transitions (PRD Module 16). Accrual above still ran.
     const dpd = daysBetween(i.dueDate, today);
     const toDue = -dpd;
-    const info = { invoiceNumber: i.invoiceNumber, due: i.dueDate, amount: formatINR(i.amount) };
+    const info = { invoiceNumber: i.invoiceNumber, due: i.dueDate, amount: formatMoney(i.amount) };
     const send = async (kind: string, fn: () => Promise<unknown>) => { if (await once(db, i.id, kind)) { await fn(); n.events++; } };
 
     if (dpd > COLLECTIONS.graceDays && ["financed", "due"].includes(i.status)) {
@@ -236,7 +236,7 @@ export async function runSurplusPayouts(db: Database, gw: Adapters = gateway) {
         ] });
         await tx.update(sellerPayouts).set({ status: "succeeded", bankRef: res.bankRef, completedAt: new Date() }).where(eq(sellerPayouts.id, p.id));
       });
-      await notifyBusiness(db, p.sellerId, "surplus_paid", { amount: formatINR(p.amount) }, gw);
+      await notifyBusiness(db, p.sellerId, "surplus_paid", { amount: formatMoney(p.amount) }, gw);
       paid++;
     } else if (status === "failed") {
       await db.update(sellerPayouts).set({ status: "failed", attempts: p.attempts + 1, failureReason: res.reason ?? `${rail} failed` }).where(eq(sellerPayouts.id, p.id));

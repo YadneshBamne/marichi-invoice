@@ -4,7 +4,7 @@ import { auditLog, collectionEvents, invoiceConfirmations, invoiceDisputes, invo
 import { gateway, type Adapters } from "../integrations/gateway";
 import { checkBasics } from "../invoices/service";
 import { notifyBusiness } from "../notify";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
 import { announceTicket, insertTicket, type Actor } from "./service";
 import { canWork, ticketNo } from "./policy";
 
@@ -47,7 +47,7 @@ export async function raiseDispute(
     await tx.update(invoices).set({ disputeFlag: true }).where(eq(invoices.id, inv.id)); // visible everywhere; collections check the dispute record
     return { ticket: await openDisputeInTx(tx, { invoice: inv, actor: p.actor, reason, phase: "post_funding", disputedAmount: p.disputedAmount, now }), inv };
   });
-  await notifyBusiness(db, t.inv.sellerId, "invoice_disputed", { invoiceNumber: t.inv.invoiceNumber, amount: formatINR(t.inv.amount), note: reason }, gw, now);
+  await notifyBusiness(db, t.inv.sellerId, "invoice_disputed", { invoiceNumber: t.inv.invoiceNumber, amount: formatMoney(t.inv.amount), note: reason }, gw, now);
   await announceTicket(db, t.ticket.id, gw);
   return t.ticket;
 }
@@ -118,6 +118,6 @@ export async function resolveDispute(
   const data = { ticketNo: no, invoiceNumber: out.inv.invoiceNumber, outcome: LABEL[p.outcome], note };
   await notifyBusiness(db, out.inv.buyerId, "dispute_resolved", data, gw, now);
   await notifyBusiness(db, out.inv.sellerId, "dispute_resolved", data, gw, now);
-  if (out.d.phase === "post_funding" && p.outcome === "upheld") await notifyBusiness(db, out.inv.sellerId, "clawback_notice", { invoiceNumber: out.inv.invoiceNumber, amount: formatINR(out.inv.amount) }, gw, now);
-  if (out.d.phase === "post_funding" && p.outcome === "credit_note") await notifyBusiness(db, out.inv.sellerId, "credit_note_shortfall", { invoiceNumber: out.inv.invoiceNumber, amount: formatINR(out.credit!) }, gw, now);
+  if (out.d.phase === "post_funding" && p.outcome === "upheld") await notifyBusiness(db, out.inv.sellerId, "clawback_notice", { invoiceNumber: out.inv.invoiceNumber, amount: formatMoney(out.inv.amount) }, gw, now);
+  if (out.d.phase === "post_funding" && p.outcome === "credit_note") await notifyBusiness(db, out.inv.sellerId, "credit_note_shortfall", { invoiceNumber: out.inv.invoiceNumber, amount: formatMoney(out.credit!) }, gw, now);
 }

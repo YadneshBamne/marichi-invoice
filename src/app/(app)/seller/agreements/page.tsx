@@ -7,7 +7,7 @@ import { agreements, financingOffers, invoices } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { prepareAgreements, readiness, signAll, signInApp } from "@/server/agreements/service";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { DataTable, EmptyState, PageHead, ReviewCard, StatusPill } from "@/components/ui/page";
 
 async function sign(fd: FormData) {
@@ -59,7 +59,7 @@ export default async function Agreements() {
       {signer && unsigned.length >= 2 && (
         <form action={signEverything} className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-card bg-p-100 p-5 ring-1 ring-p-400">
           {unsigned.map((c) => <input key={c.o.id} type="hidden" name="offerId" value={c.o.id} />)}
-          <div><p className="font-semibold">{unsigned.length} agreements are waiting for your signature</p><p className="text-muted">Sign them together. Total to be paid out: {formatINR(unsigned.reduce((a, c) => a + c.o.advanceAmount - c.o.feeAmount, 0n))}.</p></div>
+          <div><p className="font-semibold">{unsigned.length} agreements are waiting for your signature</p><p className="text-muted">Sign them together. Total to be paid out: {formatMoney(unsigned.reduce((a, c) => a + c.o.advanceAmount - c.o.feeAmount, 0n))}.</p></div>
           <div className="flex flex-wrap items-center gap-4"><label className="flex items-center gap-2.5 text-sm"><input name="agree" type="checkbox" required />I have read and agree to all of them.</label><button className="btn btn-primary">Sign all {unsigned.length}</button></div>
         </form>
       )}
@@ -68,7 +68,7 @@ export default async function Agreements() {
           {cards.map(({ o, inv, docs, ready }) => (
             <ReviewCard key={o.id} title={`Invoice ${inv.invoiceNumber}`}
               meta={ready.ready ? <StatusPill status="signed" label="Fully signed" /> : <StatusPill status="pending" label="Waiting for signature" />}
-              aside={<><p className="text-xs text-muted">To be paid out</p><p className="text-lg font-semibold">{formatINR(o.advanceAmount - o.feeAmount)}</p></>}
+              aside={<><p className="text-xs text-muted">To be paid out</p><p className="text-lg font-semibold">{formatMoney(o.advanceAmount - o.feeAmount)}</p></>}
               actions={ready.ready ? undefined : !signer ? <p className="text-xs text-s-600">Only an approver or the owner can sign. Ask one of them.</p> : (
                 <form action={sign} className="flex flex-wrap items-center justify-between gap-3">
                   <input type="hidden" name="offerId" value={o.id} />

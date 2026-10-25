@@ -6,7 +6,7 @@ import { anthropicOcr } from "./anthropic-ocr";
 import { resendNotify } from "./resend-email";
 
 export interface KycPort {
-  verifyPan(pan: string, name: string): Promise<{ valid: boolean; nameMatch: boolean }>;
+  verifyTaxId(taxId: string, name: string): Promise<{ valid: boolean; nameMatch: boolean }>;
   verifyBankAccount(acct: string, ifsc: string, name: string): Promise<{ exists: boolean; nameMatch: boolean }>;
   screenAml(name: string): Promise<{ score: number; hit: boolean }>; // fail-closed: throw => block approval
 }
@@ -18,7 +18,8 @@ export interface IrnPort {
 export interface BureauPort {
   pull(pan: string, consentRef: string): Promise<{ score: number | null; noHit: boolean }>;
 }
-export type Rail = "IMPS" | "NEFT" | "RTGS";
+export type { Rail } from "../../lib/countries";
+import type { Rail } from "../../lib/countries";
 export interface PaymentsPort {
   /** Idempotent on `idempotencyKey`: a retry must never move money twice. */
   payout(p: { idempotencyKey: string; amount: bigint; ifsc: string; account: string; rail: Rail }): Promise<{ bankRef: string; status: "processing" | "succeeded" | "failed"; reason?: string }>;
@@ -49,6 +50,11 @@ export interface MandatePort {
   cancel(mandateRef: string): Promise<void>;
 }
 
+export interface RegistryPort {
+  /** File the assignment of one invoice at the country's registry (CERSAI, PACRA). Idempotent on the key. Throw on failure so the worker retries. */
+  file(p: { idempotencyKey: string; registry: string; assignor: string; assignee: string; invoiceNumber: string; amount: bigint }): Promise<{ reference: string }>;
+}
+
 export interface FxPort {
   /** Mid-market rate: rupees per one whole unit of `currency`, times 1,000,000 (an integer, so no float ever touches money). */
   rate(currency: string): Promise<{ midMicro: bigint; asOf: string }>;
@@ -64,7 +70,7 @@ export interface OcrPort {
 }
 
 export type Adapters = {
-  kyc: KycPort; irn: IrnPort; bureau: BureauPort; payments: PaymentsPort; esign: EsignPort; notify: NotifyPort; statements: StatementPort; mandates: MandatePort; ocr: OcrPort; fx: FxPort;
+  kyc: KycPort; irn: IrnPort; bureau: BureauPort; payments: PaymentsPort; esign: EsignPort; notify: NotifyPort; statements: StatementPort; mandates: MandatePort; ocr: OcrPort; fx: FxPort; registry: RegistryPort;
 };
 
 // ponytail: mock only; add real adapters per provider when licences exist, select via INTEGRATIONS_MODE.

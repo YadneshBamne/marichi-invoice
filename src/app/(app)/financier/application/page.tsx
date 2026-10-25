@@ -2,11 +2,12 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
 import { can } from "@/server/permissions";
-import { INSTITUTIONS, profileOf, saveApplication } from "@/server/marketplace/financier";
+import { institutionLabel, institutions, profileOf, saveApplication } from "@/server/marketplace/financier";
 import { financierTerms } from "@/server/agreements/templates";
 import { putDocument } from "@/server/vault";
 import { Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { attempt } from "../attempt";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Financier application" };
 const PATH = "/financier/application";
@@ -60,9 +61,9 @@ export default async function Application({ searchParams }: { searchParams: Prom
       {may && editable && (
         <Panel title="Licence and settlement account">
           <form action={save} className="grid gap-4 sm:grid-cols-2">
-            <Field label="What kind of institution are you?"><select name="institutionType" defaultValue={p?.institutionType ?? "nbfc_factor"} className={input}>{Object.entries(INSTITUTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
-            <Field label="Countries you are licensed to lend or factor in" hint="Two-letter codes, separated by commas: IN, ZM, KE."><input name="countries" required defaultValue={p?.countries.join(", ") ?? "IN"} className={`${input} uppercase`} /></Field>
-            <Field label="Regulator" hint="For example RBI, Bank of Zambia."><input name="regulator" required defaultValue={p?.regulator ?? ""} className={input} /></Field>
+            <Field label="What kind of institution are you?"><select name="institutionType" defaultValue={p?.institutionType ?? Object.keys(institutions())[1]} className={input}>{Object.entries(institutions()).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+            <Field label="Countries you are licensed to lend or factor in" hint="Two-letter codes, separated by commas: IN, ZM, KE."><input name="countries" required defaultValue={p?.countries.join(", ") ?? market().code} className={`${input} uppercase`} /></Field>
+            <Field label="Regulator" hint={`For example ${market().regulator}.`}><input name="regulator" required defaultValue={p?.regulator ?? ""} className={input} /></Field>
             <Field label="Licence type"><input name="licenceType" required defaultValue={p?.licenceType ?? ""} placeholder="NBFC-Factor, financial institution licence" className={input} /></Field>
             <Field label="Licence or registration number"><input name="licenceNumber" required defaultValue={p?.licenceNumber ?? ""} className={input} /></Field>
             <Field label="Licence valid until" hint="Leave blank if it has no expiry."><input name="licenceValidUntil" type="date" defaultValue={p?.licenceValidUntil ?? ""} className={input} /></Field>
@@ -70,7 +71,7 @@ export default async function Application({ searchParams }: { searchParams: Prom
             <p className="text-sm font-semibold sm:col-span-2">Where we pay your repayments and withdrawals</p>
             <Field label="Account holder name"><input name="settlementName" required defaultValue={p?.settlementName ?? ""} className={input} /></Field>
             <Field label="Account number"><input name="settlementAccount" required defaultValue={p?.settlementAccount ?? ""} inputMode="numeric" className={input} /></Field>
-            <Field label="IFSC or bank code"><input name="settlementIfsc" required defaultValue={p?.settlementIfsc ?? ""} className={`${input} uppercase`} /></Field>
+            <Field label={market().ids.bankCode.label} hint={market().ids.bankCode.hint}><input name="settlementIfsc" required defaultValue={p?.settlementIfsc ?? ""} className={`${input} uppercase`} /></Field>
             <details className="rounded-xl bg-panel p-4 text-sm sm:col-span-2"><summary className="cursor-pointer font-semibold text-p-700">Financier participation terms</summary><ol className="mt-2 list-decimal space-y-1.5 pl-5 text-muted">{financierTerms().blocks.flatMap((b) => ("ol" in b ? b.ol.map((r) => r.map((x) => (typeof x === "string" ? x : x.b)).join("")) : [])).map((t, i) => <li key={i}>{t}</li>)}</ol></details>
             <label className="flex items-start gap-2 text-sm sm:col-span-2"><input name="terms" type="checkbox" className="mt-0.5" />I have read the participation terms and accept them for {u.biz?.displayName ?? u.biz?.legalName ?? "my institution"}. Needed to send the application.</label>
             <div className="flex flex-wrap gap-3 sm:col-span-2">
@@ -84,7 +85,7 @@ export default async function Application({ searchParams }: { searchParams: Prom
       {p && !editable && (
         <Panel title="What you sent">
           <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-            <dt className="text-muted">Institution</dt><dd>{INSTITUTIONS[p.institutionType as keyof typeof INSTITUTIONS] ?? p.institutionType}</dd>
+            <dt className="text-muted">Institution</dt><dd>{institutionLabel(p.institutionType)}</dd>
             <dt className="text-muted">Licensed in</dt><dd>{p.countries.join(", ")}</dd>
             <dt className="text-muted">Regulator and licence</dt><dd>{p.regulator}, {p.licenceType} {p.licenceNumber}</dd>
             <dt className="text-muted">Valid until</dt><dd>{p.licenceValidUntil ?? "no expiry stated"}</dd>

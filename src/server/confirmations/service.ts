@@ -7,7 +7,7 @@ import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
 import { openDisputeInTx } from "../support/disputes";
 import { announceTicket } from "../support/service";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
 import { ACCEPTANCE_VERSION, acceptanceText } from "./wording";
 import { sendToBuyerSide } from "./link";
 import { recordConfirmation } from "../agreements/records";
@@ -17,7 +17,7 @@ export type Actor = { id: string; email: string; role: string; businessId: strin
 export type Decision = "confirm" | "dispute" | "clarify";
 
 const HOUR = 3_600_000;
-const info = (i: Invoice) => ({ invoiceNumber: i.invoiceNumber, amount: formatINR(i.amount) });
+const info = (i: Invoice) => ({ invoiceNumber: i.invoiceNumber, amount: formatMoney(i.amount) });
 
 /** validated -> sent_for_confirmation, and tell the buyer. Atomic: only one caller can win the transition. */
 export async function sendForConfirmation(db: Database, invoiceId: string, gw: Adapters = gateway, now = new Date()) {
@@ -86,7 +86,7 @@ export async function applyResponse(
       respondedByEmail: p.who.email, verifiedEmail: p.who.method === "link" ? p.who.email : null, ip: p.who.ip, userAgent: p.who.userAgent, note,
       ...(p.decision === "confirm" ? {
         acceptanceVersion: ACCEPTANCE_VERSION,
-        acceptanceText: acceptanceText({ buyer: names.buyer, seller: names.seller, invoiceNumber: inv.invoiceNumber, amount: formatINR(inv.amount), dueDate: inv.dueDate }).join("\n"),
+        acceptanceText: acceptanceText({ buyer: names.buyer, seller: names.seller, invoiceNumber: inv.invoiceNumber, amount: formatMoney(inv.amount), dueDate: inv.dueDate }).join("\n"),
       } : {}),
       ...(claimable ? { claimUntil: new Date(now.getTime() + 60 * 60_000) } : {}),
     }).where(eq(invoiceConfirmations.invoiceId, inv.id));

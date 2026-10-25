@@ -8,14 +8,14 @@ import { businesses, buyerSellerRelationships, disbursements, financingOffers, i
 import { createInvoice } from "../invoices/service";
 import { putDocument } from "../vault";
 import { rupeesToPaise, toDecimal } from "../../lib/money";
+import { market } from "../../lib/countries";
 
-const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/;
 export const InvoiceInput = z.object({
-  buyerGstin: z.string().trim().toUpperCase().regex(GSTIN, "buyer GSTIN is not valid"),
+  buyerGstin: z.string().trim().toUpperCase().refine((v) => market().ids.taxReg.pattern.test(v), { error: () => `buyer ${market().ids.taxReg.label} is not valid` }),
   invoiceNumber: z.string().trim().min(1).max(40),
   invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "invoice date must be YYYY-MM-DD"),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "due date must be YYYY-MM-DD"),
-  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "amount must be rupees, e.g. 118000.00"),
+  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "amount must be a plain number, e.g. 118000.00"),
   irn: z.string().trim().optional(),
   poReference: z.string().trim().optional(),
   file: z.object({ base64: z.string().min(1), mime: z.enum(["application/pdf", "image/png", "image/jpeg"]) }).optional(),

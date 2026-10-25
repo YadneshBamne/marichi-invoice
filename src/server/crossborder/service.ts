@@ -14,13 +14,18 @@ import { recordIncomingPayment } from "../collections/service";
 import { notifyBusiness } from "../notify";
 
 import { CROSS } from "./rules";
+import { market } from "../../lib/countries";
 export { CROSS };
 const COUNTRY = /^[A-Z]{2}$/;
 const PURPOSE = /^P\d{4}$/;
 
+/** Export financing follows Indian rules (shipping bill, FEMA purpose codes, bank conversion), so it runs only in the Indian market for now. */
+function assertSupported() { if (market().code !== "IN") throw new Error(`export financing is not available in ${market().name} yet`); }
+
 function checkCountry(country: string) {
+  assertSupported();
   const c = country.trim().toUpperCase();
-  if (!COUNTRY.test(c) || c === "IN") throw new Error("choose the buyer's country (not India)");
+  if (!COUNTRY.test(c) || c === market().code) throw new Error(`choose the buyer's country (not ${market().name})`);
   if (CROSS.blockedCountries.includes(c)) throw new Error("we cannot finance invoices on buyers in that country");
   return c;
 }
@@ -93,6 +98,7 @@ export type ExportInvoice = {
 
 /** Capture an export invoice. The rate is locked now and stored with the invoice; the rupee amount goes through the usual checks. */
 export async function createExportInvoice(db: Database, p: ExportInvoice, gw: Adapters = gateway, now = new Date()) {
+  assertSupported();
   const [buyer] = await db.select().from(businesses).where(eq(businesses.id, p.buyerId));
   if (!buyer?.country) throw new Error("this buyer is not an overseas company");
   checkCountry(buyer.country);
@@ -114,6 +120,7 @@ export async function createExportInvoice(db: Database, p: ExportInvoice, gw: Ad
  * into the normal waterfall. A shortfall from a weaker rupee stays with the seller (recourse); a surplus goes back to them.
  */
 export async function recordForeignPayment(db: Database, p: { accountNumber: string; currency: string; foreignAmount: bigint; utr: string; receivedAt: Date }, gw: Adapters = gateway, now = new Date()) {
+  assertSupported();
   if (p.foreignAmount <= 0n) throw new Error("amount must be positive");
   const [seen] = await db.select({ id: foreignReceipts.id }).from(foreignReceipts).where(eq(foreignReceipts.utr, p.utr));
   if (seen) return { status: "replayed" as const };

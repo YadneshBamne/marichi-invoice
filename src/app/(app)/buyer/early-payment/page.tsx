@@ -8,9 +8,10 @@ import { DD, listEarlyPayments, withdrawEarlyPayment } from "@/server/earlypay/s
 import { quoteEarly } from "@/server/earlypay/quote";
 import { submit } from "@/server/approvals/service";
 import { DataTable, EmptyState, KV, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 import { QuoteForm } from "./quote-form";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Pay early" };
 const PATH = "/buyer/early-payment";
@@ -27,7 +28,7 @@ async function propose(fd: FormData) {
     if (!inv) throw new Error("invoice not found");
     const q = quoteEarly(inv.amount, Math.max(1, day(inv.dueDate) - day(new Date().toISOString())), discountBps);
     const r = await submit(db, { id: u.id, role: u.role, orgRole: u.orgRole, businessId: u.businessId }, "earlypay.propose", { invoiceId: f.invoiceId, discountBps },
-      { summary: `Pay invoice ${inv.invoiceNumber} early: ${formatINR(q.net)} now, saving ${formatINR(q.discount)}`, amount: q.net });
+      { summary: `Pay invoice ${inv.invoiceNumber} early: ${formatMoney(q.net)} now, saving ${formatMoney(q.discount)}`, amount: q.net });
     return r.status === "queued" ? "Sent for approval. An approver in your company will see it under Approvals. Nothing goes to your supplier until they approve." : "Sent to your supplier. They have 72 hours to answer.";
   });
 }
@@ -62,8 +63,8 @@ export default async function EarlyPayment({ searchParams }: { searchParams: Pro
       {!may && <div className="mb-4"><Notice tone="warn">Your role can view this page but not propose early payments.</Notice></div>}
 
       {mine.filter((m) => m.e.status === "accepted").map((m) => (
-        <Panel key={m.e.id} title={`Pay ${formatINR(m.e.netAmount)} for invoice ${m.inv.invoiceNumber}`} sub={`Accepted. Pay exactly this amount by ${m.e.expiresAt.toLocaleDateString("en-IN")} or the offer lapses.`} className="mb-5">
-          <KV cols={2} rows={[["Amount to pay", formatINR(m.e.netAmount)], ["You save", formatINR(m.e.discountAmount)], ["Account number", m.va ?? "being issued"], ["IFSC", m.ifsc ?? "-"]]} />
+        <Panel key={m.e.id} title={`Pay ${formatMoney(m.e.netAmount)} for invoice ${m.inv.invoiceNumber}`} sub={`Accepted. Pay exactly this amount by ${m.e.expiresAt.toLocaleDateString("en-IN")} or the offer lapses.`} className="mb-5">
+          <KV cols={2} rows={[["Amount to pay", formatMoney(m.e.netAmount)], ["You save", formatMoney(m.e.discountAmount)], ["Account number", m.va ?? "being issued"], [market().ids.bankCode.label, m.ifsc ?? "-"]]} />
         </Panel>
       ))}
 
@@ -73,7 +74,7 @@ export default async function EarlyPayment({ searchParams }: { searchParams: Pro
             cols={[
               { h: "Invoice", cell: (r) => r.i.invoiceNumber },
               { h: "Supplier", cell: (r) => r.seller },
-              { h: "Amount", align: "right", cell: (r) => formatINR(r.i.amount) },
+              { h: "Amount", align: "right", cell: (r) => formatMoney(r.i.amount) },
               { h: "Due", cell: (r) => <>{r.i.dueDate}<span className="block text-xs font-normal text-muted">{day(r.i.dueDate) - today} days away</span></> },
               { h: "", align: "right", cell: (r) => may && (
                 <Pop id={`pe-${r.i.id}`} label="Pay early">
@@ -88,8 +89,8 @@ export default async function EarlyPayment({ searchParams }: { searchParams: Pro
         <DataTable rows={mine} rowKey={(m) => m.e.id} empty="You have not proposed an early payment yet."
           cols={[
             { h: "Invoice", cell: (m) => m.inv.invoiceNumber },
-            { h: "You pay", align: "right", cell: (m) => formatINR(m.e.netAmount) },
-            { h: "You save", align: "right", cell: (m) => formatINR(m.e.discountAmount) },
+            { h: "You pay", align: "right", cell: (m) => formatMoney(m.e.netAmount) },
+            { h: "You save", align: "right", cell: (m) => formatMoney(m.e.discountAmount) },
             { h: "Rate", align: "right", cell: (m) => `${m.e.discountBps / 100}% a year` },
             { h: "Status", cell: (m) => <StatusPill status={m.e.status === "paid" || m.e.status === "accepted" ? "approved" : m.e.status === "proposed" ? "pending" : "rejected"} label={m.e.status} /> },
             { h: "", align: "right", cell: (m) => may && m.e.status === "proposed" && <form action={withdraw}><input type="hidden" name="id" value={m.e.id} /><button className="btn btn-ghost btn-sm">Withdraw</button></form> },

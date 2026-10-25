@@ -3,7 +3,7 @@ import type { buyerDashboard, opsDashboard, sellerDashboard } from "@/server/rep
 import { Card, Empty, PageHead, Pill, Stat, type Tone } from "@/components/ui/cards";
 import { Bars, Donut, HBars } from "@/components/ui/charts";
 import { Icon } from "@/components/ui/icons";
-import { formatCompactINR, formatINR } from "@/lib/money";
+import { formatCompactMoney, formatMoney } from "@/lib/money";
 
 // Pure presentation: data in, JSX out. Pages fetch; /design/dashboards renders the same views with sample data.
 export type SellerData = Awaited<ReturnType<typeof sellerDashboard>>;
@@ -79,16 +79,16 @@ export function SellerDashboardView({ d, first, exports = true, company }: { d: 
       <VerifyBanner status={d.kyb} />
       <GetStarted setup={d.setup} />
       <div data-tour="kpis" className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat hero label="Available credit" value={formatCompactINR(d.available)} note={`of ${formatCompactINR(d.limit)} limit`} href="/seller/invoices" />
-        <Stat label="Outstanding" value={formatCompactINR(d.outstanding)} note={plural(d.upcoming.length, "open invoice")} href="/seller/invoices" />
-        <Stat label="Financed to date" value={formatCompactINR(d.financedToDate)} note="gross advances" />
-        <Stat label="Fees & discount paid" value={formatCompactINR(d.feesPaid)} note="processing + discount" />
+        <Stat hero label="Available credit" value={formatCompactMoney(d.available)} note={`of ${formatCompactMoney(d.limit)} limit`} href="/seller/invoices" />
+        <Stat label="Outstanding" value={formatCompactMoney(d.outstanding)} note={plural(d.upcoming.length, "open invoice")} href="/seller/invoices" />
+        <Stat label="Financed to date" value={formatCompactMoney(d.financedToDate)} note="gross advances" />
+        <Stat label="Fees & discount paid" value={formatCompactMoney(d.feesPaid)} note="processing + discount" />
       </div>
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <Card title="Paid out, last 7 days" className="xl:col-span-2">
           <Bars
             data={d.funding7d.map((x) => ({ label: new Date(x.date).toLocaleDateString("en-IN", { weekday: "narrow", timeZone: "UTC" }), value: Number(x.amount / 100n) }))}
-            format={(n) => formatCompactINR(BigInt(n) * 100n)}
+            format={(n) => formatCompactMoney(BigInt(n) * 100n)}
           />
         </Card>
         <Card title="Needs your attention" tour="todo">
@@ -113,7 +113,7 @@ export function SellerDashboardView({ d, first, exports = true, company }: { d: 
                 {d.upcoming.map((r) => (
                   <tr key={r.invoiceId}>
                     <td className="font-medium">{r.number}</td><td>{r.buyer}</td><td>{r.due}</td>
-                    <td className="text-right">{formatINR(r.amount)}</td>
+                    <td className="text-right">{formatMoney(r.amount)}</td>
                     <td className="text-right"><Pill tone={dueTone(r.dpd)}>{r.dpd > 0 ? `${r.dpd}d late` : "On track"}</Pill></td>
                   </tr>
                 ))}
@@ -127,7 +127,7 @@ export function SellerDashboardView({ d, first, exports = true, company }: { d: 
               {d.recent.map((r) => (
                 <li key={r.number} className="rounded-lg bg-panel p-4">
                   <div className="text-xs text-muted">{r.number}</div>
-                  <div className="text-lg font-semibold">{formatCompactINR(r.amount)}</div>
+                  <div className="text-lg font-semibold">{formatCompactMoney(r.amount)}</div>
                   <div className="text-xs text-faint">{r.at?.toLocaleDateString("en-IN")}</div>
                 </li>
               ))}
@@ -150,9 +150,9 @@ export function BuyerDashboardView({ d, first, exports = true, company }: { d: B
       </PageHead>
       <VerifyBanner status={d.kyb} />
       <div data-tour="kpis" className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat hero label="Awaiting your confirmation" value={String(d.pendingCount)} note={`${formatCompactINR(d.pendingValue)} in total`} href="/buyer/invoices" />
-        <Stat label="Due in 30 days" value={formatCompactINR(d.due30Value)} note={plural(d.due30Count, "invoice")} href="/buyer/invoices" />
-        <Stat label="Overdue" value={formatCompactINR(d.overdueValue)} note={d.overdueCount ? plural(d.overdueCount, "invoice") : "None"} tone={d.overdueCount ? "bad" : "good"} />
+        <Stat hero label="Awaiting your confirmation" value={String(d.pendingCount)} note={`${formatCompactMoney(d.pendingValue)} in total`} href="/buyer/invoices" />
+        <Stat label="Due in 30 days" value={formatCompactMoney(d.due30Value)} note={plural(d.due30Count, "invoice")} href="/buyer/invoices" />
+        <Stat label="Overdue" value={formatCompactMoney(d.overdueValue)} note={d.overdueCount ? plural(d.overdueCount, "invoice") : "None"} tone={d.overdueCount ? "bad" : "good"} />
         <Stat label="Suppliers" value={String(d.suppliers.length)} note="linked to you" />
       </div>
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -162,7 +162,7 @@ export function BuyerDashboardView({ d, first, exports = true, company }: { d: B
               {d.awaiting.map((r) => (
                 <li key={r.id} className={row}>
                   <span><b>{r.number}</b><span className="block text-muted">{r.seller}</span></span>
-                  <span className="text-right"><b>{formatINR(r.amount)}</b><span className="block text-muted">due {r.due}</span></span>
+                  <span className="text-right"><b>{formatMoney(r.amount)}</b><span className="block text-muted">due {r.due}</span></span>
                 </li>
               ))}
             </ul>
@@ -174,7 +174,7 @@ export function BuyerDashboardView({ d, first, exports = true, company }: { d: B
               {d.upcoming.map((r) => (
                 <li key={r.id} className={row}>
                   <span><b>{r.number}</b><span className="block text-muted">{r.seller} · due {r.due}</span></span>
-                  <span className="text-right"><b>{formatINR(r.amount)}</b><span className="block"><Pill tone={dueTone(r.dpd)}>{r.dpd > 0 ? `${r.dpd}d late` : "Upcoming"}</Pill></span></span>
+                  <span className="text-right"><b>{formatMoney(r.amount)}</b><span className="block"><Pill tone={dueTone(r.dpd)}>{r.dpd > 0 ? `${r.dpd}d late` : "Upcoming"}</Pill></span></span>
                 </li>
               ))}
             </ul>
@@ -184,7 +184,7 @@ export function BuyerDashboardView({ d, first, exports = true, company }: { d: B
           {d.suppliers.length ? (
             <HBars
               rows={d.suppliers.map((s) => ({ label: s.seller, value: Number(s.volume / 100n), note: `${s.invoices} invoices · ${s.terms}-day terms` }))}
-              format={(n) => formatCompactINR(BigInt(n) * 100n)}
+              format={(n) => formatCompactMoney(BigInt(n) * 100n)}
             />
           ) : <Empty>No suppliers have linked to you yet.</Empty>}
         </Card>
@@ -221,15 +221,15 @@ export function OpsDashboardView({ d }: { d: OpsData }) {
       </PageHead>
 
       <div data-tour="kpis" className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat hero label="Funded this month" value={formatCompactINR(d.gtvMonth)} note={d.gtvChangePct === null ? "No prior month yet" : `${d.gtvChangePct >= 0 ? "+" : ""}${d.gtvChangePct}% vs last month`} />
-        <Stat label="Active book" value={formatCompactINR(d.book)} note={`${d.openInvoices} open invoices`} />
+        <Stat hero label="Funded this month" value={formatCompactMoney(d.gtvMonth)} note={d.gtvChangePct === null ? "No prior month yet" : `${d.gtvChangePct >= 0 ? "+" : ""}${d.gtvChangePct}% vs last month`} />
+        <Stat label="Active book" value={formatCompactMoney(d.book)} note={`${d.openInvoices} open invoices`} />
         <Stat label="30+ days past due" value={`${d.npaPct}%`} note="of book by value" tone={d.npaPct > 3 ? "bad" : "good"} />
-        <Stat label="Capital deployed" value={`${d.utilizationPct}%`} note={`${formatCompactINR(d.deployed)} of ${formatCompactINR(d.capital)}`} />
+        <Stat label="Capital deployed" value={`${d.utilizationPct}%`} note={`${formatCompactMoney(d.deployed)} of ${formatCompactMoney(d.capital)}`} />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <Card title="Funded per month" className="xl:col-span-2">
-          <Bars data={d.months.map((m) => ({ label: m.label, value: cents(m.amount) }))} format={(n) => formatCompactINR(BigInt(n) * 100n)} highlight={5} />
+          <Bars data={d.months.map((m) => ({ label: m.label, value: cents(m.amount) }))} format={(n) => formatCompactMoney(BigInt(n) * 100n)} highlight={5} />
         </Card>
         <Card title="Work queues" tour="queues">
           <ul className="space-y-1.5">
@@ -258,7 +258,7 @@ export function OpsDashboardView({ d }: { d: OpsData }) {
               { label: "Current", value: cents(b["0"]) }, { label: "1–30 days", value: cents(b["1-30"]) }, { label: "31–60", value: cents(b["31-60"]), color: "var(--color-s-500)" },
               { label: "61–90", value: cents(b["61-90"]), color: "var(--color-r-600)" }, { label: "90+ (NPA)", value: cents(b["90+"]), color: "var(--color-ink)" },
             ]}
-            center={formatCompactINR(d.book)} sub="outstanding" format={(n) => formatCompactINR(BigInt(n) * 100n)}
+            center={formatCompactMoney(d.book)} sub="outstanding" format={(n) => formatCompactMoney(BigInt(n) * 100n)}
           />
         </Card>
 
@@ -271,7 +271,7 @@ export function OpsDashboardView({ d }: { d: OpsData }) {
         </Card>
         <Card title="Escrow & reconciliation">
           <dl className="space-y-3 text-sm">
-            <div className="flex justify-between"><dt className="text-muted">Escrow balance</dt><dd className="font-semibold">{formatCompactINR(d.escrow)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Escrow balance</dt><dd className="font-semibold">{formatCompactMoney(d.escrow)}</dd></div>
             <div className="flex justify-between"><dt className="text-muted">Last reconciliation</dt>
               <dd>{d.recon ? <Pill tone={d.recon.status === "tied" ? "good" : "bad"}>{d.recon.date} · {d.recon.status}</Pill> : <Pill>not run yet</Pill>}</dd></div>
           </dl>

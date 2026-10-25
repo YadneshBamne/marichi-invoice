@@ -11,6 +11,7 @@ import { assignmentNotice, invoiceSchedule, masterAgreement, TEMPLATE_VERSION } 
 import { termsFor } from "./country";
 import { financierFor, ensureKeyFacts } from "./keyfacts";
 import { COLLECTIONS } from "../collections/waterfall";
+import { ensureFiling, registryReady } from "../registry/service";
 
 const STAFF = ["ops", "compliance", "admin"];
 
@@ -62,6 +63,7 @@ export async function prepareAgreements(db: Database, offerId: string, gw: Adapt
       await db.update(agreements).set({ status: "sent", esignRequestId: r.requestId, sentAt: now }).where(eq(agreements.id, a.id));
     }
   }
+  await ensureFiling(db, offerId, now); // the registry filing record; the worker sends it
   await db.insert(auditLog).values({ action: "agreements.prepared", entity: "offer", entityId: offerId });
   return db.select().from(agreements).where(and(eq(agreements.businessId, seller.id), or(eq(agreements.kind, "master"), eq(agreements.offerId, offerId))));
 }
@@ -154,6 +156,8 @@ export async function assertReadyToDisburse(db: Database, offerId: string) {
     const missing = (Object.keys(r) as (keyof typeof r)[]).filter((k) => k !== "ready" && !r[k]);
     throw new Error(`AGREEMENTS_INCOMPLETE: ${missing.join(", ")}`);
   }
+  // Where the country gives priority to whoever files first, the assignment must be on the registry before any money moves.
+  if (!(await registryReady(db, offerId))) throw new Error("REGISTRY_PENDING: the assignment is not yet filed at the registry");
 }
 
 /** Who may open a vault document. Buyers see only the assignment notice and invoice files addressed to them (never the pricing). */

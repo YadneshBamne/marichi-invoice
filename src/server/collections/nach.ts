@@ -1,4 +1,4 @@
-// NACH auto-debit. A buyer authorises a mandate on their bank account; on the day an invoice falls due we present a debit,
+// Auto-debit (e-NACH in India, direct debit elsewhere; the pack names it). A buyer authorises a mandate on their bank account; on the day an invoice falls due we present a debit,
 // and a successful debit is booked exactly like a buyer's own transfer (it goes through the collections waterfall).
 // Safety rules: one debit in flight per invoice, a hard cap per debit, a notice the day before, three tries then manual.
 import { and, count, desc, eq, inArray, isNull, lte } from "drizzle-orm";
@@ -9,7 +9,8 @@ import { notifyBusiness, notifyStaff } from "../notify";
 import { daysBetween, isoDay } from "./waterfall";
 import { recordIncomingPayment } from "./service";
 import { hasOpenDispute } from "../support/disputes";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
+import { market } from "../../lib/countries";
 import { maskTail } from "../crypto";
 
 export const NACH = { maxAttempts: 3 };
@@ -21,8 +22,9 @@ export async function registerMandate(
 ) {
   if (actor.role !== "buyer" || !actor.businessId) throw new Error("only a buyer can set up auto-pay");
   const accountNumber = p.accountNumber.replace(/\s/g, ""), ifsc = p.ifsc.trim().toUpperCase();
-  if (!/^\d{9,18}$/.test(accountNumber)) throw new Error("enter the bank account number (9 to 18 digits)");
-  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) throw new Error("enter a valid IFSC code");
+  const ids = market().ids;
+  if (!ids.bankAccount.pattern.test(accountNumber)) throw new Error(`enter the bank account number. ${ids.bankAccount.hint}`);
+  if (!ids.bankCode.pattern.test(ifsc)) throw new Error(`enter a valid ${ids.bankCode.label}. ${ids.bankCode.hint}`);
   if (p.holderName.trim().length < 2) throw new Error("enter the account holder name");
   if (p.maxAmount <= 0n) throw new Error("set a limit for a single debit");
   const [open] = await db.select({ id: mandates.id }).from(mandates).where(and(eq(mandates.businessId, actor.businessId), inArray(mandates.status, OPEN)));
@@ -77,8 +79,8 @@ export async function applyDebitResult(
     return { status: "succeeded" as const, credit };
   }
   await db.insert(auditLog).values({ action: "nach.debit_failed", entity: "invoice", entityId: d.invoiceId, after: { attempt: d.attempt, reason: r.reason ?? null } });
-  await notifyBusiness(db, inv.buyerId, "nach_debit_failed", { invoiceNumber: inv.invoiceNumber, amount: formatINR(d.amount), reason: r.reason ?? "debit failed" }, gw, now);
-  await notifyStaff(db, ["ops"], "collections_escalation", { invoiceNumber: inv.invoiceNumber, due: inv.dueDate, amount: formatINR(d.amount), dpd: "0" }, gw, now);
+  await notifyBusiness(db, inv.buyerId, "nach_debit_failed", { invoiceNumber: inv.invoiceNumber, amount: formatMoney(d.amount), reason: r.reason ?? "debit failed" }, gw, now);
+  await notifyStaff(db, ["ops"], "collections_escalation", { invoiceNumber: inv.invoiceNumber, due: inv.dueDate, amount: formatMoney(d.amount), dpd: "0" }, gw, now);
   return { status: "failed" as const };
 }
 
@@ -99,7 +101,7 @@ export async function presentDebits(db: Database, gw: Adapters = gateway, now = 
     if (prior.length >= NACH.maxAttempts) { out.skipped++; continue; } // out of tries: the normal overdue and recourse flow takes over
     if (inv.amount > m.maxAmount) {
       const first = await db.insert(collectionEvents).values({ invoiceId: inv.id, kind: "nach_over_limit" }).onConflictDoNothing().returning({ id: collectionEvents.id });
-      if (first.length) await notifyBusiness(db, inv.buyerId, "nach_over_limit", { invoiceNumber: inv.invoiceNumber, amount: formatINR(inv.amount), limit: formatINR(m.maxAmount) }, gw, now);
+      if (first.length) await notifyBusiness(db, inv.buyerId, "nach_over_limit", { invoiceNumber: inv.invoiceNumber, amount: formatMoney(inv.amount), limit: formatMoney(m.maxAmount) }, gw, now);
       out.skipped++; continue;
     }
     const attempt = prior.length + 1;
@@ -130,7 +132,7 @@ export async function sendPreDebitNotices(db: Database, gw: Adapters = gateway, 
   for (const { inv } of rows) {
     const first = await db.insert(collectionEvents).values({ invoiceId: inv.id, kind: "nach_notice" }).onConflictDoNothing().returning({ id: collectionEvents.id });
     if (!first.length) continue;
-    await notifyBusiness(db, inv.buyerId, "nach_pre_debit", { invoiceNumber: inv.invoiceNumber, amount: formatINR(inv.amount), due: inv.dueDate }, gw, now);
+    await notifyBusiness(db, inv.buyerId, "nach_pre_debit", { invoiceNumber: inv.invoiceNumber, amount: formatMoney(inv.amount), due: inv.dueDate }, gw, now);
     n++;
   }
   return n;

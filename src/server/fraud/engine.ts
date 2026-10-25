@@ -6,7 +6,8 @@ import { and, asc, desc, eq, gte, inArray, lt, ne, notInArray } from "drizzle-or
 import type { Database } from "../db/client";
 import { businessBankAccounts, businesses, fraudScans, invoices } from "../db/schema";
 import { openCase } from "./service";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
+import { market } from "../../lib/countries";
 
 /** Editable in Policy (group "Fraud engine"). */
 export const FRAUD = {
@@ -47,23 +48,23 @@ export async function scoreInvoice(db: Database, invoiceId: string, now = new Da
   // 2. Amount outlier against this seller's own history (needs a few invoices to mean anything).
   if (history.length >= 3) {
     const avg = history.reduce((a, h) => a + h.amount, 0n) / BigInt(history.length);
-    if (avg > 0n && inv.amount > avg * BigInt(FRAUD.outlierMultiple)) add({ rule: "amount_outlier", label: "Much larger than this seller's usual invoice", severity: "medium", score: 20, detail: { amount: formatINR(inv.amount), sellerAverage: formatINR(avg), times: Number(inv.amount / avg) } });
+    if (avg > 0n && inv.amount > avg * BigInt(FRAUD.outlierMultiple)) add({ rule: "amount_outlier", label: "Much larger than this seller's usual invoice", severity: "medium", score: 20, detail: { amount: formatMoney(inv.amount), sellerAverage: formatMoney(avg), times: Number(inv.amount / avg) } });
   }
 
   // 3. Round-number streak: several recent invoices in exact lakhs is a pattern real trade rarely shows.
   const LAKH = 1_00_000_00n;
   if (inv.amount >= 5n * LAKH && inv.amount % LAKH === 0n) {
     const lastFive = history.slice(0, 5);
-    if (lastFive.filter((h) => h.amount % LAKH === 0n).length >= 3) add({ rule: "round_amounts", label: "A run of exactly round amounts", severity: "low", score: 10, detail: { amount: formatINR(inv.amount) } });
+    if (lastFive.filter((h) => h.amount % LAKH === 0n).length >= 3) add({ rule: "round_amounts", label: "A run of exactly round amounts", severity: "low", score: 10, detail: { amount: formatMoney(inv.amount) } });
   }
 
   // 4. A brand-new seller account raising a large invoice.
   const ageDays = (now.getTime() - seller.createdAt.getTime()) / DAY;
-  if (ageDays < FRAUD.newSellerDays && inv.amount >= FRAUD.newSellerTicket) add({ rule: "new_seller_large", label: "New seller, large invoice", severity: "medium", score: 25, detail: { accountAgeDays: Math.floor(ageDays), amount: formatINR(inv.amount) } });
+  if (ageDays < FRAUD.newSellerDays && inv.amount >= FRAUD.newSellerTicket) add({ rule: "new_seller_large", label: "New seller, large invoice", severity: "medium", score: 25, detail: { accountAgeDays: Math.floor(ageDays), amount: formatMoney(inv.amount) } });
 
-  // 5. Related parties: the same PAN on both sides means the "buyer" is the seller (or its other registration).
+  // 5. Related parties: the same taxpayer id (PAN, TPIN) on both sides means the "buyer" is the seller (or its other registration).
   const sp = panOf(seller.gstin), bp = panOf(buyer.gstin);
-  if ((sp && bp && sp === bp) || (seller.pan && buyer.pan && seller.pan === buyer.pan)) add({ rule: "related_party", label: "Seller and buyer share a PAN", severity: "high", score: 40, detail: { pan: sp ?? seller.pan } });
+  if ((sp && bp && sp === bp) || (seller.pan && buyer.pan && seller.pan === buyer.pan)) add({ rule: "related_party", label: `Seller and buyer share a ${market().ids.kyb.label}`, severity: "high", score: 40, detail: { pan: sp ?? seller.pan } });
 
   // 6. Circular trade: money going round. A sells to B and B sells back to A, or A -> B -> C -> A, within the window.
   const win = new Date(now.getTime() - FRAUD.circularWindowDays * DAY);

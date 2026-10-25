@@ -12,7 +12,7 @@ import { sendForConfirmation } from "@/server/confirmations/service";
 import { scanInvoice } from "@/server/fraud/engine";
 import { putDocument } from "@/server/vault";
 import { DataTable, EmptyState, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
-import { formatINR, formatMinor, rupeesToPaise } from "@/lib/money";
+import { formatMoney, formatMinor, rupeesToPaise } from "@/lib/money";
 
 export const metadata = { title: "Export invoices" };
 const PATH = "/seller/invoices/export";
@@ -98,7 +98,7 @@ export default async function ExportInvoices({ searchParams }: { searchParams: P
           cols={[
             { h: "No.", cell: (i) => i.invoiceNumber },
             { h: "Invoice", align: "right", cell: (i) => formatMinor(i.foreignAmount ?? 0n, i.currency) },
-            { h: "In rupees", align: "right", cell: (i) => <>{formatINR(i.amount)}<span className="block text-xs font-normal text-muted">at ₹{(Number(i.fxRateMicro ?? 0n) / 1_000_000).toFixed(4)}</span></> },
+            { h: "In rupees", align: "right", cell: (i) => <>{formatMoney(i.amount)}<span className="block text-xs font-normal text-muted">at ₹{(Number(i.fxRateMicro ?? 0n) / 1_000_000).toFixed(4)}</span></> },
             { h: "Due", cell: (i) => i.dueDate },
             { h: "Status", cell: (i) => <StatusPill status={i.status} /> },
             { h: "Offers", cell: () => <a className="font-semibold text-p-700 underline" href="/seller/invoices">Answer offers</a> },

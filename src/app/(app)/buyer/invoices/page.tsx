@@ -13,11 +13,12 @@ import { underwriteInvoice } from "@/server/underwriting/service";
 import { generateOffer } from "@/server/offers/service";
 import { redirect } from "next/navigation";
 import { raiseDispute } from "@/server/support/disputes";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatMoney, rupeesToPaise } from "@/lib/money";
 import { myMandate } from "@/server/collections/nach";
 import { maskTail } from "@/server/crypto";
 import { Autopay } from "./autopay";
 import { acceptanceText } from "@/server/confirmations/wording";
+import { market } from "@/lib/countries";
 
 const Form = z.object({
   invoiceId: z.uuid(),
@@ -78,7 +79,7 @@ export default async function BuyerInvoices() {
   const pending = rows.filter((r) => r.i.status === "sent_for_confirmation");
   const done = rows.filter((r) => r.i.status !== "sent_for_confirmation" && r.c);
   const lead = can(u, "invoice.confirm");
-  const mandate = mandateRow && { id: mandateRow.id, status: mandateRow.status, maskedAccount: maskTail(mandateRow.accountNumber), ifsc: mandateRow.ifsc, maxLabel: formatINR(mandateRow.maxAmount) };
+  const mandate = mandateRow && { id: mandateRow.id, status: mandateRow.status, maskedAccount: maskTail(mandateRow.accountNumber), ifsc: mandateRow.ifsc, maxLabel: formatMoney(mandateRow.maxAmount) };
 
   return (
     <>
@@ -91,7 +92,7 @@ export default async function BuyerInvoices() {
               {pending.map(({ i, seller, c }) => (
                 <ReviewCard key={i.id} title={`${seller}  ${i.invoiceNumber}`}
                   meta={<><span>Dated {i.invoiceDate}</span><span>due {i.dueDate}</span>{i.poReference && <span>PO {i.poReference}</span>}</>}
-                  aside={<p className="text-lg font-semibold">{formatINR(i.amount)}</p>}
+                  aside={<p className="text-lg font-semibold">{formatMoney(i.amount)}</p>}
                   actions={!lead ? <p className="text-xs text-s-600">Only an approver or the owner can confirm an invoice. Ask one of them.</p> : (
                     <form action={respond} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="invoiceId" value={i.id} />
@@ -104,7 +105,7 @@ export default async function BuyerInvoices() {
                   {c?.status === "clarification" && <p className="mb-2 text-s-600">You asked: {c.note}</p>}
                   <details className="text-muted">
                     <summary className="cursor-pointer font-semibold text-p-700">What you agree to by confirming</summary>
-                    <ol className="mt-2 list-decimal space-y-1 pl-5">{acceptanceText({ buyer: u.biz?.displayName ?? u.biz?.legalName ?? "your company", seller, invoiceNumber: i.invoiceNumber, amount: formatINR(i.amount), dueDate: i.dueDate }).map((t, k) => <li key={k}>{t}</li>)}</ol>
+                    <ol className="mt-2 list-decimal space-y-1 pl-5">{acceptanceText({ buyer: u.biz?.displayName ?? u.biz?.legalName ?? "your company", seller, invoiceNumber: i.invoiceNumber, amount: formatMoney(i.amount), dueDate: i.dueDate }).map((t, k) => <li key={k}>{t}</li>)}</ol>
                   </details>
                 </ReviewCard>
               ))}
@@ -119,9 +120,9 @@ export default async function BuyerInvoices() {
             <DataTable rows={payables} rowKey={({ i }) => i.id}
               cols={[
                 { h: "Invoice", cell: ({ i, seller }) => <>{i.invoiceNumber}<span className="block text-[13px] font-normal text-muted">{seller}</span></> },
-                { h: "Amount", align: "right", cell: ({ i }) => formatINR(i.amount) },
+                { h: "Amount", align: "right", cell: ({ i }) => formatMoney(i.amount) },
                 { h: "Due", cell: ({ i }) => <span className="flex items-center gap-2">{i.dueDate}{i.status === "overdue" && <StatusPill status="overdue" />}</span> },
-                { h: "Pay to", cell: ({ va }) => <span className="font-mono text-[13px] font-normal">{va.accountNumber}<span className="block text-xs text-muted">IFSC {va.ifsc}</span></span> },
+                { h: "Pay to", cell: ({ va }) => <span className="font-mono text-[13px] font-normal">{va.accountNumber}<span className="block text-xs text-muted">{market().ids.bankCode.label} {va.ifsc}</span></span> },
                 { h: "Reference", cell: ({ i }) => <span className="font-mono text-[13px] font-normal">{i.invoiceNumber}</span> },
                 { h: "", align: "right", cell: ({ i }) => lead && (
                   <Pop id={`dp-${i.id}`} label="Dispute" cls="btn btn-ghost btn-sm">
@@ -142,7 +143,7 @@ export default async function BuyerInvoices() {
             <DataTable rows={done} rowKey={({ i }) => i.id}
               cols={[
                 { h: "Invoice", cell: ({ i, seller }) => <>{i.invoiceNumber}<span className="block text-[13px] font-normal text-muted">{seller}</span></> },
-                { h: "Amount", align: "right", cell: ({ i }) => formatINR(i.amount) },
+                { h: "Amount", align: "right", cell: ({ i }) => formatMoney(i.amount) },
                 { h: "Your response", cell: ({ c }) => <span className="flex items-center gap-2"><StatusPill status={c!.status} />{c!.method === "deemed" && <span className="text-xs font-normal text-muted">deemed</span>}</span> },
               ]} />
           </Panel>

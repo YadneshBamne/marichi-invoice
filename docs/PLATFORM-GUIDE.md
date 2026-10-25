@@ -252,6 +252,13 @@ One core product; the module below changes per country. The first column is what
 - **Compliance clocks**: breach notice window, retention period, consent records per country.
 - **Money**: currency per account, settlement currency, rail adapter, day-count basis.
 
+### 8.5 How the code does it (built)
+- **One deployment, one home market.** `NEXT_PUBLIC_MARKET` (IN or ZM; India if unset) selects a country pack from `src/lib/countries`. The pack is plain data read by the server, the browser, emails and agreements alike. To open a country, deploy another copy with its own database in that country's region and its own licence, partner bank and staff. This keeps every ledger in a single currency and solves data residency by construction. The price: there is no marketplace that spans countries, and one login does not work in two countries.
+- **What a pack holds:** currency and how amounts are written; the company and tax identifiers asked for (India: PAN, GSTIN, CIN, IFSC; Zambia: TPIN, PACRA number, bank sort code); the tax charged on our fees (GST 18%, VAT 16%); the e-invoice system (IRN, Smart Invoice); the assignment registry and whether filing comes before or after payout; payout rails and the amount that switches rail; the recurring-debit scheme; governing law, forum, e-signature law and complaint route; data-protection law, regulator, breach clock and residency note; the kinds of lender the regulator licenses.
+- **Policy scales with currency.** Every money value in the policy registry starts at its rupee default multiplied by the pack's scale (Zambia: 0.3, rounded to two significant figures); the platform's own balance sheet starts off wherever the pack says we cannot lend from it (Zambia). Staff change values on the Policy page as before.
+- **Registry filings.** Each accepted offer gets a filing record; the worker files it through the registry adapter (mock for now) with retries, and tells ops after five failures. India: due 30 days after assignment, payout not held. Zambia: payout waits until the filing is done, because priority goes to whoever files first. Both are drafts for counsel.
+- **Not yet done:** real adapters (IRP, ZRA Smart Invoice, CERSAI, PACRA, banks); export financing outside India; pack-specific wording of the buyer acceptance text; locale-specific date formats; money limits that are constants outside the policy registry (SCF programme maximum, fraud round-number test). Kenya, Nigeria and the other markets are a new pack each plus counsel review.
+
 ---
 
 ## 9. The hard questions (decide with counsel before launch)
@@ -303,7 +310,7 @@ The app already has the engine: invoices, fraud checks, underwriting, offers, ma
 | Buyer confirmation | Needs signup and KYB first | One-click tokenised link with one-time verification; unconditional-payment wording |
 | Financier | Portal exists, no onboarding or mandate | Application, licence record, mandate, per-buyer limits |
 | Entry and navigation | One signup with a role pick; apps wizard | Three front doors, checklist-first dashboards |
-| Data residency | Single region | Per-country residency design |
+| Data residency | One deployment per home market (see 8.5) | Built in code; hosting region per country still to be agreed with counsel |
 | Disclosure | Rate shown on offer | Standard key-facts sheet with all-in rate |
 
 ---
@@ -314,7 +321,7 @@ The app already has the engine: invoices, fraud checks, underwriting, offers, ma
 2. **Buyer link acceptance** and the new acceptance wording.
 3. **Financier application, licence record, mandate and per-buyer limits.**
 4. **Agreement stack and key-facts sheet** in the standard formats.
-5. **Country-pack framework**: currencies, IDs, tax-invoice and registry adapters; then India pack, then Zambia pack.
+5. **Country-pack framework** (built, see 8.5): currencies, IDs, tax-invoice and registry adapters; India pack, then Zambia pack. Real adapters come with each licence.
 6. **The new shell, navigation and visual redesign** on top of the finished flow.
 7. **Counsel review per country**, in parallel from day one, because items in Section 9 can change steps 3 to 5.
 

@@ -7,7 +7,7 @@ import { createHmac } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, pool } from "../src/server/db/client";
 import { invoiceCollections, invoices, repayments, virtualAccounts } from "../src/server/db/schema";
-import { formatINR, rupeesToPaise } from "../src/lib/money";
+import { formatMoney, rupeesToPaise } from "../src/lib/money";
 
 const args = process.argv.slice(2);
 const flag = (n: string) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
@@ -38,11 +38,11 @@ async function main() {
   const [inv] = await db.select().from(invoices).where(eq(invoices.id, row.i.id));
   const [col] = await db.select().from(invoiceCollections).where(eq(invoiceCollections.invoiceId, row.i.id));
   const al = (rep?.allocation ?? {}) as Record<string, string>;
-  console.log(`\n${number}: paid ${formatINR(amount)} on ${on}`);
-  console.log(`  principal  ${formatINR(BigInt(al.principal ?? 0))}`);
-  console.log(`  discount   ${formatINR(BigInt(al.discount ?? 0))}`);
-  console.log(`  penal      ${formatINR(BigInt(al.penal ?? 0))}`);
-  console.log(`  surplus to seller  ${formatINR(BigInt(al.surplus ?? 0))}`);
+  console.log(`\n${number}: paid ${formatMoney(amount)} on ${on}`);
+  console.log(`  principal  ${formatMoney(BigInt(al.principal ?? 0))}`);
+  console.log(`  discount   ${formatMoney(BigInt(al.discount ?? 0))}`);
+  console.log(`  penal      ${formatMoney(BigInt(al.penal ?? 0))}`);
+  console.log(`  surplus to seller  ${formatMoney(BigInt(al.surplus ?? 0))}`);
   console.log(`  invoice status: ${inv.status}${col?.closedAt ? " (closed)" : ""}`);
   await pool.end();
 }

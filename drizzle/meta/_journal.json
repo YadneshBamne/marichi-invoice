@@ -134,6 +134,13 @@
       "when": 1792896034892,
       "tag": "0018_acceptance_records",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792898506886,
+      "tag": "0019_registry_filings",
+      "breakpoints": true
     }
   ]
 }

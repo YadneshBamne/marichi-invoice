@@ -1,9 +1,10 @@
 // Company apps, Odoo-style: the owner switches on what the company uses. Core apps are always on.
 // Roadmap modules can be "followed" so they appear in the sidebar as coming soon.
 import { ROADMAP } from "./roadmap";
+import { market } from "./countries";
 
 export type CompanyType = "seller" | "buyer" | "financier";
-export type AppDef = { id: string; name: string; icon: string; blurb: string; types: CompanyType[]; core?: boolean; default?: boolean; nav?: { href: string; label: string; icon: string; tour?: string }[] };
+export type AppDef = { id: string; name: string; icon: string; blurb: string; types: CompanyType[]; core?: boolean; default?: boolean; markets?: string[]; nav?: { href: string; label: string; icon: string; tour?: string }[] };
 
 export const APPS: AppDef[] = [
   {
@@ -48,7 +49,7 @@ export const APPS: AppDef[] = [
     nav: [{ href: "/buyer/programme", label: "Supplier finance", icon: "handshake", tour: "nav-programme" }],
   },
   {
-    id: "cross-border", name: "Export financing", icon: "globe", types: ["seller"],
+    id: "cross-border", name: "Export financing", icon: "globe", types: ["seller"], markets: ["IN"], // follows Indian export rules (shipping bill, purpose codes) for now
     blurb: "Finance export invoices raised on overseas buyers in USD, EUR, GBP, AED or SGD, with the exchange rate locked when you upload.",
     nav: [{ href: "/seller/invoices/export", label: "Export invoices", icon: "globe", tour: "nav-export" }],
   },
@@ -68,7 +69,7 @@ export const APPS: AppDef[] = [
   },
 ];
 
-export const appsFor = (type: string) => APPS.filter((a) => a.types.includes(type as CompanyType));
+export const appsFor = (type: string) => APPS.filter((a) => a.types.includes(type as CompanyType) && (!a.markets || a.markets.includes(market().code)));
 const SOON_IDS = new Set(ROADMAP.map((r) => r.slug));
 
 /** What is actually switched on: core apps plus the owner's valid picks. Unknown or foreign ids are ignored. */

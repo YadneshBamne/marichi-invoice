@@ -5,7 +5,7 @@ import { ML, VERSION } from "@/server/underwriting/ml";
 import { modelReport } from "@/server/underwriting/ml-report";
 import { DataTable, Notice, PageHead, Panel } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 
 export const metadata = { title: "Model monitor" };
 const MODE = ["Off", "Shadow", "Assist"];
@@ -43,7 +43,7 @@ export default async function Models() {
       <Panel title="Big disagreements" sub="The model and the rules differ by two or more grades" flush className="mt-5">
         <DataTable rows={r.disagreements} rowKey={(d) => d.m.invoiceId} empty="No large disagreements."
           cols={[
-            { h: "Invoice", cell: (d) => d.number }, { h: "Amount", align: "right", cell: (d) => formatINR(d.amount) },
+            { h: "Invoice", cell: (d) => d.number }, { h: "Amount", align: "right", cell: (d) => formatMoney(d.amount) },
             { h: "Rules", align: "center", cell: (d) => d.m.rulesGrade }, { h: "Model", align: "center", cell: (d) => d.m.grade },
             { h: "Model's main reasons", cell: (d) => <span className="font-normal text-muted">{(d.m.reasons as { text: string }[]).slice(0, 2).map((x) => x.text).join(" · ")}</span> },
           ]} />

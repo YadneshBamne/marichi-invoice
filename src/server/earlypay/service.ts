@@ -9,9 +9,10 @@ import { assertNotFrozen } from "../fraud/service";
 import { ensureVirtualAccount } from "../collections/virtual-accounts";
 import { ACCOUNTS, ensureAccounts } from "../ledger/accounts";
 import { postEntry, type Line } from "../ledger/post";
-import { splitGst } from "../ledger/tax";
+import { splitTax } from "../ledger/tax";
 import { notifyBusiness } from "../notify";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
+import { market } from "../../lib/countries";
 
 import { DD, quoteEarly } from "./quote";
 export { DD, quoteEarly };
@@ -49,7 +50,7 @@ export async function proposeEarlyPayment(db: Database, actor: Actor, p: { invoi
     return { row, inv };
   });
   const [buyer] = await db.select({ n: businesses.legalName }).from(businesses).where(eq(businesses.id, out.inv.buyerId));
-  await notifyBusiness(db, out.inv.sellerId, "early_payment_proposed", { invoiceNumber: out.inv.invoiceNumber, buyer: buyer.n, net: formatINR(out.row.netAmount), discount: formatINR(out.row.discountAmount) }, gw);
+  await notifyBusiness(db, out.inv.sellerId, "early_payment_proposed", { invoiceNumber: out.inv.invoiceNumber, buyer: buyer.n, net: formatMoney(out.row.netAmount), discount: formatMoney(out.row.discountAmount) }, gw);
   return out.row;
 }
 
@@ -93,7 +94,7 @@ export async function respondEarlyPayment(db: Database, actor: Actor, id: string
   }
   const va = await ensureVirtualAccount(db, out.inv.id, gw);
   await notifyBusiness(db, out.row.buyerId, "early_payment_accepted", {
-    invoiceNumber: out.inv.invoiceNumber, net: formatINR(out.row.netAmount), account: va.accountNumber, ifsc: va.ifsc, by: out.row.expiresAt.toLocaleDateString("en-IN"),
+    invoiceNumber: out.inv.invoiceNumber, net: formatMoney(out.row.netAmount), account: va.accountNumber, ifsc: `${market().ids.bankCode.label} ${va.ifsc}`, by: out.row.expiresAt.toLocaleDateString("en-IN"),
   }, gw);
   return out.row;
 }
@@ -103,12 +104,12 @@ export async function respondEarlyPayment(db: Database, actor: Actor, id: string
  * The amount must be exactly the agreed net; anything else is left for ops to sort out rather than guessed at.
  */
 export async function settleEarlyPayment(tx: Tx, ep: typeof earlyPayments.$inferSelect, inv: typeof invoices.$inferSelect, c: { amount: bigint; utr: string; receivedAt: Date }, now: Date) {
-  if (c.amount !== ep.netAmount) return { status: "unmatched" as const, reason: `early payment must be exactly ${formatINR(ep.netAmount)}` };
+  if (c.amount !== ep.netAmount) return { status: "unmatched" as const, reason: `early payment must be exactly ${formatMoney(ep.netAmount)}` };
   const [rep] = await tx.insert(repayments).values({
     invoiceId: inv.id, amount: c.amount, utr: c.utr, receivedAt: c.receivedAt,
     allocation: { earlyPayment: true, discount: ep.discountAmount.toString(), fee: ep.feeAmount.toString() },
   }).returning();
-  const fee = splitGst(ep.feeAmount);
+  const fee = splitTax(ep.feeAmount);
   const toSeller = c.amount - ep.feeAmount;
   await ensureAccounts(tx, [ACCOUNTS.escrow, ACCOUNTS.sellerPayable(inv.sellerId), ACCOUNTS.feeIncome, ACCOUNTS.gstPayable]);
   const lines: Line[] = [
@@ -116,7 +117,7 @@ export async function settleEarlyPayment(tx: Tx, ep: typeof earlyPayments.$infer
     { account: ACCOUNTS.sellerPayable(inv.sellerId), direction: "credit", amount: toSeller },
   ];
   if (fee.base > 0n) lines.push({ account: ACCOUNTS.feeIncome, direction: "credit", amount: fee.base });
-  if (fee.gst > 0n) lines.push({ account: ACCOUNTS.gstPayable, direction: "credit", amount: fee.gst });
+  if (fee.tax > 0n) lines.push({ account: ACCOUNTS.gstPayable, direction: "credit", amount: fee.tax });
   await postEntry(tx, { ref: `early:${c.utr}`, type: "early_payment", lines });
   await tx.insert(sellerPayouts).values({ repaymentId: rep.id, sellerId: inv.sellerId, amount: toSeller, idempotencyKey: `surplus:${rep.id}` });
   await tx.update(earlyPayments).set({ status: "paid", paidAt: now }).where(eq(earlyPayments.id, ep.id));

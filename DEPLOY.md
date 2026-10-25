@@ -70,7 +70,10 @@ Run it on any always-on host (Railway, Render, Fly, a small VM) as a **worker se
 
 ## 6. Before you go live: migrations
 Run `npm run db:migrate` against the production database before the first deploy and after every update that adds a file under
-`drizzle/` (the latest are `0010_marketplace` to `0018_acceptance_records`; 0015 converts the old manager/member roles to approver/maker and creates a membership for every existing user). Then create the first admin with `scripts/seed-staff.ts`.
+`drizzle/` (the latest are `0010_marketplace` to `0019_registry_filings`; 0015 converts the old manager/member roles to approver/maker and creates a membership for every existing user). Then create the first admin with `scripts/seed-staff.ts`.
+
+### One deployment per country
+Set `NEXT_PUBLIC_MARKET` (IN or ZM; India if unset) in **both** the web project and the worker, at build time. It picks the country pack: currency, identifiers asked for, tax on fees, registry, rails, law and complaint route. Each country should be its own deployment with its own database in that country's region; do not point two markets at one database. The worker also runs `registry.file`, which files each financed invoice's assignment at the registry (mock until CERSAI or PACRA credentials exist). Check the result under **Admin > Market and registry**.
 
 ### Financiers must apply
 Since `0017`, a financier company cannot hold funds or bid until staff approve its licence application (**Admin > Financiers**), even if it was verified before. Existing financier accounts must send an application. The platform's own balance sheet can be switched off per country with the Policy setting **Platform balance sheet makes offers** (`offer.platformFunds`); set it to 0 wherever we are not licensed to lend, and invoices then wait for financiers' bids.

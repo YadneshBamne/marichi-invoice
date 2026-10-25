@@ -4,6 +4,7 @@ import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
 import { DEF_BY_KEY, DEFS, display, listSettings, recentChanges, resetSetting, toInput, updateSettings } from "@/server/config/policy";
 import { Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Policy" };
 
@@ -39,7 +40,7 @@ export default async function Policy({ searchParams }: { searchParams: Promise<{
       <PageHead title="Policy" sub="The numbers that decide pricing, limits, approvals, collections and support timers. Changes apply to every server within about 30 seconds, and each one needs a reason that is kept in the history." />
       {q.saved && <div className="mb-4"><Notice tone="good">Saved. The change is live and recorded in the history below.</Notice></div>}
       {q.error && <div className="mb-4"><Notice tone="bad">{q.error}</Notice></div>}
-      <div className="mb-5"><Notice>{changedCount === 0 ? "Every value is at its built-in default." : `${changedCount} value${changedCount === 1 ? " differs" : "s differ"} from the built-in default.`} GST rates are set by law and cannot be edited here.</Notice></div>
+      <div className="mb-5"><Notice>{changedCount === 0 ? "Every value is at its built-in default." : `${changedCount} value${changedCount === 1 ? " differs" : "s differ"} from the built-in default.`} {market().tax.name} rates are set by law and cannot be edited here.</Notice></div>
 
       <form action={save} className="space-y-5">
         {groups.map((g) => (

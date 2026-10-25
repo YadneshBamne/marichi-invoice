@@ -6,7 +6,8 @@ import { portfolioXirr, revenueReport, trialBalance } from "@/server/ledger/repo
 import { DataTable, KV, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
 import { Icon } from "@/components/ui/icons";
-import { formatCompactINR, formatINR } from "@/lib/money";
+import { formatCompactMoney, formatMoney } from "@/lib/money";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Ledger" };
 
@@ -30,10 +31,10 @@ export default async function Ledger() {
       </PageHead>
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat hero label="Net revenue this month" value={formatCompactINR(rev.netRevenue)} note="fees + discount + penal, less losses" />
-        <Stat label="Discount income" value={formatCompactINR(rev.discountIncome)} note="this month" />
+        <Stat hero label="Net revenue this month" value={formatCompactMoney(rev.netRevenue)} note="fees + discount + penal, less losses" />
+        <Stat label="Discount income" value={formatCompactMoney(rev.discountIncome)} note="this month" />
         <Stat label="Realised yield (XIRR)" value={y.xirr === null ? "n/a" : `${(y.xirr * 100).toFixed(2)}%`} note="on repaid invoices" />
-        <Stat label="Trial balance" value={tb.balanced ? "Balanced" : "Out of balance"} tone={tb.balanced ? "good" : "bad"} note={`${formatINR(tb.totalDebit)} each side`} />
+        <Stat label="Trial balance" value={tb.balanced ? "Balanced" : "Out of balance"} tone={tb.balanced ? "good" : "bad"} note={`${formatMoney(tb.totalDebit)} each side`} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_22rem]">
@@ -41,17 +42,17 @@ export default async function Ledger() {
           <DataTable rows={tb.rows} rowKey={(r) => r.code} empty="No postings yet."
             cols={[
               { h: "Account", cell: (r) => <span className="font-mono text-[13px]">{r.code}</span> },
-              { h: "Debit", align: "right", cell: (r) => formatINR(r.debit) },
-              { h: "Credit", align: "right", cell: (r) => formatINR(r.credit) },
+              { h: "Debit", align: "right", cell: (r) => formatMoney(r.debit) },
+              { h: "Credit", align: "right", cell: (r) => formatMoney(r.credit) },
             ]} />
-          <div className="flex items-center justify-between border-t border-hair bg-panel px-6 py-3 text-sm font-semibold"><span>Total</span><span>{formatINR(tb.totalDebit)} / {formatINR(tb.totalCredit)}</span></div>
+          <div className="flex items-center justify-between border-t border-hair bg-panel px-6 py-3 text-sm font-semibold"><span>Total</span><span>{formatMoney(tb.totalDebit)} / {formatMoney(tb.totalCredit)}</span></div>
         </Panel>
 
         <div className="space-y-5">
           <Panel title="Revenue this month">
             <KV rows={[
-              ["Processing fees (ex-GST)", formatINR(rev.feeIncome)], ["Discount income", formatINR(rev.discountIncome)], ["Penal charges", formatINR(rev.penalIncome)],
-              ["Credit losses", `− ${formatINR(rev.creditLoss)}`], ["Net revenue", <b key="n">{formatINR(rev.netRevenue)}</b>], ["GST collected (payable)", formatINR(rev.gstCollected)],
+              [`Processing fees (ex-${market().tax.name})`, formatMoney(rev.feeIncome)], ["Discount income", formatMoney(rev.discountIncome)], ["Penal charges", formatMoney(rev.penalIncome)],
+              ["Credit losses", `− ${formatMoney(rev.creditLoss)}`], ["Net revenue", <b key="n">{formatMoney(rev.netRevenue)}</b>], [`${market().tax.name} collected (payable)`, formatMoney(rev.gstCollected)],
             ]} />
           </Panel>
           <Panel title="Daily reconciliation" sub="Last 14 runs" flush>
@@ -59,7 +60,7 @@ export default async function Ledger() {
               cols={[
                 { h: "Date", cell: (r) => r.date },
                 { h: "Status", cell: (r) => <StatusPill status={r.status} /> },
-                { h: "Variance", align: "right", cell: (r) => formatINR(r.variance) },
+                { h: "Variance", align: "right", cell: (r) => formatMoney(r.variance) },
                 { h: "Exceptions", align: "right", cell: (r) => (r.exceptions as unknown[]).length },
               ]} />
           </Panel>

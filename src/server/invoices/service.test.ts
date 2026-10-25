@@ -7,7 +7,7 @@ import { linkBuyer } from "../relationships/service";
 import { mock } from "../integrations/mock";
 import type { IrnClaim } from "../integrations/gateway";
 import { checkBasics, createInvoice, revalidatePendingIrns, type NewInvoice } from "./service";
-import { formatINR, rupeesToPaise } from "../../lib/money";
+import { formatMoney, rupeesToPaise } from "../../lib/money";
 import type { Database } from "../db/client";
 
 const NOW = new Date("2026-10-06T00:00:00Z");
@@ -49,8 +49,8 @@ describe("rules", () => {
     expect(rupeesToPaise("1,234.5")).toBe(123450n);
     expect(rupeesToPaise("10")).toBe(1000n);
     expect(() => rupeesToPaise("1.234")).toThrow();
-    expect(formatINR(123456789n)).toBe("₹12,34,567.89");
-    expect(formatINR(99905n)).toBe("₹999.05");
+    expect(formatMoney(123456789n)).toBe("₹12,34,567.89");
+    expect(formatMoney(99905n)).toBe("₹999.05");
   });
 });
 

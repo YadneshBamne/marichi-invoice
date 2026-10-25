@@ -6,7 +6,8 @@ import type { Database, Tx } from "../db/client";
 import { auditLog, businesses, buyerSellerRelationships, financingOffers, invoices, scfProgrammes, scfSuppliers, users } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { notifyBusiness } from "../notify";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
+import { market } from "../../lib/countries";
 import { PROGRAMME_TERMS_VERSION } from "../agreements/templates";
 
 export const SCF = {
@@ -18,7 +19,6 @@ export const SCF = {
 };
 
 const STAFF = ["ops", "admin"];
-const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/;
 export type Actor = { id: string; role: string; businessId: string | null };
 const live = ["requested", "active", "paused"];
 
@@ -72,18 +72,18 @@ export async function decideProgramme(db: Database, staff: { id: string; role: s
 
 export type InviteResult = { gstin: string; result: "invited" | "already" | "not_found" | "not_verified" | "invalid" | "self" };
 
-/** Invite suppliers by GSTIN, in bulk. Only suppliers already on the platform and verified can be invited; the rest are reported back. */
+/** Invite suppliers by tax registration number (GSTIN, TPIN), in bulk. Only suppliers already on the platform and verified can be invited; the rest are reported back. */
 export async function inviteSuppliers(db: Database, actor: Actor, gstins: string[], gw: Adapters = gateway): Promise<InviteResult[]> {
   if (actor.role !== "buyer" || !actor.businessId) throw new Error("FORBIDDEN");
   const prog = await programmeOf(db, actor.businessId);
   if (!prog || prog.status !== "active") throw new Error("your programme is not active");
   const list = [...new Set(gstins.map((g) => g.trim().toUpperCase()).filter(Boolean))];
-  if (list.length === 0) throw new Error("add at least one GSTIN");
+  if (list.length === 0) throw new Error(`add at least one ${market().ids.taxReg.label}`);
   if (list.length > SCF.maxInvitesPerBatch) throw new Error(`invite at most ${SCF.maxInvitesPerBatch} suppliers at a time`);
   const [buyer] = await db.select().from(businesses).where(eq(businesses.id, actor.businessId));
   const out: InviteResult[] = [];
   for (const gstin of list) {
-    if (!GSTIN.test(gstin)) { out.push({ gstin, result: "invalid" }); continue; }
+    if (!market().ids.taxReg.pattern.test(gstin)) { out.push({ gstin, result: "invalid" }); continue; }
     if (gstin === buyer.gstin) { out.push({ gstin, result: "self" }); continue; }
     const [s] = await db.select().from(businesses).where(eq(businesses.gstin, gstin));
     const [seller] = s ? await db.select({ id: users.id }).from(users).where(and(eq(users.businessId, s.id), eq(users.role, "seller"))).limit(1) : [];
@@ -155,7 +155,7 @@ export async function programmeReport(db: Database, buyerId: string) {
   return {
     prog, suppliers: sup, used: await utilisation(db, buyerId), financed, feed,
     calendar: [...calendar.entries()].map(([date, v]) => ({ date, ...v })),
-    summary: `${formatINR(financed)} financed across ${feed.filter((f) => f.o).length} invoices`,
+    summary: `${formatMoney(financed)} financed across ${feed.filter((f) => f.o).length} invoices`,
   };
 }
 

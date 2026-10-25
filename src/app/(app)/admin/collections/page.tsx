@@ -7,7 +7,7 @@ import { requireUser } from "@/server/rbac";
 import { delinquencyReport, matchUnmatched, writeOff } from "@/server/collections/service";
 import { recentDebits } from "@/server/collections/nach";
 import { DataTable, PageHead, Panel, StatusPill } from "@/components/ui/page";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 
 export const metadata = { title: "Collections" };
 
@@ -45,9 +45,9 @@ export default async function Collections() {
               { h: "Due", cell: (r) => r.dueDate },
               { h: "DPD", align: "right", cell: (r) => r.dpd },
               { h: "Bucket", cell: (r) => r.bucket === "90+" ? <StatusPill status="written_off" label="90+ NPA" /> : r.bucket === "0" ? <StatusPill status="paid" label="Current" /> : <StatusPill status="due" label={`${r.bucket} days`} /> },
-              { h: "Principal", align: "right", cell: (r) => formatINR(r.principal) },
-              { h: "Discount", align: "right", cell: (r) => formatINR(r.discount) },
-              { h: "Penal", align: "right", cell: (r) => formatINR(r.penal) },
+              { h: "Principal", align: "right", cell: (r) => formatMoney(r.principal) },
+              { h: "Discount", align: "right", cell: (r) => formatMoney(r.discount) },
+              { h: "Penal", align: "right", cell: (r) => formatMoney(r.penal) },
               { h: "", align: "right", cell: (r) => u.role === "admin" && r.bucket === "90+" && (
                 <form action={writeOffAction} className="inline-flex gap-1.5">
                   <input type="hidden" name="invoiceId" value={r.invoiceId} />
@@ -63,7 +63,7 @@ export default async function Collections() {
             cols={[
               { h: "Invoice", cell: ({ inv }) => inv.invoiceNumber },
               { h: "Attempt", align: "center", cell: ({ d }) => d.attempt },
-              { h: "Amount", align: "right", cell: ({ d }) => formatINR(d.amount) },
+              { h: "Amount", align: "right", cell: ({ d }) => formatMoney(d.amount) },
               { h: "Status", cell: ({ d }) => <StatusPill status={d.status} /> },
               { h: "Presented", cell: ({ d }) => <span className="font-normal text-muted">{d.presentedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span> },
               { h: "Note", cell: ({ d }) => <span className="font-normal text-muted">{d.failureReason ?? ""}</span> },
@@ -73,7 +73,7 @@ export default async function Collections() {
         <Panel title="Unmatched bank credits" sub="Apply each one to the invoice it pays." flush>
           <DataTable rows={unmatched} rowKey={(c) => c.id} empty="No unmatched credits."
             cols={[
-              { h: "Amount", cell: (c) => formatINR(c.amount) },
+              { h: "Amount", cell: (c) => formatMoney(c.amount) },
               { h: "UTR", cell: (c) => <span className="font-mono text-[13px]">{c.utr}</span> },
               { h: "Account", cell: (c) => <span className="font-mono text-[13px]">{c.accountNumber}</span> },
               { h: "Reason", cell: (c) => <span className="text-muted">{c.reason}</span> },

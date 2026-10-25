@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { quoteEarly } from "@/server/earlypay/quote";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 
 /** Live preview of an early-payment proposal. The maths is the same function the server uses to price it. */
 export function QuoteForm({ amount, days, minBps, maxBps, feeBps, action, invoiceId, cta = "Send to supplier" }: {
@@ -23,8 +23,8 @@ export function QuoteForm({ amount, days, minBps, maxBps, feeBps, action, invoic
         <input type="number" step="0.01" value={treasury} onChange={(e) => setTreasury(Number(e.target.value))} className="field !py-2 text-sm font-normal" /></label>
       {q ? (
         <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 rounded-lg bg-panel p-3 text-xs">
-          <dt className="text-muted">You pay today</dt><dd className="text-right font-semibold">{formatINR(q.net)}</dd>
-          <dt className="text-muted">You save</dt><dd className="text-right">{formatINR(q.discount)}</dd>
+          <dt className="text-muted">You pay today</dt><dd className="text-right font-semibold">{formatMoney(q.net)}</dd>
+          <dt className="text-muted">You save</dt><dd className="text-right">{formatMoney(q.discount)}</dd>
           <dt className="text-muted">Your annualised return</dt><dd className="text-right">{buyerApr.toFixed(2)}%</dd>
           <dt className="text-muted">Against treasury rate</dt><dd className={`text-right font-semibold ${buyerApr >= treasury ? "text-g-600" : "text-r-600"}`}>{buyerApr >= treasury ? "+" : ""}{(buyerApr - treasury).toFixed(2)} points</dd>
           <dt className="text-muted">Supplier&apos;s all-in cost</dt><dd className="text-right">{(q.sellerCostBps / 100).toFixed(2)}% a year</dd>

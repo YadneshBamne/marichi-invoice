@@ -6,6 +6,7 @@ import { businesses } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { reviewKyb } from "@/server/kyb/service";
 import { EmptyState, KV, PageHead, ReviewCard, StatusPill } from "@/components/ui/page";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "KYB review" };
 
@@ -42,7 +43,7 @@ export default async function KybQueue() {
                   <button name="decision" value="reject" className="btn btn-danger btn-sm">Reject</button>
                 </form>
               }>
-              <KV rows={[["GSTIN", b.gstin ?? "Not provided"], ["PAN", b.pan ? `${b.pan.slice(0, 2)}${"•".repeat(6)}${b.pan.slice(-2)}` : "Not provided"], ["CIN", b.cin ?? "Not provided"], ["Verification level", b.kybLevel], ...(b.kybNote ? [["System note", b.kybNote] as [string, string]] : [])]} />
+              <KV rows={[[market().ids.taxReg.label, b.gstin ?? "Not provided"], [market().ids.kyb.label, b.pan ? `${b.pan.slice(0, 2)}${"•".repeat(6)}${b.pan.slice(-2)}` : "Not provided"], ...(market().ids.companyReg ? [[market().ids.companyReg!.label, b.cin ?? "Not provided"] as [string, string]] : []), ["Verification level", b.kybLevel], ...(b.kybNote ? [["System note", b.kybNote] as [string, string]] : [])]} />
             </ReviewCard>
           ))}
         </div>

@@ -6,13 +6,14 @@ import { applyForProgramme, inviteSuppliers, programmeReport, removeSupplier } f
 import { docText, programmeTerms } from "@/server/agreements/templates";
 import { DataTable, EmptyState, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatMoney, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Supplier finance" };
 const PATH = "/buyer/programme";
 const input = "field font-normal";
-const WORDS: Record<string, string> = { invited: "invited", already: "already invited", not_found: "not on Marichi", not_verified: "not verified yet", invalid: "not a valid GSTIN", self: "your own GSTIN" };
+const WORDS: Record<string, string> = { invited: "invited", already: "already invited", not_found: "not on Marichi", not_verified: "not verified yet", invalid: `not a valid ${market().ids.taxReg.label}`, self: `your own ${market().ids.taxReg.label}` };
 
 async function apply(fd: FormData) {
   "use server";
@@ -65,7 +66,7 @@ export default async function Programme({ searchParams }: { searchParams: Promis
         <Panel title="How it works">
           <ol className="list-decimal space-y-2 pl-5 text-sm text-muted">
             <li>Apply with the limit you want. Our credit team sets the limit and a yearly price from your credit.</li>
-            <li>Invite your suppliers by GSTIN, in bulk. Each one chooses whether to join.</li>
+            <li>Invite your suppliers by {market().ids.taxReg.label}, in bulk. Each one chooses whether to join.</li>
             <li>Their invoices that you confirm are offered financing at your price, up to the limit.</li>
             <li>You pay on the due date as usual. The programme page shows what is due when.</li>
           </ol>
@@ -90,7 +91,7 @@ export default async function Programme({ searchParams }: { searchParams: Promis
     <>
       <PageHead title="Supplier finance" sub={prog.name} />
       {banner}
-      <EmptyState icon="clock" title="Waiting for our credit team">You asked for a limit of {formatINR(prog.requestedLimit)}. We will set your limit and price and let you know.</EmptyState>
+      <EmptyState icon="clock" title="Waiting for our credit team">You asked for a limit of {formatMoney(prog.requestedLimit)}. We will set your limit and price and let you know.</EmptyState>
     </>
   );
 
@@ -102,10 +103,10 @@ export default async function Programme({ searchParams }: { searchParams: Promis
       </PageHead>
       {banner}
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat hero label="Limit" value={formatINR(prog.limit)} note={`${formatINR(prog.limit - r.used)} still available`} />
-        <Stat label="In use" value={formatINR(r.used)} note={`${prog.limit > 0n ? Number((r.used * 100n) / prog.limit) : 0}% of the limit`} />
+        <Stat hero label="Limit" value={formatMoney(prog.limit)} note={`${formatMoney(prog.limit - r.used)} still available`} />
+        <Stat label="In use" value={formatMoney(r.used)} note={`${prog.limit > 0n ? Number((r.used * 100n) / prog.limit) : 0}% of the limit`} />
         <Stat label="Suppliers" value={String(active)} note={`${r.suppliers.length - active} invited or inactive`} />
-        <Stat label="Financed" value={formatINR(r.financed)} note={r.summary} />
+        <Stat label="Financed" value={formatMoney(r.financed)} note={r.summary} />
       </div>
 
       <div className="mb-5 grid gap-5 xl:grid-cols-[1fr_22rem]">
@@ -113,7 +114,7 @@ export default async function Programme({ searchParams }: { searchParams: Promis
           <DataTable rows={r.suppliers} rowKey={(s) => s.s.id} empty="No suppliers yet. Invite some."
             cols={[
               { h: "Supplier", cell: (s) => s.name },
-              { h: "GSTIN", cell: (s) => <span className="font-mono text-[13px] font-normal text-muted">{s.gstin}</span> },
+              { h: market().ids.taxReg.label, cell: (s) => <span className="font-mono text-[13px] font-normal text-muted">{s.gstin}</span> },
               { h: "Status", cell: (s) => <StatusPill status={s.s.status === "active" ? "approved" : s.s.status === "invited" ? "pending" : "rejected"} label={s.s.status} /> },
               { h: "", align: "right", cell: (s) => may && ["active", "invited"].includes(s.s.status) && (
                 <form action={remove}><input type="hidden" name="programmeId" value={prog.id} /><input type="hidden" name="sellerId" value={s.s.sellerId} /><button className="btn btn-ghost btn-sm">Remove</button></form>
@@ -121,7 +122,7 @@ export default async function Programme({ searchParams }: { searchParams: Promis
             ]} />
         </Panel>
         {may && prog.status === "active" && (
-          <Panel title="Invite suppliers" sub="Paste GSTINs, one per line or separated by commas.">
+          <Panel title="Invite suppliers" sub={`Paste ${market().ids.taxReg.label}s, one per line or separated by commas.`}>
             <form action={invite} className="space-y-3">
               <textarea name="gstins" required rows={6} placeholder={"27AAAAA1111A1Z5\n29BBBBB2222B1Z5"} className="field font-mono text-xs font-normal" />
               <button className="btn btn-primary w-full">Send invitations</button>
@@ -137,9 +138,9 @@ export default async function Programme({ searchParams }: { searchParams: Promis
             cols={[
               { h: "Invoice", cell: (f) => f.i.invoiceNumber },
               { h: "Supplier", cell: (f) => f.seller },
-              { h: "Amount", align: "right", cell: (f) => formatINR(f.i.amount) },
+              { h: "Amount", align: "right", cell: (f) => formatMoney(f.i.amount) },
               { h: "Due", cell: (f) => f.i.dueDate },
-              { h: "Financed", align: "right", cell: (f) => (f.o ? formatINR(f.o.advanceAmount) : <span className="text-faint">not yet</span>) },
+              { h: "Financed", align: "right", cell: (f) => (f.o ? formatMoney(f.o.advanceAmount) : <span className="text-faint">not yet</span>) },
               { h: "Status", cell: (f) => <StatusPill status={f.i.status} /> },
             ]} />
         </Panel>
@@ -148,7 +149,7 @@ export default async function Programme({ searchParams }: { searchParams: Promis
             cols={[
               { h: "Due", cell: (c) => c.date },
               { h: "Invoices", align: "right", cell: (c) => c.count },
-              { h: "Amount", align: "right", cell: (c) => formatINR(c.due) },
+              { h: "Amount", align: "right", cell: (c) => formatMoney(c.due) },
             ]} />
         </Panel>
       </div>

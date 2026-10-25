@@ -19,7 +19,7 @@ import { scanInvoice } from "@/server/fraud/engine";
 import { putDocument } from "@/server/vault";
 import { DataTable, EmptyState, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
 import { UploadForm } from "./upload-form";
-import { formatINR, formatMinor, rupeesToPaise } from "@/lib/money";
+import { formatMoney, formatMinor, rupeesToPaise } from "@/lib/money";
 
 export const metadata = { title: "Invoices" };
 
@@ -80,7 +80,7 @@ async function answerOffer(fd: FormData) {
     if (f.action === "reject") { await rejectOffer(db, f.offerId, { id: u.id, role: u.role, businessId: u.businessId }); return "Offer declined."; }
     const [o] = await db.select({ o: financingOffers, no: invoices.invoiceNumber }).from(financingOffers).innerJoin(invoices, eq(invoices.id, financingOffers.invoiceId)).where(eq(financingOffers.id, f.offerId));
     if (!o) throw new Error("offer not found");
-    const r = await submit(db, actorOf(u), "offer.accept", { offerId: f.offerId, ack: fd.get("ack") === "on" }, { summary: `Accept the offer on invoice ${o.no}: ${formatINR(describeOffer(o.o).netDisbursal)} paid to you`, amount: o.o.advanceAmount });
+    const r = await submit(db, actorOf(u), "offer.accept", { offerId: f.offerId, ack: fd.get("ack") === "on" }, { summary: `Accept the offer on invoice ${o.no}: ${formatMoney(describeOffer(o.o).netDisbursal)} paid to you`, amount: o.o.advanceAmount });
     return r.status === "queued" ? QUEUED : "Offer accepted. Sign the agreement to receive the funds.";
   });
 }
@@ -93,7 +93,7 @@ async function acceptAll(fd: FormData) {
     const offers = await db.select().from(financingOffers).where(inArray(financingOffers.id, ids));
     const total = offers.reduce((a, o) => a + o.advanceAmount, 0n);
     const net = offers.reduce((a, o) => a + describeOffer(o).netDisbursal, 0n);
-    const sub = await submit(db, actorOf(u), "offer.accept_many", { offerIds: ids, ack: fd.get("ack") === "on" }, { summary: `Accept ${ids.length} offers: ${formatINR(net)} paid to you in total`, amount: total });
+    const sub = await submit(db, actorOf(u), "offer.accept_many", { offerIds: ids, ack: fd.get("ack") === "on" }, { summary: `Accept ${ids.length} offers: ${formatMoney(net)} paid to you in total`, amount: total });
     if (sub.status === "queued") return QUEUED;
     const r = sub.result as { ok: boolean; error?: string }[];
     const ok = r.filter((x) => x.ok).length, bad = r.filter((x) => !x.ok);
@@ -107,7 +107,7 @@ async function reprice(fd: FormData) {
   await attempt(async () => {
     assertCan(u, "offer.reprice");
     const o = await repriceOffer(db, z.uuid().parse(fd.get("offerId")), { id: u.id, role: u.role, businessId: u.businessId }, rupeesToPaise(String(fd.get("advance") ?? "")));
-    return `Offer updated: you will receive ${formatINR(describeOffer(o).netDisbursal)} now.`;
+    return `Offer updated: you will receive ${formatMoney(describeOffer(o).netDisbursal)} now.`;
   });
 }
 async function newOffer(fd: FormData) {
@@ -130,7 +130,7 @@ async function chooseBid(fd: FormData) {
     const bidId = z.uuid().parse(fd.get("bidId"));
     const [b] = await db.select({ b: bids, no: invoices.invoiceNumber, fin: businesses.legalName }).from(bids).innerJoin(invoices, eq(invoices.id, bids.invoiceId)).innerJoin(businesses, eq(businesses.id, bids.financierId)).where(eq(bids.id, bidId));
     if (!b) throw new Error("bid not found");
-    const r = await submit(db, actorOf(u), "bid.accept", { bidId, ack: fd.get("ack") === "on" }, { summary: `Choose ${b.fin}'s bid on invoice ${b.no}: ${formatINR(describeOffer(b.b).netDisbursal)} paid to you`, amount: b.b.advanceAmount });
+    const r = await submit(db, actorOf(u), "bid.accept", { bidId, ack: fd.get("ack") === "on" }, { summary: `Choose ${b.fin}'s bid on invoice ${b.no}: ${formatMoney(describeOffer(b.b).netDisbursal)} paid to you`, amount: b.b.advanceAmount });
     return r.status === "queued" ? QUEUED : "Bid accepted. Sign the agreement to receive the funds.";
   });
 }
@@ -152,7 +152,7 @@ async function creditNote(fd: FormData) {
     const r = await issueCreditNote(db, { id: u.id, role: u.role, businessId: u.businessId }, {
       invoiceId: z.uuid().parse(fd.get("invoiceId")), amount: rupeesToPaise(String(fd.get("amount") ?? "")), reason: String(fd.get("reason") ?? ""),
     });
-    return `Credit note ${r.creditNote.number} issued. The invoice is now ${formatINR(r.newAmount)}.`;
+    return `Credit note ${r.creditNote.number} issued. The invoice is now ${formatMoney(r.newAmount)}.`;
   });
 }
 
@@ -201,7 +201,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
       {openOffers.length >= 2 && (
         <form action={acceptAll} className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-card bg-p-100 p-5 ring-1 ring-p-400">
           {openOffers.map((o) => <input key={o.id} type="hidden" name="offerId" value={o.id} />)}
-          <div><p className="font-semibold">{openOffers.length} offers are waiting for you</p><p className="text-muted">Accept them together to receive {formatINR(bulkNet)} in total once signed. Each offer stays its own agreement.</p></div>
+          <div><p className="font-semibold">{openOffers.length} offers are waiting for you</p><p className="text-muted">Accept them together to receive {formatMoney(bulkNet)} in total once signed. Each offer stays its own agreement.</p></div>
           {prepare ? <div className="flex flex-col items-end gap-2"><label className="flex items-start gap-2 text-xs text-muted"><input name="ack" type="checkbox" className="mt-0.5" /><span>I have read the key facts sheet of each offer.</span></label><button className="btn btn-primary">{commit ? `Accept all ${openOffers.length}` : `Submit all ${openOffers.length} for approval`}</button></div> : <p className="max-w-xs text-xs text-s-600">Your role can view offers but not act on them.</p>}
         </form>
       )}
@@ -212,9 +212,9 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
             cols={[
               { h: "Invoice", cell: (e) => e.inv.invoiceNumber },
               { h: "Buyer", cell: (e) => e.buyer },
-              { h: "You receive now", align: "right", cell: (e) => formatINR(e.e.netAmount - e.e.feeAmount) },
-              { h: "Discount", align: "right", cell: (e) => <>{formatINR(e.e.discountAmount)}<span className="block text-xs font-normal text-muted">{e.e.daysEarly} days early</span></> },
-              { h: "Fee", align: "right", cell: (e) => formatINR(e.e.feeAmount) },
+              { h: "You receive now", align: "right", cell: (e) => formatMoney(e.e.netAmount - e.e.feeAmount) },
+              { h: "Discount", align: "right", cell: (e) => <>{formatMoney(e.e.discountAmount)}<span className="block text-xs font-normal text-muted">{e.e.daysEarly} days early</span></> },
+              { h: "Fee", align: "right", cell: (e) => formatMoney(e.e.feeAmount) },
               { h: "Answer by", cell: (e) => <span className="font-normal text-muted">{e.e.expiresAt.toLocaleString("en-IN")}</span> },
               { h: "", align: "right", cell: (e) => commit
                 ? <form action={answerEarly} className="inline-flex gap-2"><input type="hidden" name="id" value={e.e.id} /><button name="action" value="accept" className="btn btn-primary btn-sm">Accept</button><button name="action" value="decline" className="btn btn-ghost btn-sm">Decline</button></form>
@@ -227,7 +227,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <DataTable rows={rows} rowKey={(r) => r.id} empty="No invoices yet. Upload your first one below."
           cols={[
             { h: "No.", cell: (r) => r.invoiceNumber },
-            { h: "Amount", align: "right", cell: (r) => <>{formatINR(r.amount)}{r.currency !== "INR" && <span className="block text-xs font-normal text-muted">{formatMinor(r.foreignAmount ?? 0n, r.currency)}</span>}{creditOf.has(r.id) && <span className="block text-xs font-normal text-muted">after {formatINR(creditOf.get(r.id)!)} credit</span>}</> },
+            { h: "Amount", align: "right", cell: (r) => <>{formatMoney(r.amount)}{r.currency !== "INR" && <span className="block text-xs font-normal text-muted">{formatMinor(r.foreignAmount ?? 0n, r.currency)}</span>}{creditOf.has(r.id) && <span className="block text-xs font-normal text-muted">after {formatMoney(creditOf.get(r.id)!)} credit</span>}</> },
             { h: "Due", cell: (r) => r.dueDate },
             { h: "Status", cell: (r) => <StatusPill status={r.status} /> },
             { h: "e-Invoice", cell: (r) => <span className="font-normal text-muted">{r.irnStatus}</span> },
@@ -252,7 +252,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         const maxAdvance = (r.amount * BigInt(d.advanceRateBps)) / 10_000n;
         const bidList = o?.status === "accepted" ? [] : (bidMap.get(r.id) ?? []);
         return (
-          <Panel key={r.id} title={`Invoice ${r.invoiceNumber} · ${formatINR(r.amount)}`} className="mb-5">
+          <Panel key={r.id} title={`Invoice ${r.invoiceNumber} · ${formatMoney(r.amount)}`} className="mb-5">
             {d.decision === "declined" && (
               <div>
                 <p className="font-medium text-r-600">We couldn&apos;t finance this invoice. Reasons:</p>
@@ -264,10 +264,10 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
             {o && p && (
               <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 sm:max-w-lg sm:gap-x-8">
-                  <dt className="text-muted">Advance{o.advanceAmount < maxAdvance ? " (part of the invoice)" : ` (${d.advanceRateBps / 100}%)`}</dt><dd className="text-right">{formatINR(o.advanceAmount)}</dd>
-                  <dt className="text-muted">Processing fee (upfront)</dt><dd className="text-right">− {formatINR(o.feeAmount)}</dd>
-                  <dt className="border-t border-hair pt-2 font-semibold">You receive now</dt><dd className="border-t border-hair pt-2 text-right text-lg font-semibold">{formatINR(p.netDisbursal)}</dd>
-                  <dt className="text-muted">Discount for {o.tenorDays} days ({o.discountBps / 100}% p.a.)</dt><dd className="text-right">{formatINR(o.expectedDiscount)}</dd>
+                  <dt className="text-muted">Advance{o.advanceAmount < maxAdvance ? " (part of the invoice)" : ` (${d.advanceRateBps / 100}%)`}</dt><dd className="text-right">{formatMoney(o.advanceAmount)}</dd>
+                  <dt className="text-muted">Processing fee (upfront)</dt><dd className="text-right">− {formatMoney(o.feeAmount)}</dd>
+                  <dt className="border-t border-hair pt-2 font-semibold">You receive now</dt><dd className="border-t border-hair pt-2 text-right text-lg font-semibold">{formatMoney(p.netDisbursal)}</dd>
+                  <dt className="text-muted">Discount for {o.tenorDays} days ({o.discountBps / 100}% p.a.)</dt><dd className="text-right">{formatMoney(o.expectedDiscount)}</dd>
                   <dt className="text-muted">All-in effective rate</dt><dd className="text-right">{(p.effectiveAprBps / 100).toFixed(2)}% p.a.</dd>
                   <dt className="text-muted">Recourse</dt><dd className="text-right">{o.recourse ? "Yes: you repay if the buyer doesn't" : "No"}</dd>
                 </dl>
@@ -285,7 +285,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                         <summary className="cursor-pointer font-semibold text-p-700">Need less? Finance only part of it</summary>
                         <form action={reprice} className="mt-2 flex flex-wrap items-center gap-2">
                           <input type="hidden" name="offerId" value={o.id} />
-                          <input name="advance" inputMode="decimal" required placeholder={`Advance up to ${formatINR(maxAdvance)}`} className="field-inline w-56 !py-1.5 text-sm" />
+                          <input name="advance" inputMode="decimal" required placeholder={`Advance up to ${formatMoney(maxAdvance)}`} className="field-inline w-56 !py-1.5 text-sm" />
                           <button className="btn btn-ghost btn-sm">Update offer</button>
                           <span className="w-full text-xs text-muted">A smaller advance means a smaller fee and less discount. You receive the rest when the buyer pays.</span>
                         </form>
@@ -307,7 +307,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                 <DataTable rows={bidList} rowKey={(b) => b.id}
                   cols={[
                     { h: "Financier", cell: (b) => bidders.get(b.financierId) ?? "Financier" },
-                    { h: "You receive now", align: "right", cell: (b) => formatINR(b.netDisbursal) },
+                    { h: "You receive now", align: "right", cell: (b) => formatMoney(b.netDisbursal) },
                     { h: "Discount", align: "right", cell: (b) => `${b.discountBps / 100}% p.a.` },
                     { h: "All-in rate", align: "right", cell: (b) => `${(b.effectiveAprBps / 100).toFixed(2)}% p.a.` },
                     { h: "Valid until", cell: (b) => <span className="text-muted">{b.expiresAt.toLocaleString("en-IN")}</span> },

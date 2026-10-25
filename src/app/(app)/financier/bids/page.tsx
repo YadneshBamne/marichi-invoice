@@ -6,7 +6,7 @@ import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { withdrawBid } from "@/server/marketplace/service";
 import { DataTable, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { attempt } from "../attempt";
 
 export const metadata = { title: "My bids" };
@@ -37,7 +37,7 @@ export default async function Bids({ searchParams }: { searchParams: Promise<{ o
         <DataTable rows={rows} rowKey={(r) => r.b.id} empty="You have not placed a bid yet. Open Deal flow to start."
           cols={[
             { h: "Deal", cell: (r) => <span className="font-mono text-xs">{r.inv.slice(0, 8).toUpperCase()}</span> },
-            { h: "Advance", align: "right", cell: (r) => formatINR(r.b.advanceAmount) },
+            { h: "Advance", align: "right", cell: (r) => formatMoney(r.b.advanceAmount) },
             { h: "Discount", align: "right", cell: (r) => `${r.b.discountBps / 100}% a year` },
             { h: "Tenor", align: "right", cell: (r) => `${r.b.tenorDays} days` },
             { h: "Status", cell: (r) => <StatusPill status={r.b.status === "accepted" ? "approved" : r.b.status === "open" ? "pending" : "rejected"} label={r.b.status} /> },

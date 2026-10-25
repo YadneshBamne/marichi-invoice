@@ -21,7 +21,8 @@ import { notifyBusiness } from "../notify";
 import { assertNoEarlyPayment } from "../earlypay/service";
 import { assertActiveFinancier, assertWithinMandate, exposureToBuyer } from "./financier";
 import { ensureKeyFacts } from "../agreements/keyfacts";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
+import { market } from "../../lib/countries";
 
 export const MARKET = {
   bidValidityHours: 48,
@@ -155,7 +156,7 @@ export async function placeBid(db: Database, actor: FinancierActor, p: { invoice
     if (!Number.isInteger(p.advanceBps) || p.advanceBps <= 0 || p.advanceBps > uw.advanceRateBps) throw new Error(`the advance can be at most ${uw.advanceRateBps / 100}% of the invoice`);
     const price = priceOffer({ amount: inv.amount, advanceBps: p.advanceBps, discountBps: p.discountBps, tenorDays });
     const [seller] = await tx.select({ country: businesses.country, industry: businesses.industry }).from(businesses).where(eq(businesses.id, inv.sellerId));
-    await assertActiveFinancier(tx, fid, seller?.country ?? "IN", now); // licensed where the seller is
+    await assertActiveFinancier(tx, fid, seller?.country ?? market().code, now); // licensed where the seller is
     await assertWithinMandate(tx, fid, { buyerId: inv.buyerId, sellerId: inv.sellerId, grade: uw.riskGrade, advance: price.advanceAmount, tenorDays, industry: seller?.industry ?? null });
     if ((await position(tx, fid)).available < price.advanceAmount) throw new Error("you do not have enough available funds for this bid");
     await tx.update(bids).set({ status: "withdrawn", decidedAt: now }).where(and(eq(bids.invoiceId, inv.id), eq(bids.financierId, fid), eq(bids.status, "open")));
@@ -166,7 +167,7 @@ export async function placeBid(db: Database, actor: FinancierActor, p: { invoice
     await tx.insert(auditLog).values({ actorId: actor.id, action: "bid.place", entity: "invoice", entityId: inv.id, after: { bidId: bid.id, advance: price.advanceAmount.toString(), discountBps: p.discountBps } });
     return { bid, inv };
   });
-  await notifyBusiness(db, out.inv.sellerId, "bid_received", { invoiceNumber: out.inv.invoiceNumber, advance: formatINR(out.bid.advanceAmount) }, gw);
+  await notifyBusiness(db, out.inv.sellerId, "bid_received", { invoiceNumber: out.inv.invoiceNumber, advance: formatMoney(out.bid.advanceAmount) }, gw);
   return out.bid;
 }
 
@@ -212,7 +213,7 @@ export async function acceptBid(db: Database, bidId: string, actor: SellerActor,
     const [live] = await tx.select().from(financingOffers).where(and(eq(financingOffers.invoiceId, inv.id), inArray(financingOffers.status, ["open", "accepted"])));
     if (live?.status === "accepted") throw new Error("this invoice has already been funded");
     const [seller] = await tx.select({ country: businesses.country }).from(businesses).where(eq(businesses.id, inv.sellerId));
-    await assertActiveFinancier(tx, bid.financierId, seller?.country ?? "IN", now).catch(() => { throw new Error("that financier can no longer fund this invoice; choose another"); });
+    await assertActiveFinancier(tx, bid.financierId, seller?.country ?? market().code, now).catch(() => { throw new Error("that financier can no longer fund this invoice; choose another"); });
     const [lim] = await tx.select().from(financierBuyerLimits).where(and(eq(financierBuyerLimits.financierId, bid.financierId), eq(financierBuyerLimits.buyerId, inv.buyerId)));
     if (!lim || lim.status !== "active" || (await exposureToBuyer(tx, bid.financierId, inv.buyerId)) + bid.advanceAmount > lim.limit) throw new Error("that financier's limit on this buyer no longer covers this bid; choose another");
     if ((await position(tx, bid.financierId)).available < bid.advanceAmount) throw new Error("that financier no longer has the funds for this bid; choose another");
@@ -228,7 +229,7 @@ export async function acceptBid(db: Database, bidId: string, actor: SellerActor,
   });
   if (!out) throw new Error("bid has expired");
   await ensureKeyFacts(db, out.offer.id, now).catch((e) => console.error("[keyfacts]", (e as Error).message));
-  await notifyBusiness(db, out.bid.financierId, "bid_accepted", { invoiceNumber: out.inv.invoiceNumber, advance: formatINR(out.bid.advanceAmount) }, gw);
+  await notifyBusiness(db, out.bid.financierId, "bid_accepted", { invoiceNumber: out.inv.invoiceNumber, advance: formatMoney(out.bid.advanceAmount) }, gw);
   return out.offer;
 }
 

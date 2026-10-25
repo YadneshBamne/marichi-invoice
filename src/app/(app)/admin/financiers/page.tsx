@@ -5,7 +5,7 @@ import { businesses, financierProfiles, users } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { position, recordFunding, recordWithdrawal } from "@/server/marketplace/service";
 import { DataTable, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatMoney, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 
 export const metadata = { title: "Financiers" };
@@ -20,7 +20,7 @@ async function move(fd: FormData) {
     const amount = rupeesToPaise(f.amount);
     const p = { financierId: f.financierId, amount, ref: f.bankRef?.trim() ? `${f.bankRef.trim()}` : f.ref, staffId: u.id, staffRole: u.role };
     await (f.kind === "fund" ? recordFunding : recordWithdrawal)(db, p);
-    return f.kind === "fund" ? `Recorded ${formatINR(amount)} in.` : `Recorded ${formatINR(amount)} out.`;
+    return f.kind === "fund" ? `Recorded ${formatMoney(amount)} in.` : `Recorded ${formatMoney(amount)} out.`;
   });
 }
 
@@ -41,9 +41,9 @@ export default async function Financiers({ searchParams }: { searchParams: Promi
           cols={[
             { h: "Company", cell: (r) => <><a className="font-semibold text-p-700 hover:underline" href={`/admin/financiers/${r.id}`}>{r.name}</a><span className="block text-xs font-normal text-muted">verification: {r.kyb.replaceAll("_", " ")}</span></> },
             { h: "Application", cell: (r) => <StatusPill status={r.app === "approved" ? "approved" : r.app === "submitted" ? "pending" : !r.app || r.app === "draft" ? "draft" : "rejected"} label={(r.app ?? "not started").replaceAll("_", " ")} /> },
-            { h: "In escrow", align: "right", cell: (r) => formatINR(r.pos.funds) },
-            { h: "Promised", align: "right", cell: (r) => formatINR(r.pos.reserved) },
-            { h: "Deployed", align: "right", cell: (r) => formatINR(r.pos.deployed) },
+            { h: "In escrow", align: "right", cell: (r) => formatMoney(r.pos.funds) },
+            { h: "Promised", align: "right", cell: (r) => formatMoney(r.pos.reserved) },
+            { h: "Deployed", align: "right", cell: (r) => formatMoney(r.pos.deployed) },
             { h: "", align: "right", cell: (r) => (
               <Pop id={`pf-${r.id}`} label="Record movement" cls="btn btn-ghost btn-sm">
                 <form action={move} className="space-y-2">

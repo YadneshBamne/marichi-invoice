@@ -3,6 +3,7 @@ import { useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/ui/icons";
 import { Spinner } from "@/components/ui/forms";
 import { readInvoice, type Reading } from "./read-action";
+import { market } from "@/lib/countries";
 
 type Buyer = { id: string; name: string };
 const input = "field font-normal";
@@ -58,7 +59,7 @@ export function UploadForm({ buyers, action }: { buyers: Buyer[]; action: (fd: F
       <label className="block text-sm font-medium">Amount (₹, incl. tax)<input name="amount" inputMode="decimal" required value={v.amount} onChange={set("amount")} className={`${input} mt-1`} /></label>
       <label className="block text-sm font-medium">Invoice date<input name="invoiceDate" type="date" required value={v.invoiceDate} onChange={set("invoiceDate")} className={`${input} mt-1`} /></label>
       <label className="block text-sm font-medium">Due date<input name="dueDate" type="date" required value={v.dueDate} onChange={set("dueDate")} className={`${input} mt-1`} /></label>
-      <label className="block text-sm font-medium">e-Invoice IRN (if issued)<input name="irn" value={v.irn} onChange={set("irn")} className={`${input} mt-1`} /></label>
+      <label className="block text-sm font-medium">e-Invoice {market().eInvoice.short} (if issued)<input name="irn" value={v.irn} onChange={set("irn")} className={`${input} mt-1`} /></label>
       <label className="block text-sm font-medium">PO reference<input name="poReference" value={v.poReference} onChange={set("poReference")} className={`${input} mt-1`} /></label>
       <div className="sm:col-span-2"><button className="btn btn-primary" disabled={pending}>Submit invoice</button></div>
     </form>

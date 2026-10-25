@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { requireApp, requireUser } from "@/server/rbac";
 import { escalateToOmbudsman, getTicket, postMessage, reopenTicket } from "@/server/support/service";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { KV, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Thread } from "@/components/ui/thread";
 
@@ -69,7 +69,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
         </div>
         <aside className="space-y-5">
           <Panel title="Timeline"><KV rows={[["We aim to respond by", when(t.firstResponseDueAt)], ["We aim to resolve by", when(t.resolveDueAt)]]} /></Panel>
-          {invoice && <Panel title="Invoice"><KV rows={[["Number", invoice.invoiceNumber], ["Amount", formatINR(invoice.amount)], ["Status", <StatusPill key="s" status={invoice.status} />]]} /></Panel>}
+          {invoice && <Panel title="Invoice"><KV rows={[["Number", invoice.invoiceNumber], ["Amount", formatMoney(invoice.amount)], ["Status", <StatusPill key="s" status={invoice.status} />]]} /></Panel>}
         </aside>
       </div>
     </>

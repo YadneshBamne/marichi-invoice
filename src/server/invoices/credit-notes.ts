@@ -9,7 +9,7 @@ import { auditLog, creditNotes, financingOffers, invoices } from "../db/schema";
 import { gateway, type Adapters } from "./../integrations/gateway";
 import { notifyBusiness } from "../notify";
 import { emitEvent } from "../erp/events";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
 
 const PRE = ["uploaded", "validated", "sent_for_confirmation", "confirmed", "eligible"];
 const POST = ["financed", "due", "overdue"];
@@ -45,12 +45,12 @@ export async function issueCreditNote(db: Database, actor: CreditActor, p: { inv
     return { note, inv, newAmount, phase };
   });
 
-  const data = { invoiceNumber: out.inv.invoiceNumber, creditNote: out.note.number, amount: formatINR(p.amount), newAmount: formatINR(out.newAmount), reason };
+  const data = { invoiceNumber: out.inv.invoiceNumber, creditNote: out.note.number, amount: formatMoney(p.amount), newAmount: formatMoney(out.newAmount), reason };
   await notifyBusiness(db, out.inv.buyerId, "credit_note_issued", data, gw, now);
   const cn = { invoiceNumber: out.inv.invoiceNumber, creditNote: out.note.number, creditPaise: p.amount.toString(), newAmountPaise: out.newAmount.toString(), reason };
   await emitEvent(db, out.inv.sellerId, "invoice.credit_note", cn, now);
   await emitEvent(db, out.inv.buyerId, "invoice.credit_note", cn, now);
-  if (out.phase === "post_funding") await notifyBusiness(db, out.inv.sellerId, "credit_note_shortfall", { invoiceNumber: out.inv.invoiceNumber, amount: formatINR(p.amount) }, gw, now);
+  if (out.phase === "post_funding") await notifyBusiness(db, out.inv.sellerId, "credit_note_shortfall", { invoiceNumber: out.inv.invoiceNumber, amount: formatMoney(p.amount) }, gw, now);
   return { creditNote: out.note, newAmount: out.newAmount, phase: out.phase };
 }
 

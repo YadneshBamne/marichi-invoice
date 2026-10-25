@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import { PublicFooter, PublicHeader } from "@/components/ui/public";
 import { ROADMAP } from "@/lib/roadmap";
+import { market } from "@/lib/countries";
+import { formatMoney } from "@/lib/money";
 
 const STEPS = [
   { icon: "layers", t: "Set up your workspace", d: "Choose the apps your company needs, add your logo, and invite your team by email." },
-  { icon: "building", t: "Verify your business", d: "A one-time KYB check with PAN, GSTIN, directors and your settlement bank account." },
+  { icon: "building", t: "Verify your business", d: `A one-time KYB check with ${[market().ids.kyb.label, market().ids.taxReg.label].filter((v, i, a) => a.indexOf(v) === i).join(", ")}, directors and your settlement bank account.` },
   { icon: "users", t: "Link your buyers", d: "Invite the companies that owe you money. They verify once and confirm your invoices." },
   { icon: "upload", t: "Upload an invoice", d: "Duplicates and invalid e-invoice numbers are caught immediately. The buyer is asked to confirm." },
   { icon: "scale", t: "Review, sign and get paid", d: "See the advance, fee and all-in annual cost before you accept, then e-sign and receive the advance." },
@@ -14,11 +16,14 @@ const STEPS = [
 const TRUST = [
   { icon: "shield", t: "Two-factor sign-in, everywhere", d: "Every account, customer or staff, uses an authenticator app." },
   { icon: "receipt", t: "Buyer-confirmed invoices", d: "No invoice is financed until the buyer confirms it. Duplicates are blocked." },
-  { icon: "scale", t: "Double-entry ledger", d: "Every rupee is booked twice, and the books are reconciled with the bank every day." },
+  { icon: "scale", t: "Double-entry ledger", d: `Every ${market().currency.major} is booked twice, and the books are reconciled with the bank every day.` },
   { icon: "users", t: "Maker-checker on large payouts", d: "A second person must approve payouts above the threshold." },
   { icon: "clock", t: "Full audit trail", d: "Every sensitive change records who did it, when, and what it was before." },
   { icon: "flag", t: "Grievance redressal", d: "Tracked tickets with response times, escalation levels and the Ombudsman route." },
 ];
+
+// Example amounts are written in rupees and scaled to the home currency, so the sample offer looks like the market it is shown in.
+const ex = (rupees: number) => { const [n, d] = market().policyScale; return formatMoney((BigInt(rupees) * 100n * BigInt(n)) / BigInt(d)); };
 
 export default function Home() {
   const sandbox = (process.env.INTEGRATIONS_MODE ?? "mock") === "mock";
@@ -44,10 +49,10 @@ export default function Home() {
             <div className="rounded-panel bg-card p-6 text-ink shadow-pop">
               <div className="flex items-center justify-between"><p className="text-[13px] font-semibold text-muted">Your offer</p><span className="pill bg-g-100 text-g-600">Valid for 24 h</span></div>
               <p className="mt-4 text-sm text-muted">Invoice INV-2041 · Big Corp Ltd</p>
-              <p className="mt-1 text-[34px] font-semibold tracking-tight">₹4,22,500</p>
+              <p className="mt-1 text-[34px] font-semibold tracking-tight">{ex(422_500)}</p>
               <p className="text-sm text-muted">paid to your bank account today</p>
               <dl className="mt-5 space-y-2.5 border-t border-hair pt-4 text-sm">
-                {[["Invoice value", "₹5,00,000"], ["Advance (85%)", "₹4,25,000"], ["Processing fee incl. GST", "− ₹2,500"], ["Discount for 31 days", "charged at repayment"], ["Effective annual cost", "shown before you accept"]].map(([k, v]) => (
+                {[["Invoice value", ex(500_000)], ["Advance (85%)", ex(425_000)], [`Processing fee incl. ${market().tax.name}`, `− ${ex(2_500)}`], ["Discount for 31 days", "charged at repayment"], ["Effective annual cost", "shown before you accept"]].map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-4"><dt className="text-muted">{k}</dt><dd className="font-medium">{v}</dd></div>
                 ))}
               </dl>

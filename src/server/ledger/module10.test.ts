@@ -8,7 +8,7 @@ import { assertPreviousDayReconciled, reconcileDay, runReconciliation } from "..
 import type { StatementLine } from "../integrations/gateway";
 import { ACCOUNTS, balance } from "./accounts";
 import { portfolioXirr, revenueReport, toCsv, trialBalance, generalLedger } from "./reports";
-import { splitGst } from "./tax";
+import { splitTax } from "./tax";
 import { xirr } from "./xirr";
 
 const at = (d: string) => new Date(`${d}T10:00:00Z`);
@@ -18,8 +18,8 @@ beforeEach(async () => { w = await world(); });
 
 describe("tax", () => {
   it("splits a GST-inclusive fee exactly", () => {
-    expect(splitGst(5_000_00n)).toEqual({ base: 4_237_28n, gst: 762_72n });
-    for (const f of [1n, 99n, 118n, 12345n, 999_999n]) { const s = splitGst(f); expect(s.base + s.gst).toBe(f); }
+    expect(splitTax(5_000_00n)).toEqual({ base: 4_237_28n, tax: 762_72n });
+    for (const f of [1n, 99n, 118n, 12345n, 999_999n]) { const s = splitTax(f); expect(s.base + s.tax).toBe(f); }
   });
 });
 

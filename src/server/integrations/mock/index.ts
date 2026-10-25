@@ -1,18 +1,19 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Adapters } from "../gateway";
+import { market } from "../../../lib/countries";
 
 // Deterministic fakes. Magic inputs let tests drive failure paths:
 //   (IRN magic prefixes: see getIrn)
-//   PAN with 0 as its 9th char (last digit) => invalid; name containing "SANCTION" => AML hit; IRN starting "CANCEL" => cancelled.
+//   a taxpayer id (PAN, TPIN) with 0 as its second-to-last character => invalid; name containing "SANCTION" => AML hit; IRN starting "CANCEL" => cancelled.
 const done = new Map<string, { bankRef: string; status: "succeeded" }>();
 
 export const mock: Adapters = {
   kyc: {
-    async verifyPan(pan, name) {
-      return { valid: /^[A-Z]{5}\d{4}[A-Z]$/.test(pan) && pan[8] !== "0", nameMatch: name.length > 0 };
+    async verifyTaxId(id, name) {
+      return { valid: market().ids.kyb.pattern.test(id) && id[id.length - 2] !== "0", nameMatch: name.length > 0 };
     },
     async verifyBankAccount(acct, _ifsc, name) {
-      return { exists: acct.length >= 9, nameMatch: name.length > 0 };
+      return { exists: market().ids.bankAccount.pattern.test(acct), nameMatch: name.length > 0 };
     },
     async screenAml(name) {
       const hit = name.toUpperCase().includes("SANCTION");
@@ -65,6 +66,13 @@ export const mock: Adapters = {
     },
     async cancel() {},
   },
+  // Magic input: an assignor whose name contains REGFAIL is refused, to drive the retry path.
+  registry: {
+    async file(p) {
+      if (p.assignor.toUpperCase().includes("REGFAIL")) throw new Error("registry unavailable");
+      return { reference: `MOCKREG-${createHash("sha1").update(p.idempotencyKey).digest("hex").slice(0, 10).toUpperCase()}` };
+    },
+  },
   // Fixed sandbox rates (rupees per unit, micro). A real adapter reads the bank's or a treasury feed's live rate.
   fx: {
     async rate(currency) {
@@ -82,7 +90,7 @@ export const mock: Adapters = {
       return {
         simulated: true,
         fields: {
-          invoiceNumber: `INV-${h.slice(0, 5).toUpperCase()}`, invoiceDate: day(-7), dueDate: day(53), totalAmount: String(100000 + (n % 900000)), currency: "INR",
+          invoiceNumber: `INV-${h.slice(0, 5).toUpperCase()}`, invoiceDate: day(-7), dueDate: day(53), totalAmount: String(100000 + (n % 900000)), currency: market().currency.code,
           sellerName: null, sellerGstin: null, buyerName: null, buyerGstin: null, irn: null, poReference: `PO-${h.slice(5, 9).toUpperCase()}`,
         },
       };

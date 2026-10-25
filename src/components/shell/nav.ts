@@ -30,6 +30,7 @@ const ADMIN_ONLY: Section = { label: "Administration", items: [
   { href: "/admin/users", label: "Users & roles", icon: "users", tour: "nav-users" },
   { href: "/admin/audit", label: "Audit log", icon: "scale", tour: "nav-audit" },
   { href: "/admin/policy", label: "Policy", icon: "scale", tour: "nav-policy" },
+  { href: "/admin/market", label: "Market and registry", icon: "globe", tour: "nav-market" },
   { href: "/admin/legal", label: "Legal documents", icon: "file", tour: "nav-legal" },
   { href: "/admin/system", label: "System health", icon: "gear", tour: "nav-system" },
 ] };
@@ -80,5 +81,5 @@ export const CRUMBS: Record<string, string> = {
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
   system: "System health", policy: "Policy", models: "Model monitor", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
-  apps: "Apps", team: "Team", approvals: "Approvals", legal: "Legal documents", mandate: "Mandate and limits", application: "Application", invite: "Invitation", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
+  apps: "Apps", team: "Team", approvals: "Approvals", legal: "Legal documents", market: "Market and registry", mandate: "Mandate and limits", application: "Application", invite: "Invitation", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
 };

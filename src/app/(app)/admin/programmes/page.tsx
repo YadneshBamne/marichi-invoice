@@ -3,7 +3,7 @@ import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
 import { decideProgramme, listProgrammes, SCF } from "@/server/scf/service";
 import { DataTable, Notice, PageHead, Panel, StatusPill, Pop } from "@/components/ui/page";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatMoney, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 
 export const metadata = { title: "Programmes" };
@@ -39,9 +39,9 @@ export default async function Programmes({ searchParams }: { searchParams: Promi
           cols={[
             { h: "Buyer", cell: (r) => <>{r.buyer}<span className="block text-xs font-normal text-muted">{r.p.name}</span></> },
             { h: "Status", cell: (r) => <StatusPill status={r.p.status === "active" ? "approved" : r.p.status === "requested" || r.p.status === "paused" ? "pending" : "rejected"} label={r.p.status} /> },
-            { h: "Asked", align: "right", cell: (r) => formatINR(r.p.requestedLimit) },
-            { h: "Limit", align: "right", cell: (r) => (r.p.limit > 0n ? formatINR(r.p.limit) : "-") },
-            { h: "In use", align: "right", cell: (r) => formatINR(r.used) },
+            { h: "Asked", align: "right", cell: (r) => formatMoney(r.p.requestedLimit) },
+            { h: "Limit", align: "right", cell: (r) => (r.p.limit > 0n ? formatMoney(r.p.limit) : "-") },
+            { h: "In use", align: "right", cell: (r) => formatMoney(r.used) },
             { h: "Price", align: "right", cell: (r) => (r.p.discountBps ? `${r.p.discountBps / 100}% / ${(r.p.advanceBps ?? 0) / 100}%` : "-") },
             { h: "", align: "right", cell: (r) => r.p.status === "requested" ? (
               <Pop id={`pd-${r.p.id}`} label="Decide" cls="btn btn-primary btn-sm">

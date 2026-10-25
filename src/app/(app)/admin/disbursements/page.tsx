@@ -8,7 +8,7 @@ import { approveDisbursement, fundEscrow, retryDisbursement } from "@/server/dis
 import { ACCOUNTS, balance } from "@/server/ledger/accounts";
 import { DataTable, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatMoney, rupeesToPaise } from "@/lib/money";
 
 export const metadata = { title: "Disbursements" };
 
@@ -43,7 +43,7 @@ export default async function Disbursements() {
     <>
       <PageHead title="Disbursements" sub="Fund escrow, approve large payouts, and retry failed ones. Money only leaves escrow once the funds are there." />
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Stat hero label="Escrow balance" value={formatINR(escrow)} note="available for payouts" />
+        <Stat hero label="Escrow balance" value={formatMoney(escrow)} note="available for payouts" />
         <Stat label="Awaiting approval" value={String(waiting)} note="second person must approve" tone={waiting ? "warn" : undefined} />
         <Stat label="Failed" value={String(failed)} note={failed ? "retry or investigate" : "none"} tone={failed ? "bad" : "good"} />
       </div>
@@ -53,7 +53,7 @@ export default async function Disbursements() {
           <DataTable rows={rows} rowKey={(r) => r.d.id} empty="No disbursements yet."
             cols={[
               { h: "Invoice", cell: ({ inv }) => inv.invoiceNumber },
-              { h: "Amount", align: "right", cell: ({ d }) => formatINR(d.amount) },
+              { h: "Amount", align: "right", cell: ({ d }) => formatMoney(d.amount) },
               { h: "Status", cell: ({ d }) => <span className="flex flex-wrap items-center gap-1.5"><StatusPill status={d.status} />{d.needsApproval && !d.approvedAt && d.status === "pending" && <StatusPill status="pending" label="needs approval" />}</span> },
               { h: "Rail", cell: ({ d }) => d.rail ?? <span className="text-faint">–</span> },
               { h: "Note", cell: ({ d }) => <span className="text-muted">{d.failureReason ?? ""}</span> },

@@ -4,7 +4,7 @@ import { requireUser } from "@/server/rbac";
 import { CROSS, exposure, foreignBuyers, recordForeignPayment } from "@/server/crossborder/service";
 import { gateway } from "@/server/integrations/gateway";
 import { DataTable, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
-import { formatINR, formatMinor, rupeesToPaise } from "@/lib/money";
+import { formatMoney, formatMinor, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 
 export const metadata = { title: "Cross-border" };
@@ -17,7 +17,7 @@ async function receive(fd: FormData) {
   await attempt(PATH, async () => {
     const f = z.object({ accountNumber: z.string().min(6), currency: z.string().length(3), amount: z.string(), utr: z.string().min(4) }).parse(Object.fromEntries(fd));
     const r = await recordForeignPayment(db, { accountNumber: f.accountNumber.trim(), currency: f.currency, foreignAmount: rupeesToPaise(f.amount), utr: f.utr.trim(), receivedAt: new Date() });
-    return r.status === "replayed" ? "That payment was already recorded." : `Converted to ${formatINR(r.inr)} at ₹${(Number(r.rateMicro) / 1_000_000).toFixed(4)} and applied to the invoice.`;
+    return r.status === "replayed" ? "That payment was already recorded." : `Converted to ${formatMoney(r.inr)} at ₹${(Number(r.rateMicro) / 1_000_000).toFixed(4)} and applied to the invoice.`;
   });
 }
 
@@ -32,14 +32,14 @@ export default async function CrossBorder({ searchParams }: { searchParams: Prom
       {q.ok && <div className="mb-4"><Notice tone="good">{q.ok}</Notice></div>}
       {q.error && <div className="mb-4"><Notice tone="bad">{q.error}</Notice></div>}
       <div className="mb-5 grid gap-5 xl:grid-cols-[1fr_22rem]">
-        <Panel title="Open exposure" sub={`${formatINR(total)} advanced against export invoices`} flush>
+        <Panel title="Open exposure" sub={`${formatMoney(total)} advanced against export invoices`} flush>
           <DataTable rows={exp} rowKey={(e) => `${e.currency}${e.country}`} empty="No export invoices outstanding."
             cols={[
               { h: "Currency", cell: (e) => e.currency },
               { h: "Buyer country", cell: (e) => e.country },
               { h: "Invoices", align: "right", cell: (e) => e.invoices },
               { h: "Invoiced", align: "right", cell: (e) => formatMinor(e.foreign, e.currency) },
-              { h: "Advanced (₹)", align: "right", cell: (e) => formatINR(e.principal) },
+              { h: "Advanced (₹)", align: "right", cell: (e) => formatMoney(e.principal) },
               { h: "Share", align: "right", cell: (e) => `${total > 0n ? Number((e.principal * 100n) / total) : 0}%` },
             ]} />
         </Panel>

@@ -3,6 +3,7 @@ import { useActionState } from "react";
 import { Alert, Spinner } from "@/components/ui/forms";
 import { Panel, StatusPill } from "@/components/ui/page";
 import { authoriseAutopay, revokeAutopay, setupAutopay, type AutopayState } from "./autopay-actions";
+import { market } from "@/lib/countries";
 
 export type MandateView = { id: string; status: string; maskedAccount: string; ifsc: string; maxLabel: string } | null;
 
@@ -31,7 +32,7 @@ export function Autopay({ mandate, canManage, mock }: { mandate: MandateView; ca
         <form key={JSON.stringify(v)} action={action} className="grid gap-4 text-sm sm:grid-cols-2">
           {mandate && <p className="text-muted sm:col-span-2">Your last auto-pay mandate was {mandate.status}. You can set it up again.</p>}
           <label className="block font-medium">Bank account number<input name="accountNumber" required inputMode="numeric" defaultValue={v.accountNumber} className="field font-normal" /></label>
-          <label className="block font-medium">IFSC<input name="ifsc" required defaultValue={v.ifsc} placeholder="HDFC0001234" className="field font-normal" /></label>
+          <label className="block font-medium">{market().ids.bankCode.label}<input name="ifsc" required defaultValue={v.ifsc} className="field font-normal" /></label>
           <label className="block font-medium">Account holder name<input name="holderName" required defaultValue={v.holderName} className="field font-normal" /></label>
           <label className="block font-medium">Limit for a single debit (₹)<input name="maxAmount" required inputMode="decimal" defaultValue={v.maxAmount} placeholder="e.g. 10,00,000" className="field font-normal" /></label>
           {state.error && <div className="sm:col-span-2"><Alert>{state.error}</Alert></div>}

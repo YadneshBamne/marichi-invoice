@@ -7,21 +7,22 @@ import { assertNotFrozen } from "../fraud/service";
 import { assertReadyToDisburse } from "../agreements/service";
 import { ACCOUNTS, balance, ensureAccounts } from "../ledger/accounts";
 import { postEntry } from "../ledger/post";
-import { splitGst } from "../ledger/tax";
+import { splitTax } from "../ledger/tax";
 import { assertPreviousDayReconciled } from "../recon/service";
 import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
 import { platformCash, position } from "../marketplace/service";
 import { assertActiveFinancier } from "../marketplace/financier";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
+import { market } from "../../lib/countries";
 
 export const DISBURSE = {
   approvalThreshold: 10_00_000_00n, // > ₹10L needs a second person (maker-checker)
   autoAttempts: 2, // automatic tries (primary + alternate rail) before it lands in the ops queue
 };
 
-/** Rail plan by amount: small => IMPS then NEFT; larger => RTGS then NEFT. */
-export const railPlan = (amount: bigint): Rail[] => (amount <= 5_00_000_00n ? ["IMPS", "NEFT"] : ["RTGS", "NEFT"]);
+/** Rail plan by amount, from the country pack: a small payment goes by the fast rail first; a large one by the high-value rail. */
+export const railPlan = (amount: bigint): Rail[] => { const r = market().rails; return amount <= r.largeAbove ? r.small : r.large; };
 
 const STAFF = ["ops", "admin"];
 
@@ -87,13 +88,13 @@ async function finalize(db: Database, d: typeof disbursements.$inferSelect, bank
     const [offer] = await tx.select().from(financingOffers).where(eq(financingOffers.id, d.offerId));
     const [inv] = await tx.select().from(invoices).where(eq(invoices.id, offer.invoiceId));
     await ensureAccounts(tx, [ACCOUNTS.escrow, ACCOUNTS.feeIncome, ACCOUNTS.gstPayable, ACCOUNTS.receivable(inv.sellerId)]);
-    // Advance becomes a receivable from the seller; cash leaves escrow; the (GST-inclusive) fee is earned immediately.
-    const fee = splitGst(offer.feeAmount);
+    // Advance becomes a receivable from the seller; cash leaves escrow; the (tax-inclusive) fee is earned immediately.
+    const fee = splitTax(offer.feeAmount);
     await postEntry(tx, { ref: `disb:${d.id}`, type: "disbursement", lines: [
       { account: ACCOUNTS.receivable(inv.sellerId), direction: "debit", amount: offer.advanceAmount },
       { account: ACCOUNTS.escrow, direction: "credit", amount: d.amount },
       ...(fee.base > 0n ? [{ account: ACCOUNTS.feeIncome, direction: "credit" as const, amount: fee.base }] : []),
-      ...(fee.gst > 0n ? [{ account: ACCOUNTS.gstPayable, direction: "credit" as const, amount: fee.gst }] : []),
+      ...(fee.tax > 0n ? [{ account: ACCOUNTS.gstPayable, direction: "credit" as const, amount: fee.tax }] : []),
     ] });
     if (offer.financierId) { // the advance is now the financier's capital out in this invoice
       await ensureAccounts(tx, [ACCOUNTS.financierFunds(offer.financierId), ACCOUNTS.financierDeployed(offer.financierId)]);
@@ -113,7 +114,7 @@ async function finalize(db: Database, d: typeof disbursements.$inferSelect, bank
     return inv;
   });
   if (done) {
-    await notifyBusiness(db, done.sellerId, "disbursed", { invoiceNumber: done.invoiceNumber, amount: formatINR(d.amount) }, gw);
+    await notifyBusiness(db, done.sellerId, "disbursed", { invoiceNumber: done.invoiceNumber, amount: formatMoney(d.amount) }, gw);
     await emitEvent(db, done.sellerId, "invoice.financed", { invoiceNumber: done.invoiceNumber, netPayoutPaise: d.amount.toString(), bankRef, paidOutAt: now.toISOString() }, now);
   }
 }

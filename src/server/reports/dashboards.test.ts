@@ -7,7 +7,7 @@ import { prepareAgreements } from "../agreements/service";
 import { recordIncomingPayment, runCollectionsSweep } from "../collections/service";
 import { openCase } from "../fraud/service";
 import { mock } from "../integrations/mock";
-import { formatCompactINR } from "../../lib/money";
+import { formatCompactMoney } from "../../lib/money";
 import { buyerDashboard, median, opsDashboard, sellerDashboard } from "./dashboards";
 
 let w: Awaited<ReturnType<typeof world>>;
@@ -17,7 +17,7 @@ beforeEach(async () => { w = await world(); });
 describe("helpers", () => {
   it("median and compact rupees", () => {
     expect(median([])).toBeNull(); expect(median([3, 1, 2])).toBe(2); expect(median([1, 2, 3, 10])).toBe(2.5);
-    expect([950n * 100n, 12_400_00n, 8_90_000_00n, 1_20_00_000_00n, -5_00_000_00n].map(formatCompactINR)).toEqual(["₹950", "₹12.4K", "₹8.9L", "₹1.2Cr", "-₹5L"]);
+    expect([950n * 100n, 12_400_00n, 8_90_000_00n, 1_20_00_000_00n, -5_00_000_00n].map(formatCompactMoney)).toEqual(["₹950", "₹12.4K", "₹8.9L", "₹1.2Cr", "-₹5L"]);
   });
 });
 

@@ -1,5 +1,7 @@
 import { eq } from "drizzle-orm";
 import { businesses, financierBuyerLimits, financierMandates, financierProfiles, invoices, memberships, users } from "./db/schema";
+import { market, setMarketForTests } from "../lib/countries";
+import { applyMarketPolicy, resetPolicyForTests } from "./config/policy";
 import { submitKyb, submitLightKyb } from "./kyb/service";
 import { linkBuyer } from "./relationships/service";
 import { createInvoice } from "./invoices/service";
@@ -13,19 +15,27 @@ import { financingOffers, virtualAccounts } from "./db/schema";
 import { recordFunding } from "./marketplace/service";
 
 export const T0 = new Date("2026-10-06T00:00:00Z");
+/** Tests only: run as another home market (currency, identifiers, rails, policy scale), then call useMarket("IN") to go back. */
+export function useMarket(code: string) { setMarketForTests(code); applyMarketPolicy(); resetPolicyForTests(); }
+/** Valid sample identifiers for each market, as the mock checks them. */
+export const SAMPLE: Record<string, { sellerTax: string; sellerReg: string; buyerTax: string; buyerReg: string; bankCode: string }> = {
+  IN: { sellerTax: "ABCDE1234F", sellerReg: "27AAAAA1111A1Z5", buyerTax: "BCDEF2345G", buyerReg: "29BBBBB2222B1Z5", bankCode: "HDFC0001234" },
+  ZM: { sellerTax: "1000000011", sellerReg: "1000000011", buyerTax: "2000000021", buyerReg: "2000000021", bankCode: "040001" },
+};
 export const gw = { ...mock, bureau: { pull: async () => ({ score: 780, noHit: false }) } };
 
 /** A verified seller + buyer (with one login each), linked, with bureau consent. Tests only. */
 export async function world() {
   const db = await testDb();
+  const sample = SAMPLE[market().code];
   const sellerId = (await db.insert(businesses).values({ legalName: "Seller Co", entityType: "pvt_ltd" }).returning())[0].id;
   const buyerId = (await db.insert(businesses).values({ legalName: "Big Corp", entityType: "pvt_ltd" }).returning())[0].id;
   await submitKyb(db, {
-    businessId: sellerId, pan: "ABCDE1234F", gstin: "27AAAAA1111A1Z5", ubos: [{ name: "Ravi", shareholdingBps: 10000 }],
-    bank: { accountNumber: "123456789012", ifsc: "HDFC0001234", holderName: "Seller Co" },
+    businessId: sellerId, pan: sample.sellerTax, gstin: sample.sellerReg, ubos: [{ name: "Ravi", shareholdingBps: 10000 }],
+    bank: { accountNumber: "123456789012", ifsc: sample.bankCode, holderName: "Seller Co" },
   });
-  await submitLightKyb(db, { businessId: buyerId, gstin: "29BBBBB2222B1Z5", pan: "BCDEF2345G" });
-  await linkBuyer(db, { sellerId, buyerGstin: "29BBBBB2222B1Z5", buyerEmail: "ap@big.com" });
+  await submitLightKyb(db, { businessId: buyerId, gstin: sample.buyerReg, pan: sample.buyerTax });
+  await linkBuyer(db, { sellerId, buyerGstin: sample.buyerReg, buyerEmail: "ap@big.com" });
   await recordConsent(db, { businessId: sellerId, text: "ok" });
   await recordConsent(db, { businessId: buyerId, text: "ok" });
   const [su, bu] = await db.insert(users).values([
@@ -75,7 +85,7 @@ export async function world() {
     await db.insert(memberships).values({ userId: u.id, businessId: b.id, orgRole: "owner" });
     await db.update(businesses).set({ kind: "financier" }).where(eq(businesses.id, b.id));
     // Approved by staff, licensed in India, an open mandate and a generous limit on the buyer: tests tighten what they need to test.
-    await db.insert(financierProfiles).values({ businessId: b.id, institutionType: "nbfc_factor", countries: ["IN"], regulator: "RBI", licenceType: "NBFC-Factor", licenceNumber: `N-${b.id.slice(0, 6)}`, licenceValidUntil: "2030-12-31", settlementAccount: "123456789012", settlementIfsc: "HDFC0001234", settlementName: name, settlementVerified: true, status: "approved" });
+    await db.insert(financierProfiles).values({ businessId: b.id, institutionType: market().code === "IN" ? "nbfc_factor" : "nbfi", countries: [market().code], regulator: market().regulator, licenceType: market().code === "IN" ? "NBFC-Factor" : "Financial institution licence", licenceNumber: `N-${b.id.slice(0, 6)}`, licenceValidUntil: "2030-12-31", settlementAccount: "123456789012", settlementIfsc: SAMPLE[market().code].bankCode, settlementName: name, settlementVerified: true, status: "approved" });
     await db.insert(financierMandates).values({ businessId: b.id, minGrade: "E", maxTicket: null });
     await db.insert(financierBuyerLimits).values({ financierId: b.id, buyerId, limit: 1_000_00_00_000_00n });
     if (fund > 0n) await recordFunding(db, { financierId: b.id, amount: fund, ref: `seed-${b.id}`, staffId: "00000000-0000-0000-0000-0000000000a1", staffRole: "ops" });

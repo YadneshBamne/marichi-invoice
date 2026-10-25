@@ -1,3 +1,4 @@
+import { market } from "../../lib/countries";
 // Guided tour content. `target` is a data-tour id in the shell or a page; a step without a target is a centred card.
 // `optional` steps are skipped silently when their target isn't on screen (e.g. a page widget while on another page).
 export type Step = {
@@ -43,7 +44,7 @@ export function stepsFor(role: string, first: string): Step[] {
 
   if (role === "buyer") return [
     welcome(first, "Your suppliers use Marichi to get paid early on invoices you owe them. Your part is quick and keeps your payment terms unchanged.", [
-      "Verify your business with GSTIN and PAN", "A supplier links you and uploads an invoice", "You confirm it is valid or raise a dispute", "You pay on the original due date, to the account shown for that invoice",
+      `Verify your business with ${[market().ids.taxReg.label, market().ids.kyb.label].filter((v, i, a) => a.indexOf(v) === i).join(" and ")}`, "A supplier links you and uploads an invoice", "You confirm it is valid or raise a dispute", "You pay on the original due date, to the account shown for that invoice",
     ]),
     workspace("This panel shows which account you are in and your verification status."),
     nav("nav-dashboard", "Dashboard", "Invoices waiting for your confirmation, payments coming due, and how much each supplier is financing."),

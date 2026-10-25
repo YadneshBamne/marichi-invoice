@@ -1,3 +1,4 @@
+import { market } from "./countries";
 // Mandatory grievance-redressal disclosure (PRD Module 16): the grievance officer's contact and the escalation path.
 // Values come from the environment so legal can set the real ones without a code change. Defaults are loud placeholders.
 export const grievanceOfficer = () => ({
@@ -9,12 +10,8 @@ export const grievanceOfficer = () => ({
 
 export const isGrievanceConfigured = () => Object.values(grievanceOfficer()).every((v) => v !== "TO BE CONFIGURED");
 
-// ponytail: Ombudsman details are jurisdiction-specific; confirm with counsel for the launch geography.
-export const OMBUDSMAN = {
-  name: "RBI Integrated Ombudsman Scheme",
-  url: "https://cms.rbi.org.in",
-  when: "if your complaint is not resolved within 30 days, or you are not satisfied with our reply",
-};
+// The scheme a customer can escalate to comes from the country pack; confirm it with counsel for each launch country.
+export const ombudsman = () => ({ ...market().ombudsman, when: "if your complaint is not resolved within 30 days, or you are not satisfied with our reply" });
 
 export const ESCALATION_MATRIX = [
   { level: 1, who: "Customer support", within: "Acknowledged within 24 hours" },

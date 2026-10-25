@@ -5,22 +5,24 @@ import { gateway, type Adapters } from "../integrations/gateway";
 import { resolveInvites } from "../relationships/service";
 import { KYB_AML_RULE, openCase } from "../fraud/service";
 import { notifyBusiness } from "../notify";
+import { checkId, market } from "../../lib/countries";
 
 export type KybStatus = typeof businesses.$inferSelect.kybStatus;
 export type KybInput = {
   businessId: string;
   pan: string;
-  gstin?: string; // needed for e-invoice (IRN) cross-checks on this seller's invoices
-  cin?: string;
+  gstin?: string; // the tax registration on this seller's invoices (GSTIN, or the TPIN in Zambia); needed for e-invoice cross-checks
+  cin?: string; // company registry number (CIN, PACRA number)
   ubos: { name: string; din?: string; shareholdingBps: number }[];
   bank: { accountNumber: string; ifsc: string; holderName: string };
 };
 
 const COMPLIANCE_CASE = KYB_AML_RULE;
-/** A GSTIN belongs to one company. If a supplier already named it, the buyer takes that company over from the emailed link instead. */
+/** A tax registration number (GSTIN, TPIN) belongs to one company. If a supplier already named it, the buyer takes that company over from the emailed link instead. */
 async function assertGstinFree(db: Database, gstin: string, selfId: string) {
+  const label = market().ids.taxReg.label;
   const [other] = await db.select({ id: businesses.id }).from(businesses).where(eq(businesses.gstin, gstin));
-  if (other && other.id !== selfId) throw new Error("this GSTIN is already registered on Marichi. If a supplier invited you, open the link in that email to take over the company");
+  if (other && other.id !== selfId) throw new Error(`this ${label} is already registered on Marichi. If a supplier invited you, open the link in that email to take over the company`);
 }
 
 
@@ -28,7 +30,7 @@ async function assertGstinFree(db: Database, gstin: string, selfId: string) {
  * Submit KYB. Auto-approves only when every check is clean. (PRD Module 1 rules)
  *  - Sanctions/PEP hit  -> under_review + compliance case; never auto-approved.
  *  - Bank name mismatch -> under_review (manual reconciliation queue).
- *  - Invalid PAN        -> info_requested.
+ *  - Invalid taxpayer id (PAN, TPIN) -> info_requested.
  *  - Screening provider error -> throws, status stays `submitted` (fail-closed, PRD 12.10).
  */
 export async function submitKyb(db: Database, input: KybInput, gw: Adapters = gateway) {
@@ -38,9 +40,15 @@ export async function submitKyb(db: Database, input: KybInput, gw: Adapters = ga
     throw new Error(`cannot submit KYB from status ${biz.kybStatus}`);
   }
   if (input.ubos.length === 0) throw new Error("at least one director/UBO is required");
+  const ids = market().ids;
+  const taxId = checkId(ids.kyb, input.pan)!;
+  const gstin = checkId(ids.taxReg, input.gstin, true) ?? (ids.kyb.label === ids.taxReg.label ? taxId : undefined); // in Zambia one number does both jobs
+  const cin = ids.companyReg ? checkId(ids.companyReg, input.cin, true) : undefined;
+  checkId(ids.bankCode, input.bank.ifsc); checkId(ids.bankAccount, input.bank.accountNumber);
+  if (gstin) await assertGstinFree(db, gstin, biz.id);
 
   // External calls first (no DB tx held open across network I/O).
-  const pan = await gw.kyc.verifyPan(input.pan, biz.legalName);
+  const pan = await gw.kyc.verifyTaxId(taxId, biz.legalName);
   const bank = await gw.kyc.verifyBankAccount(input.bank.accountNumber, input.bank.ifsc, input.bank.holderName);
   const names = [biz.legalName, ...input.ubos.map((u) => u.name)];
   const screens = await Promise.all(names.map((n) => gw.kyc.screenAml(n))); // throws => fail closed
@@ -51,7 +59,7 @@ export async function submitKyb(db: Database, input: KybInput, gw: Adapters = ga
   let status: KybStatus = "approved";
   if (!pan.valid || !pan.nameMatch) {
     status = "info_requested";
-    reasons.push("PAN invalid or name mismatch");
+    reasons.push(`${ids.kyb.label} invalid or name mismatch`);
   }
   if (!bank.exists || !bank.nameMatch) {
     if (status !== "info_requested") status = "under_review";
@@ -64,7 +72,7 @@ export async function submitKyb(db: Database, input: KybInput, gw: Adapters = ga
 
   await db.transaction(async (tx) => {
     await tx.update(businesses)
-      .set({ pan: input.pan, cin: input.cin, gstin: input.gstin?.trim().toUpperCase(), kybStatus: status, kybNote: reasons.join("; ") || null })
+      .set({ pan: taxId, cin, gstin, kybStatus: status, kybNote: reasons.join("; ") || null })
       .where(eq(businesses.id, biz.id));
     await tx.delete(ubos).where(eq(ubos.businessId, biz.id));
     await tx.insert(ubos).values(
@@ -97,7 +105,7 @@ export async function submitKyb(db: Database, input: KybInput, gw: Adapters = ga
 }
 
 /**
- * Light onboarding for buyers (they receive no funds): PAN + GSTIN + AML on the entity.
+ * Light onboarding for buyers (they receive no funds): taxpayer id + tax registration + AML on the entity.
  * Must upgrade to full KYB (submitKyb) to sponsor an SCF program (Phase 3).
  */
 export async function submitLightKyb(
@@ -108,17 +116,19 @@ export async function submitLightKyb(
   if (!["draft", "info_requested", "rejected"].includes(biz.kybStatus)) {
     throw new Error(`cannot submit KYB from status ${biz.kybStatus}`);
   }
-  const gstin = p.gstin.trim().toUpperCase();
+  const ids = market().ids;
+  const taxId = checkId(ids.kyb, p.pan)!;
+  const gstin = checkId(ids.taxReg, p.gstin || (ids.kyb.label === ids.taxReg.label ? taxId : ""))!;
   await assertGstinFree(db, gstin, biz.id);
-  const [pan, aml] = await Promise.all([gw.kyc.verifyPan(p.pan, biz.legalName), gw.kyc.screenAml(biz.legalName)]);
+  const [pan, aml] = await Promise.all([gw.kyc.verifyTaxId(taxId, biz.legalName), gw.kyc.screenAml(biz.legalName)]);
   const reasons: string[] = [];
   let status: KybStatus = "approved";
-  if (!pan.valid || !pan.nameMatch) { status = "info_requested"; reasons.push("PAN invalid or name mismatch"); }
+  if (!pan.valid || !pan.nameMatch) { status = "info_requested"; reasons.push(`${ids.kyb.label} invalid or name mismatch`); }
   if (aml.hit) { status = "under_review"; reasons.push("sanctions/PEP screening hit"); }
 
   await db.transaction(async (tx) => {
     await tx.update(businesses)
-      .set({ gstin, pan: p.pan, kybLevel: "light", kybStatus: status, kybNote: reasons.join("; ") || null })
+      .set({ gstin, pan: taxId, kybLevel: "light", kybStatus: status, kybNote: reasons.join("; ") || null })
       .where(eq(businesses.id, biz.id));
     if (aml.hit) await openCase(tx, { entityType: "business", entityId: biz.id, rule: COMPLIANCE_CASE, subjectBusinessId: biz.id, details: { screenedNames: [biz.legalName] } });
     await tx.insert(auditLog).values({

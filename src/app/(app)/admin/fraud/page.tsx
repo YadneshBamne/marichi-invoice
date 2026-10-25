@@ -5,7 +5,7 @@ import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
 import { addCaseNote, assignCase, fileStr, listCases, resolveCase } from "@/server/fraud/service";
 import { EmptyState, KV, PageHead, ReviewCard, StatusPill, Tabs } from "@/components/ui/page";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 
 export const metadata = { title: "Fraud cases" };
 
@@ -60,7 +60,7 @@ export default async function FraudQueue({ searchParams }: { searchParams: Promi
                 </form>
               ) : undefined}>
               <KV rows={[
-                ...(c.invoice ? [["Invoice", `${c.invoice.number} · ${formatINR(c.invoice.amount)}`], ["Parties", `${c.invoice.seller} → ${c.invoice.buyer}`], ["Invoice status", c.invoice.status.replaceAll("_", " ")]] as [string, string][] : []),
+                ...(c.invoice ? [["Invoice", `${c.invoice.number} · ${formatMoney(c.invoice.amount)}`], ["Parties", `${c.invoice.seller} → ${c.invoice.buyer}`], ["Invoice status", c.invoice.status.replaceAll("_", " ")]] as [string, string][] : []),
                 ...(c.subjectName ? [["Subject", c.subjectName]] as [string, string][] : []),
                 ...(c.status === "closed" ? [["Outcome", <b key="o" className="capitalize">{String(c.outcome).replaceAll("_", " ")}</b>], ["Resolution", c.resolution ?? ""]] as [string, React.ReactNode][] : []),
               ]} />

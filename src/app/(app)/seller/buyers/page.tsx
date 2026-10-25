@@ -8,9 +8,10 @@ import { assertCan, can } from "@/server/permissions";
 import { linkBuyer } from "@/server/relationships/service";
 import { linkForeignBuyer } from "@/server/crossborder/service";
 import { invitationsFor, respondInvite } from "@/server/scf/service";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
 import { DataTable, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
+import { market } from "@/lib/countries";
 
 const Form = z.object({
   buyerGstin: z.string().min(15),
@@ -73,7 +74,7 @@ export default async function Buyers({ searchParams }: { searchParams: Promise<{
               { h: "Buyer", cell: (p) => <>{p.buyer}<span className="block text-xs font-normal text-muted">{p.p.name}</span></> },
               { h: "Price", align: "right", cell: (p) => `${(p.p.discountBps ?? 0) / 100}% a year` },
               { h: "Advance", align: "right", cell: (p) => `${(p.p.advanceBps ?? 0) / 100}%` },
-              { h: "Programme limit", align: "right", cell: (p) => formatINR(p.p.limit) },
+              { h: "Programme limit", align: "right", cell: (p) => formatMoney(p.p.limit) },
               { h: "Status", cell: (p) => <StatusPill status={p.s.status === "active" ? "approved" : "pending"} label={p.s.status === "active" ? "Joined" : "Invited"} /> },
               { h: "", align: "right", cell: (p) => p.s.status === "invited" && can(u, "programme.join") && (
                 <form action={answerInvite} className="inline-flex flex-wrap items-center justify-end gap-2"><input type="hidden" name="programmeId" value={p.p.id} /><label className="flex items-center gap-1.5 text-xs text-muted"><input name="terms" type="checkbox" />I accept the programme terms</label><button name="action" value="accept" className="btn btn-primary btn-sm">Join</button><button name="action" value="decline" className="btn btn-ghost btn-sm">Decline</button></form>
@@ -86,7 +87,7 @@ export default async function Buyers({ searchParams }: { searchParams: Promise<{
           <DataTable rows={rows} rowKey={(r) => r.key} empty="No buyers yet. Add your first one."
             cols={[
               { h: "Buyer", cell: (r) => r.name },
-              { h: "GSTIN", cell: (r) => <span className="font-mono text-[13px] font-normal text-muted">{r.gstin}</span> },
+              { h: market().ids.taxReg.label, cell: (r) => <span className="font-mono text-[13px] font-normal text-muted">{r.gstin}</span> },
               { h: "Credit terms", align: "right", cell: (r) => (r.days ? `${r.days} days` : <span className="text-faint">-</span>) },
               { h: "Status", cell: (r) => (r.status === "linked" ? <StatusPill status="approved" label="Linked" /> : <StatusPill status="pending" label="Invited, not verified yet" />) },
             ]} />
@@ -95,7 +96,7 @@ export default async function Buyers({ searchParams }: { searchParams: Promise<{
         {!can(u, "buyer.invite") ? <Notice tone="warn">Your role can view buyers but not link them.</Notice> : (
           <Panel title="Add a buyer">
             <form action={add} className="space-y-4">
-              <Field label="Buyer GSTIN"><input name="buyerGstin" required className={input} /></Field>
+              <Field label={`Buyer ${market().ids.taxReg.label}`} hint={market().ids.taxReg.hint}><input name="buyerGstin" required className={input} /></Field>
               <Field label="Buyer company name" hint="Needed the first time, if the buyer is not on Marichi yet."><input name="buyerName" className={input} /></Field>
               <Field label="Email of the person who confirms your invoices" hint="At the buyer, such as accounts payable. They confirm each invoice from an emailed link; they do not need an account."><input name="buyerEmail" type="email" required className={input} /></Field>
               <Field label="Credit terms (days)"><input name="creditTermsDays" type="number" defaultValue={60} className={input} /></Field>

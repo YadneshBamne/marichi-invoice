@@ -1,4 +1,4 @@
-import { ESCALATION_MATRIX, grievanceOfficer, isGrievanceConfigured, OMBUDSMAN } from "@/lib/grievance";
+import { ESCALATION_MATRIX, grievanceOfficer, isGrievanceConfigured, ombudsman } from "@/lib/grievance";
 import { PublicFrame } from "@/components/ui/public";
 
 // Public on purpose: the grievance officer's details and the escalation path must be disclosed to everyone (PRD Module 16).
@@ -28,7 +28,7 @@ export default function Grievance() {
       </ol>
 
       <h2 className="mt-6 font-medium">Ombudsman</h2>
-      <p className="mt-2">You can approach the {OMBUDSMAN.name} ({OMBUDSMAN.url}) {OMBUDSMAN.when}.</p>
+      <p className="mt-2">You can approach the {ombudsman().name} ({ombudsman().url}) {ombudsman().when}.</p>
       <p className="mt-6"><a className="underline" href="/support">Raise a grievance →</a></p>
     </PublicFrame>
   );

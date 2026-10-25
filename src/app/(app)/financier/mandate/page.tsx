@@ -6,8 +6,9 @@ import { requireUser } from "@/server/rbac";
 import { can } from "@/server/permissions";
 import { GRADES, listLimits, mandateOf, profileOf, saveMandate, setBuyerLimit } from "@/server/marketplace/financier";
 import { DataTable, EmptyState, Field, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
-import { formatINR, rupeesToPaise, toDecimal } from "@/lib/money";
+import { formatMoney, rupeesToPaise, toDecimal } from "@/lib/money";
 import { attempt } from "../attempt";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Mandate and limits" };
 const PATH = "/financier/mandate";
@@ -43,7 +44,7 @@ async function saveLimit(fd: FormData) {
   await attempt(PATH, async () => {
     const f = z.object({ gstin: z.string().trim().toUpperCase().min(10), limit: z.string(), status: z.enum(["active", "blocked"]) }).parse(Object.fromEntries(fd));
     const [b] = await db.select({ id: businesses.id }).from(businesses).where(and(eq(businesses.gstin, f.gstin), or(eq(businesses.kind, "buyer"), sql`${businesses.kind} is null`)));
-    if (!b) throw new Error("we do not know a buyer with that GSTIN. It appears once a supplier has named it");
+    if (!b) throw new Error(`we do not know a buyer with that ${market().ids.taxReg.label}. It appears once a supplier has named it`);
     await setBuyerLimit(db, a, { buyerId: b.id, limit: rupeesToPaise(f.limit), status: f.status });
     return f.status === "blocked" ? "Buyer blocked." : "Limit saved.";
   });
@@ -93,7 +94,7 @@ export default async function Mandate({ searchParams }: { searchParams: Promise<
           action={may ? (
             <Pop id="new-limit" label="Set a limit" cls="btn btn-primary btn-sm">
               <form action={saveLimit} className="space-y-2">
-                <input name="gstin" required placeholder="Buyer GSTIN" className="field !py-2 text-sm uppercase" />
+                <input name="gstin" required placeholder={`Buyer ${market().ids.taxReg.label}`} className="field !py-2 text-sm uppercase" />
                 <input name="limit" inputMode="decimal" required placeholder="Limit (₹)" className="field !py-2 text-sm" />
                 <select name="status" className="field !py-2 text-sm"><option value="active">Active</option><option value="blocked">Blocked</option></select>
                 <button className="btn btn-primary btn-sm w-full">Save limit</button>
@@ -103,9 +104,9 @@ export default async function Mandate({ searchParams }: { searchParams: Promise<
           <DataTable rows={limits} rowKey={(l) => l.buyerId} empty="No limits yet. Set one for each buyer you are willing to fund."
             cols={[
               { h: "Buyer", cell: (l) => <>{l.name}<span className="block font-mono text-xs font-normal text-muted">{l.gstin}</span></> },
-              { h: "Limit", align: "right", cell: (l) => formatINR(l.limit) },
-              { h: "Out now", align: "right", cell: (l) => formatINR(l.used) },
-              { h: "Left", align: "right", cell: (l) => formatINR(l.left) },
+              { h: "Limit", align: "right", cell: (l) => formatMoney(l.limit) },
+              { h: "Out now", align: "right", cell: (l) => formatMoney(l.used) },
+              { h: "Left", align: "right", cell: (l) => formatMoney(l.left) },
               { h: "Status", cell: (l) => <StatusPill status={l.status === "active" ? "approved" : "rejected"} label={l.status} /> },
             ]} />
         </Panel>

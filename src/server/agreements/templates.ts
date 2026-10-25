@@ -1,5 +1,6 @@
-import { formatINR } from "../../lib/money";
-import { splitGst } from "../ledger/tax";
+import { formatMoney } from "../../lib/money";
+import { splitTax } from "../ledger/tax";
+import { market } from "../../lib/countries";
 import { termsFor, type CountryTerms } from "./country";
 
 // DRAFT TEMPLATES: the clause text must be reviewed by counsel in each country before any real use (PRD risk register; see
@@ -37,7 +38,7 @@ export function masterAgreement({ seller, financier = PLATFORM, country = termsF
   return doc("Master Invoice Financing Agreement", [
     { h: "Master Invoice Financing Agreement" },
     { p: [`Date: ${date(now)}. Template ${TEMPLATE_VERSION}.`] },
-    { p: ["Between ", { b: financier.legalName }, " (the “Financier”) and ", { b: seller.legalName }, seller.gstin ? ` (GSTIN ${seller.gstin})` : "", " (the “Seller”).", ...servicing(financier)] },
+    { p: ["Between ", { b: financier.legalName }, " (the “Financier”) and ", { b: seller.legalName }, seller.gstin ? ` (${market().ids.taxReg.label} ${seller.gstin})` : "", " (the “Seller”).", ...servicing(financier)] },
     { ol: [
       [{ b: "Assignment. " }, "Each Invoice Schedule signed under this agreement assigns the receivable it describes to the Financier, effective when the Seller signs it and the advance is paid. The parties intend an assignment of the receivable. Where financing is with recourse, the Seller's repayment obligation in clause 5 is the Seller's own obligation and does not change that intention. [Counsel to confirm the characterisation in each country.]"],
       [{ b: "Eligible invoices. " }, "Only a genuine tax invoice for goods or services actually delivered, confirmed by the Buyer, not disputed, not already assigned, financed or charged to anyone, and free of any restriction on assignment (or where the Buyer has waived it), may be assigned."],
@@ -71,15 +72,15 @@ export function invoiceSchedule(d: ScheduleData) {
     { p: [`Date: ${date(d.now)}. Issued under the Master Invoice Financing Agreement between ${f.legalName} and ${d.seller.legalName}. Template ${TEMPLATE_VERSION}.`] },
     { table: [
       ["Financier (assignee)", f.legalName + (f.platform ? "" : ", serviced by Marichi Labs")],
-      ["Buyer", d.buyer.legalName + (d.buyer.gstin ? ` (GSTIN ${d.buyer.gstin})` : "")],
+      ["Buyer", d.buyer.legalName + (d.buyer.gstin ? ` (${market().ids.taxReg.label} ${d.buyer.gstin})` : "")],
       ["Invoice number", d.invoice.invoiceNumber],
       ["Invoice date / due date", `${d.invoice.invoiceDate} / ${d.invoice.dueDate}`],
-      ["Invoice amount", formatINR(d.invoice.amount)],
-      ["Advance", formatINR(d.offer.advanceAmount)],
-      ["Processing fee (deducted upfront, including tax)", formatINR(d.offer.feeAmount)],
-      ["Net amount paid to Seller", formatINR(d.offer.advanceAmount - d.offer.feeAmount)],
+      ["Invoice amount", formatMoney(d.invoice.amount)],
+      ["Advance", formatMoney(d.offer.advanceAmount)],
+      ["Processing fee (deducted upfront, including tax)", formatMoney(d.offer.feeAmount)],
+      ["Net amount paid to Seller", formatMoney(d.offer.advanceAmount - d.offer.feeAmount)],
       ["Discount rate", `${d.offer.discountBps / 100}% per annum on the advance, accruing daily, actual days over 365`],
-      [`Expected discount over ${d.offer.tenorDays} days`, formatINR(d.offer.expectedDiscount)],
+      [`Expected discount over ${d.offer.tenorDays} days`, formatMoney(d.offer.expectedDiscount)],
       ["Penal charge", d.penalBps ? `${d.penalBps / 100}% per annum on overdue principal, from the due date` : "As in the Key Facts sheet"],
       ["Grace period before recourse", `${d.graceDays ?? 5} days after the due date`],
       ["Recourse", d.offer.recourse ? "With recourse to the Seller" : "Without recourse"],
@@ -100,12 +101,12 @@ export function assignmentNotice(d: NoticeData) {
     { h: "Notice of Assignment of Receivable" },
     { p: [`Date: ${date(d.now)}. Template ${TEMPLATE_VERSION}.`] },
     { p: ["To: ", { b: d.buyer.legalName }] },
-    { p: ["Please take notice that ", { b: d.seller.legalName }, " has assigned to ", { b: f.legalName }, ` its right to receive payment of invoice `, { b: d.invoice.invoiceNumber }, ` dated ${d.invoice.invoiceDate} for `, { b: formatINR(d.invoice.amount) }, ", due on ", { b: d.invoice.dueDate }, ".", ...(f.platform ? [] : [" Marichi Labs collects for the assignee."])] },
+    { p: ["Please take notice that ", { b: d.seller.legalName }, " has assigned to ", { b: f.legalName }, ` its right to receive payment of invoice `, { b: d.invoice.invoiceNumber }, ` dated ${d.invoice.invoiceDate} for `, { b: formatMoney(d.invoice.amount) }, ", due on ", { b: d.invoice.dueDate }, ".", ...(f.platform ? [] : [" Marichi Labs collects for the assignee."])] },
     { p: ["Payment must be made only to the following collection account. Payment to the Seller or to any other account will not discharge your obligation. This notice takes effect when you receive it. Please do not change the currency or place of payment."] },
     { table: [
       ["Beneficiary", `${f.platform ? "Marichi Labs" : f.legalName + " (held by Marichi Labs)"}, collection account`],
       ["Account number", d.collection.accountNumber],
-      ["IFSC", d.collection.ifsc],
+      [market().ids.bankCode.label, d.collection.ifsc],
       ["Reference", `Invoice ${d.invoice.invoiceNumber}`],
     ] },
     { p: ["If you have any defence, set-off or counterclaim against this invoice, tell us in writing within seven days of receiving this notice, quoting the invoice number. If you do not, we will treat the invoice as undisputed. On request we will give you proof of the assignment."] },
@@ -125,7 +126,7 @@ export function keyFacts(d: KeyFactsData) {
   const f = d.financier ?? PLATFORM;
   const country = d.country ?? termsFor(null);
   const net = d.offer.advanceAmount - d.offer.feeAmount;
-  const gst = splitGst(d.offer.feeAmount).gst;
+  const gst = splitTax(d.offer.feeAmount).tax;
   const pct = (bps: number) => `${(bps / 100).toFixed(2)}%`;
   const advPct = d.invoice.amount > 0n ? Number((d.offer.advanceAmount * 10_000n) / d.invoice.amount) : 0;
   return doc("Key Facts", [
@@ -135,16 +136,16 @@ export function keyFacts(d: KeyFactsData) {
     { table: [
       ["Who funds you", f.legalName + (f.platform ? "" : ", serviced by Marichi Labs")],
       ["Your invoice", `${d.invoice.invoiceNumber} to ${d.buyer.legalName}, dated ${d.invoice.invoiceDate}, due ${d.invoice.dueDate}`],
-      ["Invoice amount", formatINR(d.invoice.amount)],
-      ["Advance", `${formatINR(d.offer.advanceAmount)} (${pct(advPct)} of the invoice)`],
-      ["Processing fee, paid upfront", `${formatINR(d.offer.feeAmount)}, of which tax ${formatINR(gst)}`],
-      ["You receive now", formatINR(net)],
+      ["Invoice amount", formatMoney(d.invoice.amount)],
+      ["Advance", `${formatMoney(d.offer.advanceAmount)} (${pct(advPct)} of the invoice)`],
+      ["Processing fee, paid upfront", `${formatMoney(d.offer.feeAmount)}, of which tax ${formatMoney(gst)}`],
+      ["You receive now", formatMoney(net)],
     ] },
     { h: "What it costs" },
     { table: [
       ["Discount rate", `${pct(d.offer.discountBps)} a year on the advance, for each day until the buyer pays. Actual days over 365.`],
-      [`Discount if the buyer pays on the due date (${d.offer.tenorDays} days)`, formatINR(d.offer.expectedDiscount)],
-      ["Total cost if the buyer pays on time", formatINR(d.offer.feeAmount + d.offer.expectedDiscount)],
+      [`Discount if the buyer pays on the due date (${d.offer.tenorDays} days)`, formatMoney(d.offer.expectedDiscount)],
+      ["Total cost if the buyer pays on time", formatMoney(d.offer.feeAmount + d.offer.expectedDiscount)],
       ["All-in annual rate, fee included", `${pct(d.effectiveAprBps)} a year. This is (discount + fee) divided by what you receive now, scaled to a year.`],
       ["Other charges", "None, apart from the penal charge below if the buyer pays late."],
     ] },
@@ -177,7 +178,7 @@ export function confirmationRecord(d: ConfirmationRecordData) {
     { p: [`Recorded ${d.at.toISOString().replace("T", " ").slice(0, 19)} UTC. Wording version ${d.version}. Template ${TEMPLATE_VERSION}.`] },
     { table: [
       ["Invoice", `${d.invoice.invoiceNumber}, dated ${d.invoice.invoiceDate}, due ${d.invoice.dueDate}`],
-      ["Amount", formatINR(d.invoice.amount)],
+      ["Amount", formatMoney(d.invoice.amount)],
       ["From (seller)", d.seller.legalName],
       ["To (buyer)", d.buyer.legalName],
       ["Confirmed by", `${d.email}, ${d.via === "link" ? "verified by a one-time code sent to that address" : "signed in to the buyer's Marichi account"}`],

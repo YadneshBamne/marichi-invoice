@@ -9,7 +9,7 @@ import { ensureKeyFacts } from "../agreements/keyfacts";
 import { CROSS } from "../crossborder/rules";
 import { notifyBusiness } from "../notify";
 import { emitEvent } from "../erp/events";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
 import { OFFER, platformCapital, priceOffer } from "./pricing";
 
 const dayOf = (d: Date | string) => Math.floor(new Date(d).getTime() / 86_400_000);
@@ -83,7 +83,7 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
   if (result.created) {
     await ensureKeyFacts(db, result.offer.id, now).catch((e) => console.error("[keyfacts]", (e as Error).message)); // the seller reads it before accepting
     await notifyBusiness(db, inv.sellerId, "offer_ready", {
-      invoiceNumber: inv.invoiceNumber, advance: formatINR(result.offer.advanceAmount), expires: result.offer.expiresAt.toISOString(),
+      invoiceNumber: inv.invoiceNumber, advance: formatMoney(result.offer.advanceAmount), expires: result.offer.expiresAt.toISOString(),
     }, gw);
     await emitEvent(db, inv.sellerId, "offer.created", {
       invoiceNumber: inv.invoiceNumber, advanceAmountPaise: result.offer.advanceAmount.toString(), feePaise: result.offer.feeAmount.toString(),

@@ -8,7 +8,7 @@ import { resolveDispute } from "@/server/support/disputes";
 import { canWork } from "@/server/support/policy";
 import { KV, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Thread } from "@/components/ui/thread";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatMoney, rupeesToPaise } from "@/lib/money";
 
 const F = z.object({
   ticketId: z.uuid(),
@@ -97,7 +97,7 @@ export default async function AdminTicket({ params }: { params: Promise<{ id: st
           </Panel>
           {invoice && (
             <Panel title="Invoice">
-              <KV rows={[["Number", invoice.invoiceNumber], ["Amount", formatINR(invoice.amount)], ["Due", invoice.dueDate], ["Status", <StatusPill key="i" status={invoice.status} />], ...(invoice.disputeFlag ? [["Dispute", <StatusPill key="d" status="disputed" label="flagged" />] as [string, React.ReactNode]] : [])]} />
+              <KV rows={[["Number", invoice.invoiceNumber], ["Amount", formatMoney(invoice.amount)], ["Due", invoice.dueDate], ["Status", <StatusPill key="i" status={invoice.status} />], ...(invoice.disputeFlag ? [["Dispute", <StatusPill key="d" status="disputed" label="flagged" />] as [string, React.ReactNode]] : [])]} />
             </Panel>
           )}
         </aside>

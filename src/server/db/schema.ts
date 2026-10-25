@@ -575,6 +575,22 @@ export const agreements = pgTable("agreements", {
   uniqueIndex("agr_esign_req").on(t.esignRequestId),
 ]);
 
+// The assignment of one financed invoice, filed at the country's registry (CERSAI in India, the PACRA collateral registry in Zambia).
+// Where the country says priority is decided by filing first, the payout waits for status = filed.
+export const registryFilings = pgTable("registry_filings", {
+  id: id(),
+  offerId: uuid("offer_id").notNull().references(() => financingOffers.id),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  registry: text("registry").notNull(), // short name, as the pack gives it
+  status: text("status").notNull().default("pending"), // pending | filed
+  reference: text("reference"), // the registry's own reference once filed
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  dueBy: date("due_by"), // where the law gives a deadline (India: 30 days from assignment)
+  filedAt: timestamp("filed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("regfile_offer").on(t.offerId)]);
+
 // ---- Module 8 / 9 ----
 export const disbursements = pgTable("disbursements", {
   id: id(),

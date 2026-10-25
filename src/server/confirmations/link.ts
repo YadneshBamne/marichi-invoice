@@ -8,7 +8,7 @@ import { account, auditLog, businesses, buyerSellerRelationships, invoiceConfirm
 import { gateway, type Adapters } from "../integrations/gateway";
 import { appUrl, notifyBusiness, notifyStaff } from "../notify";
 import { render } from "../notify/templates";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
 import type { Decision } from "./service";
 import { acceptanceText, CLARIFY_TEXT, DISPUTE_TEXT } from "./wording";
 import { PLATFORM_TERMS_VERSION } from "../agreements/templates";
@@ -48,7 +48,7 @@ export async function buyerAddresses(db: Database, inv: Pick<Invoice, "buyerId" 
  */
 export async function sendToBuyerSide(db: Database, inv: Invoice, template: "confirmation_requested" | "confirmation_reminder", gw: Adapters = gateway, now = new Date()) {
   const path = `/confirm/${await tokenFor(db, inv.id, now)}`;
-  const data = { invoiceNumber: inv.invoiceNumber, amount: formatINR(inv.amount), link: path };
+  const data = { invoiceNumber: inv.invoiceNumber, amount: formatMoney(inv.amount), link: path };
   const reached = await notifyBusiness(db, inv.buyerId, template, data, gw, now);
   const { contact, users: us } = await buyerAddresses(db, inv);
   let direct = 0;
@@ -82,7 +82,7 @@ export async function viewByToken(db: Database, token: string, now = new Date())
   const [b] = await db.select({ buyer: businesses.legalName, displayBuyer: businesses.displayName }).from(businesses).where(eq(businesses.id, i.buyerId));
   const [s] = await db.select({ seller: businesses.legalName, display: businesses.displayName }).from(businesses).where(eq(businesses.id, i.sellerId));
   const buyer = b.displayBuyer ?? b.buyer, seller = s.display ?? s.seller;
-  const w = { buyer, seller, invoiceNumber: i.invoiceNumber, amount: formatINR(i.amount), dueDate: i.dueDate };
+  const w = { buyer, seller, invoiceNumber: i.invoiceNumber, amount: formatMoney(i.amount), dueDate: i.dueDate };
   return { state: "open", invoice: { number: i.invoiceNumber, amount: w.amount, dueDate: i.dueDate, invoiceDate: i.invoiceDate, seller, buyer }, wording: acceptanceText(w), dispute: DISPUTE_TEXT, clarify: CLARIFY_TEXT };
 }
 

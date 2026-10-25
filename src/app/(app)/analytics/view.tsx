@@ -5,7 +5,7 @@ import { concentration, forecast, REPORTS, vintages, type ReportKind, type Scope
 import { DataTable, PageHead, Panel } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
 import { Bars } from "@/components/ui/charts";
-import { formatCompactINR, formatINR } from "@/lib/money";
+import { formatCompactMoney, formatMoney } from "@/lib/money";
 import { schedule } from "./actions";
 
 const COPY: Record<string, { title: string; sub: string }> = {
@@ -33,15 +33,15 @@ export async function Analytics({ scope, userId, path }: { scope: Scope; userId:
     <>
       <PageHead title={copy.title} sub={copy.sub} />
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat hero label="Next 5 weeks" value={formatINR(next30)} note={fc.columns.join(" and ").toLowerCase()} />
-        <Stat label="Already past due" value={formatINR(overdue)} tone={overdue > 0n ? "bad" : "good"} note={overdue > 0n ? "due before today" : "nothing overdue"} />
-        <Stat label="Open book" value={formatINR(con.total)} note="advanced and not yet repaid" />
+        <Stat hero label="Next 5 weeks" value={formatMoney(next30)} note={fc.columns.join(" and ").toLowerCase()} />
+        <Stat label="Already past due" value={formatMoney(overdue)} tone={overdue > 0n ? "bad" : "good"} note={overdue > 0n ? "due before today" : "nothing overdue"} />
+        <Stat label="Open book" value={formatMoney(con.total)} note="advanced and not yet repaid" />
         <Stat label="Buyer concentration" value={`${con.byBuyer.hhi.toLocaleString("en-IN")}`} note={con.byBuyer.hhi > 2500 ? "highly concentrated" : con.byBuyer.count ? "spread out" : "no open advances"} tone={con.byBuyer.hhi > 2500 ? "warn" : undefined} />
       </div>
 
       <Panel title="Cash-flow forecast" sub="Expected by due date, week by week from today" className="mb-5"
         action={<a className="btn btn-ghost btn-sm" href="/api/analytics/forecast">Download CSV</a>}>
-        <Bars data={fc.weeks.map((w, i) => ({ label: i === 0 ? "This wk" : `+${i}w`, value: Number(weekTotal(w.values) / 100n) }))} format={(n) => formatCompactINR(BigInt(n) * 100n)} />
+        <Bars data={fc.weeks.map((w, i) => ({ label: i === 0 ? "This wk" : `+${i}w`, value: Number(weekTotal(w.values) / 100n) }))} format={(n) => formatCompactMoney(BigInt(n) * 100n)} />
       </Panel>
 
       <div className="mb-5 grid gap-5 xl:grid-cols-2">
@@ -50,7 +50,7 @@ export async function Analytics({ scope, userId, path }: { scope: Scope; userId:
             cols={[
               { h: "Funded in", cell: (v) => v.month },
               { h: "Invoices", align: "right", cell: (v) => v.invoices },
-              { h: "Advanced", align: "right", cell: (v) => formatCompactINR(v.advanced) },
+              { h: "Advanced", align: "right", cell: (v) => formatCompactMoney(v.advanced) },
               { h: "Repaid", align: "right", cell: (v) => `${v.repaidPct}%` },
               { h: "30+ days late", align: "right", cell: (v) => <span className={v.late30Pct > 0 ? "text-r-600" : ""}>{v.late30Pct}%</span> },
               { h: "Lost", align: "right", cell: (v) => `${v.lossPct}%` },
@@ -61,7 +61,7 @@ export async function Analytics({ scope, userId, path }: { scope: Scope; userId:
             cols={[
               { h: "", cell: (x) => <span className="text-xs font-normal text-faint">{x.side}</span> },
               { h: "Name", cell: (x) => x.name },
-              { h: "Exposure", align: "right", cell: (x) => formatCompactINR(x.exposure) },
+              { h: "Exposure", align: "right", cell: (x) => formatCompactMoney(x.exposure) },
               { h: "Share", align: "right", cell: (x) => `${x.share}%` },
             ]} />
         </Panel>

@@ -5,7 +5,7 @@ import { buyerDashboard, sellerDashboard } from "@/server/reports/dashboards";
 import { Card, Empty, PageHead, Stat } from "@/components/ui/cards";
 import { dealFlow, earnings, portfolio, position } from "@/server/marketplace/service";
 import { profileOf } from "@/server/marketplace/financier";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import Link from "next/link";
 import { BuyerDashboardView, SellerDashboardView } from "@/components/dashboards/views";
 
@@ -25,9 +25,9 @@ export default async function Dashboard() {
       <>
         <PageHead title={`Hello, ${first}`} sub={`${company ? company + " · " : ""}Your funds, your deals and what they have earned.`} />
         <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-tour="kpis">
-          <Stat hero label="Available to bid" value={formatINR(pos.available)} note={`${formatINR(pos.funds)} in escrow`} href="/financier/statement" />
-          <Stat label="Deployed" value={formatINR(pos.deployed)} note={`${book.filter((r) => r.outstandingPrincipal > 0n).length} invoices outstanding`} href="/financier/portfolio" />
-          <Stat label="Earned" value={formatINR(earn.earned)} note="beyond principal" tone="good" />
+          <Stat hero label="Available to bid" value={formatMoney(pos.available)} note={`${formatMoney(pos.funds)} in escrow`} href="/financier/statement" />
+          <Stat label="Deployed" value={formatMoney(pos.deployed)} note={`${book.filter((r) => r.outstandingPrincipal > 0n).length} invoices outstanding`} href="/financier/portfolio" />
+          <Stat label="Earned" value={formatMoney(earn.earned)} note="beyond principal" tone="good" />
           <Stat label="Open deals" value={String(deals.length)} note={late ? `${late} of yours past due` : "waiting for a bid"} tone={late ? "bad" : undefined} href="/financier/deals" />
         </div>
         {prof?.status !== "approved" ? (

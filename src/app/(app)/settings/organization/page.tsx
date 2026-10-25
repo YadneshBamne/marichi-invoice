@@ -8,8 +8,9 @@ import { setCompanyLogo, updateCompany } from "@/server/company/service";
 import { can } from "@/server/permissions";
 import { Card, Empty, Pill, type Tone } from "@/components/ui/cards";
 import { CompanyMark } from "@/components/shell/sidebar";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { ROLE_META } from "@/components/shell/nav";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Company" };
 const TONE: Record<string, Tone> = { approved: "good", under_review: "warn", submitted: "warn", rejected: "bad", info_requested: "warn" };
@@ -33,9 +34,9 @@ export default async function Organization() {
   const edit = can(u, "company.edit");
   const name = b.displayName ?? b.legalName;
   const rows: [string, React.ReactNode][] = [
-    ["Legal name", b.legalName], ["Entity type", b.entityType.replaceAll("_", " ")], ["GSTIN", b.gstin ?? "Not provided"], ["PAN", mask(b.pan)], ["CIN", b.cin ?? "Not provided"],
+    ["Legal name", b.legalName], ["Entity type", b.entityType.replaceAll("_", " ")], [market().ids.taxReg.label, b.gstin ?? "Not provided"], [market().ids.kyb.label, mask(b.pan)], ...(market().ids.companyReg ? [[market().ids.companyReg!.label, b.cin ?? "Not provided"] as [string, string]] : []),
     ["Verification", <Pill key="k" tone={TONE[b.kybStatus] ?? "neutral"}>{b.kybStatus.replaceAll("_", " ")}</Pill>],
-    ...(u.role === "seller" ? [["Credit limit", b.creditLimit > 0n ? formatINR(b.creditLimit) : "Default policy limit"] as [string, React.ReactNode]] : []),
+    ...(u.role === "seller" ? [["Credit limit", b.creditLimit > 0n ? formatMoney(b.creditLimit) : "Default policy limit"] as [string, React.ReactNode]] : []),
   ];
   return (
     <div className="space-y-5">

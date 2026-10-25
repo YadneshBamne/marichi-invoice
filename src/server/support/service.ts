@@ -3,7 +3,7 @@ import type { Database, Tx } from "../db/client";
 import { auditLog, businesses, invoiceDisputes, invoices, ticketMessages, tickets } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { notifyBusiness, notifyStaff } from "../notify";
-import { grievanceOfficer, OMBUDSMAN } from "../../lib/grievance";
+import { grievanceOfficer, ombudsman } from "../../lib/grievance";
 import { canWork, LEVEL_ROLES, MAX_LEVEL, slaDates, STAFF_ROLES, ticketNo, type Kind } from "./policy";
 
 export type Actor = { id: string; role: string; businessId: string | null; email?: string };
@@ -217,7 +217,7 @@ export async function escalateToOmbudsman(db: Database, ticketId: string, actor:
     await tx.update(tickets).set({ ombudsmanEscalatedAt: now, updatedAt: now }).where(eq(tickets.id, t.id));
     await tx.insert(ticketMessages).values({
       ticketId: t.id, authorId: null, authorRole: "system", createdAt: now,
-      body: `You may file this with the ${OMBUDSMAN.name} (${OMBUDSMAN.url}) ${OMBUDSMAN.when}. Our compliance team has been informed and will provide our response.`,
+      body: `You may file this with the ${ombudsman().name} (${ombudsman().url}) ${ombudsman().when}. Our compliance team has been informed and will provide our response.`,
     });
     await tx.insert(auditLog).values({ actorId: actor.id, action: "ticket.ombudsman", entity: "ticket", entityId: t.id });
   });

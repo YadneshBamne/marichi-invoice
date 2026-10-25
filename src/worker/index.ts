@@ -18,6 +18,7 @@ import { runCollectionsSweep, runSurplusPayouts } from "../server/collections/se
 import { presentDebits, sendPreDebitNotices } from "../server/collections/nach";
 import { runDisbursements } from "../server/disbursements/service";
 import { prepareAllAccepted } from "../server/agreements/service";
+import { runRegistryFilings } from "../server/registry/service";
 import { expireOffers, generateOffers } from "../server/offers/service";
 import { underwriteEligible } from "../server/underwriting/service";
 import { dispatchValidated, runConfirmationSla } from "../server/confirmations/service";
@@ -33,6 +34,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "offers.generate": { cron: "*/5 * * * *", run: async () => { await generateOffers(db); } },            // Module 6 (lite)
   "offers.expire": { cron: "*/10 * * * *", run: async () => { await expireOffers(db); } },
   "agreements.prepare": { cron: "*/5 * * * *", run: async () => { await prepareAllAccepted(db); } },    // Module 7
+  "registry.file": { cron: "*/5 * * * *", run: async () => { await runRegistryFilings(db); } },        // file assignments at the registry (CERSAI, PACRA); payouts wait where the country requires it
   "disbursements.run": { cron: "*/2 * * * *", run: async () => { await runDisbursements(db); } },       // Module 8
   "invoice.sla-escalation": { cron: "*/15 * * * *", run: async () => { await runConfirmationSla(db); } },   // Module 4 (24h/48h/72h)
   "collections.sweep": { cron: "0 9 * * *", run: async () => { await runCollectionsSweep(db); } },        // Module 9: accrual, reminders, recourse

@@ -1,3 +1,4 @@
+import { market } from "../../lib/countries";
 // Rules-based underwriting policy (Module 5, Phase 1). Pure: no DB, no I/O, so every rule is testable.
 // All numbers are illustrative defaults; they move to admin-console config (Module 15) later.
 export type Grade = "A" | "B" | "C" | "D" | "E";
@@ -84,7 +85,7 @@ export function decide(i: Inputs): Outcome {
   let advanceRateBps = m.advanceBps;
   if (i.irnStatus !== "verified") {
     advanceRateBps -= POLICY.noIrnAdvanceCutBps;
-    reasons.push({ code: "NO_IRN_COMPENSATING", text: `No verified e-invoice IRN: advance reduced by ${POLICY.noIrnAdvanceCutBps / 100} points` });
+    reasons.push({ code: "NO_IRN_COMPENSATING", text: `No verified e-invoice (${market().eInvoice.short}): advance reduced by ${POLICY.noIrnAdvanceCutBps / 100} points` });
   }
 
   // 4. Auto-approve only inside the grade's ticket threshold; the rest goes to a credit analyst.

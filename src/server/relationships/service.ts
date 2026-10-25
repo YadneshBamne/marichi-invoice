@@ -3,10 +3,10 @@ import type { Database } from "../db/client";
 import { isBlacklisted, KYB_AML_RULE, openCase } from "../fraud/service";
 import { auditLog, businesses, buyerInvites, buyerSellerRelationships, memberships, users } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
+import { checkId, market } from "../../lib/countries";
 
-/** How an invitation names an overseas buyer, which has no GSTIN. */
+/** How an invitation names an overseas buyer, which has no tax registration number here. */
 export const foreignKey = (country: string, taxId: string) => `FOREIGN:${country.toUpperCase()}:${taxId.trim().toUpperCase()}`;
-const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/;
 
 async function statusOf(db: Database, id: string) {
   const [b] = await db.select({ s: businesses.kybStatus }).from(businesses).where(eq(businesses.id, id));
@@ -28,7 +28,7 @@ async function assertContactIsNotSeller(db: Database, sellerId: string, email: s
 }
 
 /**
- * Seller names a buyer by GSTIN and gives the email of the person there who confirms invoices.
+ * Seller names a buyer by its tax registration number (GSTIN, TPIN) and gives the email of the person there who confirms invoices.
  *  - A buyer we already verified: linked now.
  *  - A buyer we have never seen: we create it as a pending buyer (sanctions-screened), and link it now. It is verified when its
  *    contact confirms the first invoice from the emailed link. Nobody has to sign up first.
@@ -39,8 +39,7 @@ export async function linkBuyer(
   p: { sellerId: string; buyerGstin: string; buyerEmail: string; buyerName?: string; creditTermsDays?: number; maxExposure?: bigint },
   gw: Adapters = gateway,
 ) {
-  const gstin = p.buyerGstin.trim().toUpperCase();
-  if (!GSTIN.test(gstin)) throw new Error("invalid GSTIN");
+  const gstin = checkId(market().ids.taxReg, p.buyerGstin)!;
   if ((await statusOf(db, p.sellerId)) !== "approved") throw new Error("seller KYB not approved");
   const email = p.buyerEmail.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("enter the buyer's email address");

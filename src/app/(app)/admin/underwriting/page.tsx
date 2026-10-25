@@ -7,7 +7,7 @@ import { generateOffer } from "@/server/offers/service";
 import { requireUser } from "@/server/rbac";
 import { pendingReviews, reviewUnderwriting } from "@/server/underwriting/service";
 import { EmptyState, KV, PageHead, ReviewCard } from "@/components/ui/page";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 
 export const metadata = { title: "Underwriting" };
 
@@ -38,7 +38,7 @@ export default async function UnderwritingQueue() {
           {rows.map(({ d, inv }) => (
             <ReviewCard key={d.id} title={`Invoice ${inv.invoiceNumber}`}
               meta={<><span className={`pill ${GRADE[d.riskGrade] ?? "bg-panel text-muted"}`}>Grade {d.riskGrade}</span><span>PD {(Number(d.pd) * 100).toFixed(1)}%</span></>}
-              aside={<p className="text-lg font-semibold">{formatINR(inv.amount)}</p>}
+              aside={<p className="text-lg font-semibold">{formatMoney(inv.amount)}</p>}
               actions={
                 <form action={decide} className="flex flex-wrap items-center gap-2">
                   <input type="hidden" name="decisionId" value={d.id} />

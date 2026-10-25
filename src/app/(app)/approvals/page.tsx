@@ -4,7 +4,7 @@ import { requireUser } from "@/server/rbac";
 import { can } from "@/server/permissions";
 import { cancel, decide, listRequests } from "@/server/approvals/service";
 import { DataTable, EmptyState, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { attempt } from "../financier/attempt";
 
 export const metadata = { title: "Approvals" };
@@ -49,7 +49,7 @@ export default async function Approvals({ searchParams }: { searchParams: Promis
             <DataTable rows={toDecide} rowKey={(x) => x.r.id}
               cols={[
                 { h: "Request", cell: (x) => <>{x.r.summary}<span className="block text-xs font-normal text-muted">{KIND[x.r.kind] ?? x.r.kind} · asked by {x.by}</span></> },
-                { h: "Amount", align: "right", cell: (x) => (x.r.amount > 0n ? formatINR(x.r.amount) : <span className="text-faint">-</span>) },
+                { h: "Amount", align: "right", cell: (x) => (x.r.amount > 0n ? formatMoney(x.r.amount) : <span className="text-faint">-</span>) },
                 { h: "Time", cell: (x) => <span className="font-normal text-muted">{left(x.r.expiresAt)}</span> },
                 { h: "", align: "right", cell: (x) => (
                   <form action={act} className="flex flex-wrap items-center justify-end gap-2">
@@ -68,7 +68,7 @@ export default async function Approvals({ searchParams }: { searchParams: Promis
         <DataTable rows={mine} rowKey={(x) => x.r.id} empty="You have not asked for anything to be approved."
           cols={[
             { h: "Request", cell: (x) => <>{x.r.summary}<span className="block text-xs font-normal text-muted">{KIND[x.r.kind] ?? x.r.kind}</span></> },
-            { h: "Amount", align: "right", cell: (x) => (x.r.amount > 0n ? formatINR(x.r.amount) : <span className="text-faint">-</span>) },
+            { h: "Amount", align: "right", cell: (x) => (x.r.amount > 0n ? formatMoney(x.r.amount) : <span className="text-faint">-</span>) },
             { h: "Status", cell: (x) => <>
               <StatusPill status={x.r.status === "approved" ? "approved" : x.r.status === "pending" ? "pending" : "rejected"} label={x.r.status} />
               {x.r.note && <span className="block text-xs font-normal text-muted">{x.r.note}</span>}</> },
@@ -83,7 +83,7 @@ export default async function Approvals({ searchParams }: { searchParams: Promis
           <DataTable rows={history} rowKey={(x) => x.r.id}
             cols={[
               { h: "Request", cell: (x) => <>{x.r.summary}<span className="block text-xs font-normal text-muted">asked by {x.by}</span></> },
-              { h: "Amount", align: "right", cell: (x) => (x.r.amount > 0n ? formatINR(x.r.amount) : "-") },
+              { h: "Amount", align: "right", cell: (x) => (x.r.amount > 0n ? formatMoney(x.r.amount) : "-") },
               { h: "Outcome", cell: (x) => <StatusPill status={x.r.status === "approved" ? "approved" : "rejected"} label={x.r.status} /> },
               { h: "Decided", cell: (x) => <span className="font-normal text-muted">{x.r.decidedAt?.toLocaleDateString("en-IN") ?? "-"}</span> },
             ]} />

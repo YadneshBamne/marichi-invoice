@@ -4,10 +4,10 @@ import { notFound } from "next/navigation";
 import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
-import { INSTITUTIONS, listLimits, mandateOf, profileOf, reviewApplication, type Review } from "@/server/marketplace/financier";
+import { institutionLabel, listLimits, mandateOf, profileOf, reviewApplication, type Review } from "@/server/marketplace/financier";
 import { position } from "@/server/marketplace/service";
 import { KV, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
-import { formatINR } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { attempt } from "../../../financier/attempt";
 
 export const metadata = { title: "Financier review" };
@@ -41,7 +41,7 @@ export default async function Review({ params, searchParams }: { params: Promise
             <Panel title="Application" action={<StatusPill status={p.status === "approved" ? "approved" : p.status === "submitted" ? "pending" : "rejected"} label={p.status.replaceAll("_", " ")} />}>
               <KV rows={[
                 ["Company verification (KYB)", <StatusPill key="k" status={b.kybStatus === "approved" ? "approved" : "pending"} label={b.kybStatus.replaceAll("_", " ")} />],
-                ["Institution", INSTITUTIONS[p.institutionType as keyof typeof INSTITUTIONS] ?? p.institutionType],
+                ["Institution", institutionLabel(p.institutionType)],
                 ["Licensed in", p.countries.join(", ")],
                 ["Regulator", p.regulator],
                 ["Licence", `${p.licenceType}, ${p.licenceNumber}`],
@@ -53,7 +53,7 @@ export default async function Review({ params, searchParams }: { params: Promise
               ]} />
             </Panel>
             {m && <Panel title="Mandate"><KV rows={[
-              ["Status", m.status], ["Worst grade", m.minGrade], ["Ticket", `${formatINR(m.minTicket)} to ${m.maxTicket != null ? formatINR(m.maxTicket) : "no cap"}`],
+              ["Status", m.status], ["Worst grade", m.minGrade], ["Ticket", `${formatMoney(m.minTicket)} to ${m.maxTicket != null ? formatMoney(m.maxTicket) : "no cap"}`],
               ["Tenor", `${m.minTenorDays} to ${m.maxTenorDays} days`], ["Automatic bids", m.autoBid ? `on, ${(m.autoDiscountBps ?? 0) / 100}% a year` : "off"],
             ]} /></Panel>}
           </div>
@@ -71,7 +71,7 @@ export default async function Review({ params, searchParams }: { params: Promise
                 <p className="text-xs text-muted">Approval creates a default mandate (grade C or better, no caps, no automatic bidding) for the financier to adjust. Suspending stops new bids, payouts on accepted bids, and funding.</p>
               </form>
             </Panel>
-            <Panel title="Funds and limits"><KV rows={[["In escrow", formatINR(pos.funds)], ["Promised to deals", formatINR(pos.reserved)], ["Deployed", formatINR(pos.deployed)], ["Buyer limits set", String(limits.length)]]} /></Panel>
+            <Panel title="Funds and limits"><KV rows={[["In escrow", formatMoney(pos.funds)], ["Promised to deals", formatMoney(pos.reserved)], ["Deployed", formatMoney(pos.deployed)], ["Buyer limits set", String(limits.length)]]} /></Panel>
           </div>
         </div>
       )}

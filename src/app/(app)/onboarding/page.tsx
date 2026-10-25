@@ -12,15 +12,17 @@ import { submitKyb, submitLightKyb } from "@/server/kyb/service";
 import { submitForeignKyb } from "@/server/crossborder/service";
 import { Card, PageHead } from "@/components/ui/cards";
 import { Icon } from "@/components/ui/icons";
+import { market } from "@/lib/countries";
 
+// The identifiers are checked against the country pack inside the service, so this only shapes the form data.
 const Form = z.object({
-  pan: z.string().regex(/^[A-Z]{5}\d{4}[A-Z]$/, "Invalid PAN format"),
-  gstin: z.string().regex(/^\d{2}[A-Za-z]{5}\d{4}[A-Za-z][A-Za-z\d]Z[A-Za-z\d]$/, "Invalid GSTIN"),
+  pan: z.string(),
+  gstin: z.string().optional(),
   cin: z.string().optional(),
   uboName: z.string().min(2),
   uboDin: z.string().optional(),
-  accountNumber: z.string().min(9),
-  ifsc: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC"),
+  accountNumber: z.string(),
+  ifsc: z.string(),
   holderName: z.string().min(2),
 });
 
@@ -43,7 +45,7 @@ async function submit(fd: FormData) {
   await submitKyb(db, {
     businessId: user.businessId,
     pan: f.pan,
-    gstin: f.gstin,
+    gstin: f.gstin || undefined,
     cin: f.cin || undefined,
     // ponytail: single UBO at 100% in the form; multi-director entry when needed (PRD edge case).
     ubos: [{ name: f.uboName, din: f.uboDin || undefined, shareholdingBps: 10000 }],
@@ -55,12 +57,9 @@ async function submit(fd: FormData) {
 async function submitLight(fd: FormData) {
   "use server";
   const user = await requireUser(["buyer"]);
-  const f = z.object({
-    gstin: z.string().regex(/^\d{2}[A-Za-z]{5}\d{4}[A-Za-z][A-Za-z\d]Z[A-Za-z\d]$/, "Invalid GSTIN"),
-    pan: Form.shape.pan,
-  }).parse(Object.fromEntries(fd));
+  const f = z.object({ gstin: z.string().optional(), pan: z.string() }).parse(Object.fromEntries(fd));
   await captureConsent(fd, user);
-  await submitLightKyb(db, { businessId: user.businessId!, ...f });
+  await submitLightKyb(db, { businessId: user.businessId!, pan: f.pan, gstin: f.gstin ?? "" });
   revalidatePath("/onboarding");
 }
 
@@ -84,6 +83,9 @@ export default async function Onboarding() {
   const canSubmit = ["draft", "info_requested", "rejected"].includes(biz.kybStatus);
   const stage = stageOf(biz.kybStatus);
   const buyer = user.role === "buyer";
+  const { ids } = market();
+  const oneId = ids.kyb.label === ids.taxReg.label; // in Zambia a single number does both jobs
+  const hint = (s: string) => <span className="mt-1 block text-xs font-normal text-muted">{s}</span>;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -117,13 +119,13 @@ export default async function Onboarding() {
       {canSubmit && buyer && (
         <Card title="Your company">
           <form action={submitLight} className="space-y-4 text-sm">
-            <label className="block font-medium">GSTIN<input name="gstin" required className={input} /></label>
-            <label className="block font-medium">Business PAN<input name="pan" required className={input} /></label>
+            {!oneId && <label className="block font-medium">{ids.taxReg.label}<input name="gstin" required className={input} />{hint(ids.taxReg.hint)}</label>}
+            <label className="block font-medium">{oneId ? ids.kyb.label : `Business ${ids.kyb.label}`}<input name="pan" required className={input} />{hint(ids.kyb.hint)}</label>
             <label className="flex items-start gap-3 text-[13.5px] text-muted"><input name="consent" type="checkbox" required className="mt-0.5" />{CONSENT_TEXT}</label>
             <button className="btn btn-primary">Verify</button>
           </form>
           <details className="mt-5 border-t border-hair pt-4 text-sm">
-            <summary className="cursor-pointer font-semibold text-p-700">Is your company based outside India?</summary>
+            <summary className="cursor-pointer font-semibold text-p-700">Is your company based outside {market().name}?</summary>
             <form action={submitForeign} className="mt-3 space-y-4">
               <label className="block font-medium">Country (two-letter code, for example US, GB, AE)<input name="country" required maxLength={2} className={`${input} uppercase`} /></label>
               <label className="block font-medium">Tax or company registration number<input name="taxId" required className={input} /></label>
@@ -137,21 +139,21 @@ export default async function Onboarding() {
         <form action={submit} className="space-y-4 text-sm">
           <Card title="Business identity">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block font-medium">Business PAN<input name="pan" required className={input} placeholder="ABCDE1234F" /></label>
-              <label className="block font-medium">GSTIN<input name="gstin" required className={input} /></label>
-              <label className="block font-medium sm:col-span-2">CIN <span className="font-normal text-faint">(if applicable)</span><input name="cin" className={input} /></label>
+              <label className="block font-medium">{oneId ? ids.kyb.label : `Business ${ids.kyb.label}`}<input name="pan" required className={input} />{hint(ids.kyb.hint)}</label>
+              {!oneId && <label className="block font-medium">{ids.taxReg.label}<input name="gstin" required className={input} />{hint(ids.taxReg.hint)}</label>}
+              {ids.companyReg && <label className="block font-medium sm:col-span-2">{ids.companyReg.label} <span className="font-normal text-faint">(if applicable)</span><input name="cin" className={input} />{hint(ids.companyReg.hint)}</label>}
             </div>
           </Card>
           <Card title="Director or beneficial owner">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block font-medium">Full name<input name="uboName" required className={input} /></label>
-              <label className="block font-medium">DIN <span className="font-normal text-faint">(optional)</span><input name="uboDin" className={input} /></label>
+              <label className="block font-medium">{ids.director} <span className="font-normal text-faint">(optional)</span><input name="uboDin" className={input} /></label>
             </div>
           </Card>
           <Card title="Settlement bank account">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block font-medium">Account number<input name="accountNumber" required className={input} /></label>
-              <label className="block font-medium">IFSC<input name="ifsc" required className={input} placeholder="HDFC0001234" /></label>
+              <label className="block font-medium">{ids.bankAccount.label}<input name="accountNumber" required className={input} />{hint(ids.bankAccount.hint)}</label>
+              <label className="block font-medium">{ids.bankCode.label}<input name="ifsc" required className={input} />{hint(ids.bankCode.hint)}</label>
               <label className="block font-medium sm:col-span-2">Account holder name<input name="holderName" required className={input} /></label>
             </div>
             <p className="mt-3 text-xs text-muted">Advances are paid to this account. The holder name must match your business name.</p>

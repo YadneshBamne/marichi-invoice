@@ -6,12 +6,14 @@ import { auditLog, businesses, financierBuyerLimits, financierMandates, financie
 import { gateway, type Adapters } from "../integrations/gateway";
 import { notifyBusiness, notifyStaff } from "../notify";
 import { assertCan } from "../permissions";
-import { formatINR } from "../../lib/money";
+import { formatMoney } from "../../lib/money";
+import { market, PACKS } from "../../lib/countries";
 import { createHash } from "node:crypto";
 import { docText, financierTerms, FINANCIER_TERMS_VERSION } from "../agreements/templates";
 
-export const INSTITUTIONS = { bank: "Bank", nbfc_factor: "NBFC-Factor or factoring company", nbfc: "NBFC or lender", mfi: "Microfinance institution", fund: "Fund", other: "Other licensed institution" } as const;
-export type Institution = keyof typeof INSTITUTIONS;
+/** The kinds of lender this market licenses, and a label for any stored kind. */
+export const institutions = () => market().institutions;
+export const institutionLabel = (k: string) => market().institutions[k] ?? Object.values(PACKS).map((x) => x.institutions[k]).find(Boolean) ?? k;
 export const GRADES = ["A", "B", "C", "D", "E"] as const;
 const STAFF = ["ops", "compliance", "admin"];
 const LIVE = ["eligible", "financed", "due", "overdue"] as const; // invoice states in which money is still out or committed
@@ -38,8 +40,9 @@ export async function saveApplication(db: Database, actor: Actor, a: Application
   const cur = await profileOf(db, businessId);
   if (cur && !["draft", "info_requested", "rejected"].includes(cur.status)) throw new Error(`your application is ${cur.status.replace("_", " ")} and cannot be edited`);
   const countries = [...new Set(a.countries.map((c) => c.trim().toUpperCase()).filter(Boolean))];
-  if (!(a.institutionType in INSTITUTIONS)) throw new Error("choose the kind of institution you are");
+  if (!(a.institutionType in market().institutions)) throw new Error("choose the kind of institution you are");
   if (countries.length === 0 || countries.some((c) => !COUNTRY.test(c))) throw new Error("list the countries you are licensed in, as two-letter codes such as IN or ZM");
+  if (submit && !countries.includes(market().code)) throw new Error(`your licence must cover ${market().name}, where this platform operates`);
   for (const [v, m] of [[a.regulator, "the regulator"], [a.licenceType, "the licence type"], [a.licenceNumber, "the licence number"]] as const) if (v.trim().length < 2) throw new Error(`enter ${m}`);
   if (a.licenceValidUntil && !/^\d{4}-\d{2}-\d{2}$/.test(a.licenceValidUntil)) throw new Error("licence expiry must be a date");
   if (submit && a.licenceValidUntil && a.licenceValidUntil < today(now)) throw new Error("that licence has expired");
@@ -97,7 +100,7 @@ export async function reviewApplication(db: Database, staff: { id: string; role:
  * Can this financier fund an invoice raised by a seller in `country` right now? Approved by staff, licence not lapsed, licensed in that country.
  * Called when it bids, when a bid is accepted and when the payout is made, so a licence that lapses stops new money straight away.
  */
-export async function assertActiveFinancier(db: Database | Tx, businessId: string, country: string | null = "IN", now = new Date()) {
+export async function assertActiveFinancier(db: Database | Tx, businessId: string, country: string | null = market().code, now = new Date()) {
   const p = await profileOf(db, businessId);
   if (!p) throw new Error("complete your financier application first");
   if (p.status !== "approved") throw new Error(p.status === "suspended" ? "your financier access is suspended" : "your financier application has not been approved yet");
@@ -172,8 +175,8 @@ export async function assertWithinMandate(tx: Tx, financierId: string, deal: { b
   const m = await mandateOf(tx, financierId);
   if (!m) throw new Error("set up your mandate first");
   if (m.status !== "active") throw new Error("your mandate is paused");
-  if (deal.advance < m.minTicket) throw new Error(`this is below your smallest ticket (${formatINR(m.minTicket)})`);
-  if (m.maxTicket !== null && deal.advance > m.maxTicket) throw new Error(`this is above your largest ticket (${formatINR(m.maxTicket)})`);
+  if (deal.advance < m.minTicket) throw new Error(`this is below your smallest ticket (${formatMoney(m.minTicket)})`);
+  if (m.maxTicket !== null && deal.advance > m.maxTicket) throw new Error(`this is above your largest ticket (${formatMoney(m.maxTicket)})`);
   if (deal.tenorDays < m.minTenorDays || deal.tenorDays > m.maxTenorDays) throw new Error(`the tenor (${deal.tenorDays} days) is outside your mandate (${m.minTenorDays} to ${m.maxTenorDays} days)`);
   if (GRADES.indexOf(deal.grade as never) > GRADES.indexOf(m.minGrade as never)) throw new Error(`this invoice is grade ${deal.grade}; your mandate stops at ${m.minGrade}`);
   if (m.sectors.length > 0 && !(deal.industry && m.sectors.includes(deal.industry))) throw new Error("the seller's industry is outside your mandate");

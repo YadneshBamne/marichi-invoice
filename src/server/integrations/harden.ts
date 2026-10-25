@@ -18,7 +18,7 @@ export const DEFAULTS: Opts = {
   timeouts: { "ocr.extractInvoice": 90_000 }, // reading a document takes a while
   noRetry: ["notify.send", "ocr.extractInvoice"], // a repeat costs money; the user can simply press the button again
   // (notify.send is retried by the outbox itself) // the notification outbox retries with its own schedule; a blind repeat could double-send an SMS
-  cache: ["kyc.verifyPan", "bureau.pull"],
+  cache: ["kyc.verifyTaxId", "bureau.pull"],
   now: Date.now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: (l) => console.log(l),
 };
 
