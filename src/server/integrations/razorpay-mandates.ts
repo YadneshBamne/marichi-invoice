@@ -84,10 +84,9 @@ export function razorpayMandates(cfg: RazorpayMandateConfig): MandatePort {
   return {
     async register(p) {
       const rc = receipt(p.idempotencyKey);
-      // Idempotent retry: if a link with this receipt exists, return it instead of making a second one.
-      // UNVERIFIED: GET /invoices?receipt= is the "fetch multiple invoices" call; its page could not be read.
-      const seen = await call(cfg, "GET", `/invoices?receipt=${rc}`).catch(() => undefined);
-      let link: Json = seen?.ok ? (seen.json.items ?? []).find((i: Json) => i.receipt === rc) : undefined;
+      // Razorpay cannot list registration links (GET /invoices returns none of them), so a repeat cannot be recognised: the gateway
+      // therefore never retries this call by itself (harden.ts), and an unused extra link left by a lost reply is harmless.
+      let link: Json | undefined;
       if (!link) {
         const extra = p as { email?: string; phone?: string };
         const r = await call(cfg, "POST", "/subscription_registration/auth_links", {

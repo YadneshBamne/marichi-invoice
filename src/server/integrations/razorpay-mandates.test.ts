@@ -21,11 +21,11 @@ const timeout = new DOMException("timed out", "TimeoutError");
 
 describe("register", () => {
   it("creates an e-mandate authorisation link and comes back pending", async () => {
-    const f = stub(reply(200, { items: [] }), reply(200, { id: "inv_1", customer_id: "cust_1", status: "issued", short_url: "https://rzp.io/i/x" }));
+    const f = stub(reply(200, { id: "inv_1", customer_id: "cust_1", status: "issued", short_url: "https://rzp.io/i/x" }));
     const r = await razorpayMandates({ ...base, fetch: f }).register(reg);
     expect(r).toEqual({ mandateRef: "cust_1:inv_1", status: "pending" });
-    expect(call(f, 0).url).toMatch(/^https:\/\/api\.razorpay\.com\/v1\/invoices\?receipt=MV[0-9a-f]{30}$/);
-    const c = call(f, 1);
+    expect(f).toHaveBeenCalledTimes(1); // no lookup first: Razorpay cannot list registration links
+    const c = call(f, 0);
     expect(c.url).toBe("https://api.razorpay.com/v1/subscription_registration/auth_links");
     expect(c.init.method).toBe("POST");
     expect(c.headers.authorization).toBe(auth);
@@ -34,22 +34,14 @@ describe("register", () => {
       customer: { name: "Acme Pvt Ltd" },
       subscription_registration: { method: "emandate", auth_type: "netbanking", max_amount: 5_000_000, bank_account: { beneficiary_name: "Acme Pvt Ltd", account_number: "1121431121541121", ifsc_code: "HDFC0000001" } },
     });
-    expect(c.body.receipt).toBe(call(f, 0).url.split("=")[1]);
-  });
-  it("returns the existing link on a retry instead of making a second", async () => {
-    const f1 = stub(reply(200, { items: [] }), reply(200, { id: "inv_1", customer_id: "cust_1", status: "issued" }));
-    await razorpayMandates({ ...base, fetch: f1 }).register(reg);
-    const receipt = call(f1, 1).body.receipt;
-    const f = stub(reply(200, { items: [{ id: "inv_1", customer_id: "cust_1", receipt, status: "issued" }] }));
-    expect(await razorpayMandates({ ...base, fetch: f }).register(reg)).toEqual({ mandateRef: "cust_1:inv_1", status: "pending" });
-    expect(f).toHaveBeenCalledTimes(1);
+    expect(c.body.receipt).toMatch(/^MV[0-9a-f]{30}$/);
   });
   it("reports refused details as rejected, but outages and timeouts throw", async () => {
-    const bad = await razorpayMandates({ ...base, fetch: stub(reply(200, { items: [] }), reply(400, { error: { code: "BAD_REQUEST_ERROR", description: "ifsc_code is invalid" } })) }).register(reg);
+    const bad = await razorpayMandates({ ...base, fetch: stub(reply(400, { error: { code: "BAD_REQUEST_ERROR", description: "ifsc_code is invalid" } })) }).register(reg);
     expect(bad).toMatchObject({ status: "rejected", reason: "ifsc_code is invalid" });
-    await expect(razorpayMandates({ ...base, fetch: stub(reply(200, { items: [] }), reply(401, { error: { code: "BAD_REQUEST_ERROR", description: "Authentication failed" } })) }).register(reg)).rejects.toThrow(/401/);
-    await expect(razorpayMandates({ ...base, fetch: stub(reply(200, { items: [] }), reply(502, {})) }).register(reg)).rejects.toThrow(/502/);
-    await expect(razorpayMandates({ ...base, fetch: stub(reply(200, { items: [] }), timeout) }).register(reg)).rejects.toThrow(/timed out/);
+    await expect(razorpayMandates({ ...base, fetch: stub(reply(401, { error: { code: "BAD_REQUEST_ERROR", description: "Authentication failed" } })) }).register(reg)).rejects.toThrow(/401/);
+    await expect(razorpayMandates({ ...base, fetch: stub(reply(502, {})) }).register(reg)).rejects.toThrow(/502/);
+    await expect(razorpayMandates({ ...base, fetch: stub(timeout) }).register(reg)).rejects.toThrow(/timed out/);
   });
   it("gives back the link the buyer opens", async () => {
     const f = stub(reply(200, { id: "inv_1", short_url: "https://rzp.io/i/x" }));

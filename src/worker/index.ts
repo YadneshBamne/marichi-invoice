@@ -28,6 +28,8 @@ import { underwriteEligible } from "../server/underwriting/service";
 import { dispatchValidated, runConfirmationSla } from "../server/confirmations/service";
 import { runRetention } from "../server/privacy/service";
 import { refreshSanctionLists } from "../server/aml/service";
+import { reconcilePendingMandates } from "../server/collections/nach";
+import { mandateStatus, razorpayConfigFromEnv } from "../server/integrations/razorpay-mandates";
 
 const boss = new PgBoss((process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL)!); // job queue wants a direct, session-capable connection
 boss.on("error", (e) => console.error("[boss]", e));
@@ -63,6 +65,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "limits.rescore": { cron: "0 5 * * *", run: async () => { await rescoreLimits(db); } },          // PRD Module 5: periodic review of seller credit limits
   "kyb.rekyc": { cron: "0 4 * * *", run: async () => { await runRekyc(db); } },               // PRD Module 1: periodic re-verification
   "aml.lists": { cron: "0 1 * * *", run: async () => { for (const r of await refreshSanctionLists(db)) if (!r.ok) console.error("[aml.lists]", r.list, r.error); } }, // reload the public sanctions lists before the nightly re-screen
+  "mandates.reconcile": { cron: "*/10 * * * *", run: async () => { const cfg = razorpayConfigFromEnv(); if (cfg) await reconcilePendingMandates(db, (ref) => mandateStatus(cfg, ref)); } }, // ask Razorpay whether waiting auto-pay mandates were authorised (its webhook may not offer these events)
   "retention.sweep": { cron: "30 3 * * *", run: async () => { await runRetention(db); } },        // delete what the retention policy says has outlived its purpose
   "licences.expiry": { cron: "30 4 * * *", run: async () => { await remindLicences(db); await remindDocuments(db); } },  // financier licence and company document expiry notices
 };

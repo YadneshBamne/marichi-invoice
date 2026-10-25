@@ -63,7 +63,7 @@ describe("importing from a connected system", () => {
 
   it("a check changes nothing, and unusable rows are explained", async () => {
     await save(fake([]));
-    const r = await syncConnection(w.db, w.sellerId, "zoho", { dryRun: true, accounting: fake([row("Z-1"), row("Z-2", { buyerTaxId: null })]) });
+    const r = await syncConnection(w.db, w.sellerId, "zoho", { dryRun: true, accounting: fake([row("Z-1"), row("Z-2", { buyerTaxId: null, buyerName: "Nobody Traders" })]) });
     expect(r).toMatchObject({ found: 2, valid: 1, invalid: 1, imported: 0 });
     expect(r.results.find((x) => !x.ok)!.error).toMatch(/no GSTIN/);
     expect((await w.db.select().from(invoices)).length).toBe(0);

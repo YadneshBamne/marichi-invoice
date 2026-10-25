@@ -35,7 +35,7 @@ export async function AccountingPanel({ businessId, owner }: { businessId: strin
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-muted">A buyer must already be one of your linked buyers, and the invoice needs a due date. QuickBooks has no GST number field, so add custom invoice fields named &quot;Buyer GSTIN&quot; and &quot;P.O. Number&quot;.</p>
+      <p className="mt-3 text-xs text-muted">A buyer must already be one of your linked buyers, and the invoice needs a due date. QuickBooks has no GST number field, so the customer name must match one of your linked buyers exactly (a custom invoice field named &quot;Buyer GSTIN&quot; is used instead if you add one).</p>
     </Panel>
   );
 }

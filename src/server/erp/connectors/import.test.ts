@@ -26,7 +26,7 @@ describe("importing rows from an accounting system", () => {
 
   it("says in plain words why a row cannot be imported, and still imports the others", async () => {
     const r = await importErpRows(w.db, w.sellerId, [
-      row({ invoiceNumber: "A", buyerTaxId: null }),
+      row({ invoiceNumber: "A", buyerTaxId: null, buyerName: "Nobody Traders" }),
       row({ invoiceNumber: "B", dueDate: null }),
       row({ invoiceNumber: "C", currency: "USD" }),
       row({ invoiceNumber: "D", buyerTaxId: "27AAAAA1111A1Z5" }), // a company that is not one of this seller's buyers
@@ -34,12 +34,19 @@ describe("importing rows from an accounting system", () => {
       row({ invoiceNumber: "E" }),
     ]);
     const err = (n: string) => r.results.filter((x) => x.number === n).map((x) => x.error ?? "ok");
-    expect(err("A")[0]).toMatch(/no GSTIN in your accounting system/);
+    expect(err("A")[0]).toMatch(/no GSTIN in your accounting system and is not the name of one of your linked buyers/);
     expect(err("B")[0]).toMatch(/no due date/);
     expect(err("C")[0]).toMatch(/in USD; only INR/);
     expect(err("D")[0]).toMatch(/not one of your linked buyers/);
     expect(err("E")).toEqual(["ok", "this invoice number appears twice"]);
     expect(r.imported).toBe(1);
+  });
+
+  it("recognises a buyer by its name when the accounting system holds no GST number", async () => {
+    const r = await importErpRows(w.db, w.sellerId, [row({ invoiceNumber: "N-1", buyerTaxId: null, buyerName: "  BIG   corp " })]);
+    expect(r).toMatchObject({ imported: 1, invalid: 0 });
+    const [inv] = await w.db.select().from(invoices).where(eq(invoices.invoiceNumber, "N-1"));
+    expect(inv.buyerId).toBe(w.buyerId);
   });
 
   it("a dry run reports the same problems and creates nothing", async () => {
