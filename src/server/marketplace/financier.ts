@@ -7,6 +7,8 @@ import { gateway, type Adapters } from "../integrations/gateway";
 import { notifyBusiness, notifyStaff } from "../notify";
 import { assertCan } from "../permissions";
 import { formatINR } from "../../lib/money";
+import { createHash } from "node:crypto";
+import { docText, financierTerms, FINANCIER_TERMS_VERSION } from "../agreements/templates";
 
 export const INSTITUTIONS = { bank: "Bank", nbfc_factor: "NBFC-Factor or factoring company", nbfc: "NBFC or lender", mfi: "Microfinance institution", fund: "Fund", other: "Other licensed institution" } as const;
 export type Institution = keyof typeof INSTITUTIONS;
@@ -25,7 +27,9 @@ export const mandateOf = async (db: Database | Tx, businessId: string) => (await
 export type Application = {
   institutionType: string; countries: string[]; regulator: string; licenceType: string; licenceNumber: string; licenceValidUntil?: string | null;
   licenceDocRef?: string | null; settlementAccount: string; settlementIfsc: string; settlementName: string;
+  acceptTerms?: boolean; // must be true to send the application: the participation terms
 };
+export const financierTermsHash = () => createHash("sha256").update(docText(financierTerms())).digest("hex");
 
 /** Save the application as a draft, or send it to staff. A rejected or info-requested application can be edited and sent again. */
 export async function saveApplication(db: Database, actor: Actor, a: Application, submit: boolean, gw: Adapters = gateway, now = new Date()) {
@@ -41,6 +45,7 @@ export async function saveApplication(db: Database, actor: Actor, a: Application
   if (submit && a.licenceValidUntil && a.licenceValidUntil < today(now)) throw new Error("that licence has expired");
   if (a.settlementAccount.trim().length < 6 || a.settlementIfsc.trim().length < 4 || a.settlementName.trim().length < 2) throw new Error("enter the account your repayments are paid to");
   if (submit && !(cur?.licenceDocRef || a.licenceDocRef)) throw new Error("attach a copy of the licence");
+  if (submit && !a.acceptTerms) throw new Error("read and accept the financier participation terms");
 
   let verified = false;
   if (submit) verified = (await gw.kyc.verifyBankAccount(a.settlementAccount.trim(), a.settlementIfsc.trim().toUpperCase(), a.settlementName.trim())).nameMatch; // throws when the provider is down: fail closed
@@ -48,7 +53,8 @@ export async function saveApplication(db: Database, actor: Actor, a: Application
     institutionType: a.institutionType, countries, regulator: a.regulator.trim(), licenceType: a.licenceType.trim(), licenceNumber: a.licenceNumber.trim(),
     licenceValidUntil: a.licenceValidUntil || null, licenceDocRef: a.licenceDocRef ?? cur?.licenceDocRef ?? null,
     settlementAccount: a.settlementAccount.trim(), settlementIfsc: a.settlementIfsc.trim().toUpperCase(), settlementName: a.settlementName.trim(), settlementVerified: submit ? verified : false,
-    status: submit ? "submitted" : (cur?.status ?? "draft"), ...(submit ? { submittedAt: now, note: null } : {}),
+    status: submit ? "submitted" : (cur?.status ?? "draft"),
+    ...(submit ? { submittedAt: now, note: null, termsVersion: FINANCIER_TERMS_VERSION, termsHash: financierTermsHash(), termsAcceptedAt: now, termsAcceptedBy: actor.id } : {}),
   };
   await db.transaction(async (tx) => {
     if (cur) await tx.update(financierProfiles).set(values).where(eq(financierProfiles.id, cur.id));

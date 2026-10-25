@@ -13,11 +13,11 @@ const SELLER_GSTIN = "27AAAAA1111A1Z5";
 beforeEach(async () => { w = await world(); });
 
 async function activeProgramme(limit = 50n * L) {
-  const p = await applyForProgramme(w.db, buyer(), { name: "Big Corp suppliers", limit });
+  const p = await applyForProgramme(w.db, buyer(), { name: "Big Corp suppliers", limit, acceptTerms: true });
   await decideProgramme(w.db, ops, p.id, { decision: "approve", limit, discountBps: 800, advanceBps: 9500 }, gw, T0);
   return p;
 }
-const join = async (p: { id: string }) => { await inviteSuppliers(w.db, buyer(), [SELLER_GSTIN], gw); await respondInvite(w.db, w.sellerActor, p.id, true, T0); };
+const join = async (p: { id: string }) => { await inviteSuppliers(w.db, buyer(), [SELLER_GSTIN], gw); await respondInvite(w.db, w.sellerActor, p.id, true, T0, true); };
 const offerOf = async (offerId: string) => (await w.db.select().from(financingOffers).where(eq(financingOffers.id, offerId)))[0];
 
 describe("applying and approval", () => {
@@ -25,9 +25,9 @@ describe("applying and approval", () => {
     await expect(applyForProgramme(w.db, { ...buyer(), role: "seller" }, { name: "x", limit: L })).rejects.toThrow("FORBIDDEN");
     await expect(applyForProgramme(w.db, buyer(), { name: " ", limit: L })).rejects.toThrow("name");
     await expect(applyForProgramme(w.db, buyer(), { name: "x", limit: SCF.maxLimit + 1n })).rejects.toThrow("limit");
-    const p = await applyForProgramme(w.db, buyer(), { name: "Big Corp suppliers", limit: 20n * L });
+    const p = await applyForProgramme(w.db, buyer(), { name: "Big Corp suppliers", limit: 20n * L, acceptTerms: true });
     expect(p).toMatchObject({ status: "requested", limit: 0n });
-    await expect(applyForProgramme(w.db, buyer(), { name: "again", limit: L })).rejects.toThrow("already has");
+    await expect(applyForProgramme(w.db, buyer(), { name: "again", limit: L, acceptTerms: true })).rejects.toThrow("already has");
     await expect(decideProgramme(w.db, { ...ops, role: "seller" }, p.id, { decision: "approve", limit: L, discountBps: 800, advanceBps: 9500 })).rejects.toThrow("forbidden");
     await expect(decideProgramme(w.db, ops, p.id, { decision: "approve", limit: L, discountBps: 100, advanceBps: 9500 })).rejects.toThrow("between");
     await expect(decideProgramme(w.db, ops, p.id, { decision: "approve", limit: L, discountBps: 800, advanceBps: 9900 })).rejects.toThrow("at most");
@@ -37,12 +37,12 @@ describe("applying and approval", () => {
   });
   it("an unverified buyer cannot apply; declining needs a reason and frees the buyer to apply again", async () => {
     await w.db.update(businesses).set({ kybStatus: "under_review" }).where(eq(businesses.id, w.buyerId));
-    await expect(applyForProgramme(w.db, buyer(), { name: "x", limit: L })).rejects.toThrow("not approved");
+    await expect(applyForProgramme(w.db, buyer(), { name: "x", limit: L, acceptTerms: true })).rejects.toThrow("not approved");
     await w.db.update(businesses).set({ kybStatus: "approved" }).where(eq(businesses.id, w.buyerId));
-    const p = await applyForProgramme(w.db, buyer(), { name: "x", limit: L });
+    const p = await applyForProgramme(w.db, buyer(), { name: "x", limit: L, acceptTerms: true });
     await expect(decideProgramme(w.db, ops, p.id, { decision: "decline" })).rejects.toThrow("note");
     await decideProgramme(w.db, ops, p.id, { decision: "decline", note: "thin financials" }, gw, T0);
-    await expect(applyForProgramme(w.db, buyer(), { name: "second try", limit: L })).resolves.toMatchObject({ status: "requested" });
+    await expect(applyForProgramme(w.db, buyer(), { name: "second try", limit: L, acceptTerms: true })).resolves.toMatchObject({ status: "requested" });
   });
 });
 
@@ -58,8 +58,8 @@ describe("inviting suppliers", () => {
     const p = await activeProgramme();
     await inviteSuppliers(w.db, buyer(), [SELLER_GSTIN], gw);
     expect(await termsFor(w.db, w.buyerId, w.sellerId)).toBeNull(); // invited is not joined
-    await expect(respondInvite(w.db, { ...w.sellerActor, businessId: w.buyerId }, p.id, true, T0)).rejects.toThrow("no open invitation");
-    await respondInvite(w.db, w.sellerActor, p.id, true, T0);
+    await expect(respondInvite(w.db, { ...w.sellerActor, businessId: w.buyerId }, p.id, true, T0, true)).rejects.toThrow("no open invitation");
+    await respondInvite(w.db, w.sellerActor, p.id, true, T0, true);
     expect(await termsFor(w.db, w.buyerId, w.sellerId)).toMatchObject({ discountBps: 800 });
     await decideProgramme(w.db, ops, p.id, { decision: "pause" }, gw, T0);
     expect(await termsFor(w.db, w.buyerId, w.sellerId)).toBeNull();

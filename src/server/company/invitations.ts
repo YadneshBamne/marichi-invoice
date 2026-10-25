@@ -9,6 +9,7 @@ import { appUrl } from "../notify";
 import { render } from "../notify/templates";
 import { assertCan, INVITABLE, ORG_ROLE_LABEL, POWERFUL } from "../permissions";
 import type { Actor } from "./service";
+import { PLATFORM_TERMS_VERSION } from "../agreements/templates";
 
 export const INVITE_DAYS = 10;
 export type Hash = (password: string) => Promise<string>;
@@ -121,7 +122,7 @@ export async function acceptAsNewUser(db: Database, hash: Hash, token: string, p
   return db.transaction(async (tx) => {
     const [u] = await tx.insert(users).values({
       name: p.name.trim(), email: inv.email, emailVerified: true, role: (b?.kind as "seller" | "buyer" | "financier" | null) ?? "seller",
-      businessId: inv.businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy,
+      businessId: inv.businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy, termsVersion: PLATFORM_TERMS_VERSION, termsAcceptedAt: now,
     }).returning();
     await tx.insert(account).values({ accountId: u.id, providerId: "credential", userId: u.id, password: passwordHash });
     await tx.insert(memberships).values({ userId: u.id, businessId: inv.businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy });

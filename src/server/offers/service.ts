@@ -5,6 +5,7 @@ import { gateway, type Adapters } from "../integrations/gateway";
 import { assertNotFrozen } from "../fraud/service";
 import { assertNoEarlyPayment } from "../earlypay/service";
 import { termsFor, utilisation } from "../scf/service";
+import { ensureKeyFacts } from "../agreements/keyfacts";
 import { CROSS } from "../crossborder/rules";
 import { notifyBusiness } from "../notify";
 import { emitEvent } from "../erp/events";
@@ -80,6 +81,7 @@ export async function generateOffer(db: Database, invoiceId: string, gw: Adapter
     return { unfunded: true as const };
   }
   if (result.created) {
+    await ensureKeyFacts(db, result.offer.id, now).catch((e) => console.error("[keyfacts]", (e as Error).message)); // the seller reads it before accepting
     await notifyBusiness(db, inv.sellerId, "offer_ready", {
       invoiceNumber: inv.invoiceNumber, advance: formatINR(result.offer.advanceAmount), expires: result.offer.expiresAt.toISOString(),
     }, gw);

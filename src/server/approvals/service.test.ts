@@ -15,7 +15,7 @@ async function person(email: string, orgRole: "admin" | "approver" | "maker" | "
   return { id: u.id, role: "seller", orgRole, businessId: w.sellerId };
 }
 const status = async (offerId: string) => (await w.db.select().from(financingOffers).where(eq(financingOffers.id, offerId)))[0].status;
-const ask = (a: Actor, offerId: string, amount = 9_00_000_00n, now = T0) => submit(w.db, a, "offer.accept", { offerId }, { summary: "Accept the offer on invoice INV-1", amount }, gw, now);
+const ask = (a: Actor, offerId: string, amount = 9_00_000_00n, now = T0) => submit(w.db, a, "offer.accept", { offerId, ack: true }, { summary: "Accept the offer on invoice INV-1", amount }, gw, now);
 const templates = async () => (await w.db.select().from(notifications)).map((n) => n.template);
 
 describe("who commits directly and who must ask", () => {
@@ -159,7 +159,7 @@ describe("bulk and bid commitments use the same gate", () => {
     const maker = await person("maker@seller.com", "maker");
     const appr = await person("appr@seller.com", "approver");
     const a = await w.offered(3_00_000_00n), b = await w.offered(3_00_000_00n);
-    const r = await submit(w.db, maker, "offer.accept_many", { offerIds: [a.offerId, b.offerId] }, { summary: "Accept 2 offers", amount: 5_40_000_00n }, gw, T0);
+    const r = await submit(w.db, maker, "offer.accept_many", { offerIds: [a.offerId, b.offerId], ack: true }, { summary: "Accept 2 offers", amount: 5_40_000_00n }, gw, T0);
     if (r.status !== "queued") throw new Error("expected queued");
     expect(await decide(w.db, appr, r.id, "approve", "", gw, T0)).toEqual({ status: "approved" });
     expect(await status(a.offerId)).toBe("accepted");

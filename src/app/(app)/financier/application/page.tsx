@@ -3,6 +3,7 @@ import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
 import { can } from "@/server/permissions";
 import { INSTITUTIONS, profileOf, saveApplication } from "@/server/marketplace/financier";
+import { financierTerms } from "@/server/agreements/templates";
 import { putDocument } from "@/server/vault";
 import { Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { attempt } from "../attempt";
@@ -26,7 +27,7 @@ async function save(fd: FormData) {
     if (file instanceof File && file.size > 0) licenceDocRef = (await putDocument(Buffer.from(await file.arrayBuffer()), file.type)).ref;
     const submit = fd.get("intent") === "submit";
     await saveApplication(db, { id: u.id, role: u.role, orgRole: u.orgRole, businessId: u.businessId }, {
-      ...f, countries: f.countries.split(/[\s,;]+/), licenceValidUntil: f.licenceValidUntil || null, licenceDocRef,
+      ...f, countries: f.countries.split(/[\s,;]+/), licenceValidUntil: f.licenceValidUntil || null, licenceDocRef, acceptTerms: fd.get("terms") === "on",
     }, submit);
     return submit ? "Sent to our team. We will review your licence and tell you the outcome." : "Draft saved.";
   });
@@ -70,6 +71,8 @@ export default async function Application({ searchParams }: { searchParams: Prom
             <Field label="Account holder name"><input name="settlementName" required defaultValue={p?.settlementName ?? ""} className={input} /></Field>
             <Field label="Account number"><input name="settlementAccount" required defaultValue={p?.settlementAccount ?? ""} inputMode="numeric" className={input} /></Field>
             <Field label="IFSC or bank code"><input name="settlementIfsc" required defaultValue={p?.settlementIfsc ?? ""} className={`${input} uppercase`} /></Field>
+            <details className="rounded-xl bg-panel p-4 text-sm sm:col-span-2"><summary className="cursor-pointer font-semibold text-p-700">Financier participation terms</summary><ol className="mt-2 list-decimal space-y-1.5 pl-5 text-muted">{financierTerms().blocks.flatMap((b) => ("ol" in b ? b.ol.map((r) => r.map((x) => (typeof x === "string" ? x : x.b)).join("")) : [])).map((t, i) => <li key={i}>{t}</li>)}</ol></details>
+            <label className="flex items-start gap-2 text-sm sm:col-span-2"><input name="terms" type="checkbox" className="mt-0.5" />I have read the participation terms and accept them for {u.biz?.displayName ?? u.biz?.legalName ?? "my institution"}. Needed to send the application.</label>
             <div className="flex flex-wrap gap-3 sm:col-span-2">
               <button name="intent" value="draft" className="btn btn-ghost">Save draft</button>
               <button name="intent" value="submit" className="btn btn-primary" disabled={!kybOk} title={kybOk ? undefined : "Finish company verification first"}>Send to our team</button>

@@ -127,6 +127,13 @@
       "when": 1792894377227,
       "tag": "0017_financier_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792896034892,
+      "tag": "0018_acceptance_records",
+      "breakpoints": true
     }
   ]
 }

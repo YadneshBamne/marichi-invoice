@@ -23,7 +23,7 @@ const MANDATE: MandateInput = { status: "active", minTicket: 0n, maxTicket: null
 const mandate = (f: { id: string }, m: Partial<MandateInput>) => saveMandate(w.db, { id: "00000000-0000-0000-0000-0000000000f1", role: "financier", orgRole: "owner", businessId: f.id }, { ...MANDATE, ...m });
 const APP: Application = {
   institutionType: "nbfc_factor", countries: ["in"], regulator: "RBI", licenceType: "NBFC-Factor", licenceNumber: "N-14.03456", licenceValidUntil: "2030-01-01",
-  licenceDocRef: "doc-ref", settlementAccount: "123456789012", settlementIfsc: "hdfc0001234", settlementName: "Nova Finance",
+  licenceDocRef: "doc-ref", settlementAccount: "123456789012", settlementIfsc: "hdfc0001234", settlementName: "Nova Finance", acceptTerms: true,
 };
 
 /** A new financier company with a login, KYB approved, but no application yet. */

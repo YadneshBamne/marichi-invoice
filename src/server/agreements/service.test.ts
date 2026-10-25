@@ -20,11 +20,11 @@ describe("prepareAgreements", () => {
   it("creates master + schedule + notice, requests signatures, sends the notice; re-running changes nothing", async () => {
     const offer = await w.acceptedOffer();
     await prepareAgreements(w.db, offer, gw, T0);
-    expect(await kinds()).toEqual(["assignment_notice:sent", "invoice_schedule:sent", "master:sent"]);
+    expect(await kinds()).toEqual(["assignment_notice:sent", "invoice_schedule:sent", "key_facts:sent", "master:sent"]);
     const sigs = (await all()).filter((a) => a.esignRequestId);
     expect(sigs).toHaveLength(2);
     await prepareAgreements(w.db, offer, gw, T0);
-    expect(await all()).toHaveLength(3);
+    expect(await all()).toHaveLength(4);
     expect((await all()).filter((a) => a.esignRequestId).map((a) => a.esignRequestId).sort()).toEqual(sigs.map((a) => a.esignRequestId).sort());
   });
 
@@ -32,7 +32,7 @@ describe("prepareAgreements", () => {
     await prepareAgreements(w.db, await w.acceptedOffer(), gw, T0);
     await prepareAgreements(w.db, await w.acceptedOffer(), gw, T0);
     expect((await all()).filter((a) => a.kind === "master")).toHaveLength(1);
-    expect(await all()).toHaveLength(5);
+    expect(await all()).toHaveLength(7);
   });
 
   it("only for accepted offers", async () => {

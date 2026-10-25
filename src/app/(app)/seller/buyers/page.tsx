@@ -33,7 +33,7 @@ async function answerInvite(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
   assertCan(u, "programme.join");
-  await respondInvite(db, { id: u.id, role: u.role, businessId: u.businessId }, z.uuid().parse(fd.get("programmeId")), fd.get("action") === "accept");
+  await respondInvite(db, { id: u.id, role: u.role, businessId: u.businessId }, z.uuid().parse(fd.get("programmeId")), fd.get("action") === "accept", new Date(), fd.get("terms") === "on");
   revalidatePath("/seller/buyers");
 }
 
@@ -76,7 +76,7 @@ export default async function Buyers({ searchParams }: { searchParams: Promise<{
               { h: "Programme limit", align: "right", cell: (p) => formatINR(p.p.limit) },
               { h: "Status", cell: (p) => <StatusPill status={p.s.status === "active" ? "approved" : "pending"} label={p.s.status === "active" ? "Joined" : "Invited"} /> },
               { h: "", align: "right", cell: (p) => p.s.status === "invited" && can(u, "programme.join") && (
-                <form action={answerInvite} className="inline-flex gap-2"><input type="hidden" name="programmeId" value={p.p.id} /><button name="action" value="accept" className="btn btn-primary btn-sm">Join</button><button name="action" value="decline" className="btn btn-ghost btn-sm">Decline</button></form>
+                <form action={answerInvite} className="inline-flex flex-wrap items-center justify-end gap-2"><input type="hidden" name="programmeId" value={p.p.id} /><label className="flex items-center gap-1.5 text-xs text-muted"><input name="terms" type="checkbox" />I accept the programme terms</label><button name="action" value="accept" className="btn btn-primary btn-sm">Join</button><button name="action" value="decline" className="btn btn-ghost btn-sm">Decline</button></form>
               ) },
             ]} />
         </Panel>

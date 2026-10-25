@@ -36,7 +36,7 @@ async function signEverything(fd: FormData) {
   revalidatePath("/seller/agreements");
 }
 
-const LABEL: Record<string, string> = { master: "Master agreement", invoice_schedule: "Invoice schedule", assignment_notice: "Assignment notice (sent to buyer)" };
+const LABEL: Record<string, string> = { master: "Master agreement", invoice_schedule: "Invoice schedule", assignment_notice: "Assignment notice (sent to buyer)", key_facts: "Key facts sheet (what you read before accepting)" };
 
 export default async function Agreements() {
   const u = await requireUser(["seller"]);

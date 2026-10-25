@@ -1,13 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, asc, eq, or } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { agreements, auditLog, businesses, financingOffers, invoices, users, financierProfiles } from "../db/schema";
+import { agreements, auditLog, businesses, financingOffers, invoiceConfirmations, invoices, users, financierProfiles } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { ensureVirtualAccount } from "../collections/virtual-accounts";
 import { notifyBusiness } from "../notify";
 import { putGenerated } from "../vault";
 import { renderPdf } from "./pdf";
-import { assignmentNotice, invoiceSchedule, masterAgreement } from "./templates";
+import { assignmentNotice, invoiceSchedule, masterAgreement, TEMPLATE_VERSION } from "./templates";
+import { termsFor } from "./country";
+import { financierFor, ensureKeyFacts } from "./keyfacts";
+import { COLLECTIONS } from "../collections/waterfall";
 
 const STAFF = ["ops", "compliance", "admin"];
 
@@ -27,17 +30,20 @@ export async function prepareAgreements(db: Database, offerId: string, gw: Adapt
   ]);
   const invoice = { invoiceNumber: inv.invoiceNumber, invoiceDate: inv.invoiceDate, dueDate: inv.dueDate, amount: inv.amount };
   const collection = await ensureVirtualAccount(db, inv.id, gw); // the notice must tell the buyer exactly where to pay
+  const financier = await financierFor(db, offer); // the assignee: the bidding financier, or the platform's own balance sheet
+  const country = termsFor(seller.country);
+  await ensureKeyFacts(db, offerId, now); // normally made when the offer was; this covers offers that predate it
 
   const docs = [
-    { kind: "master", offerId: null, doc: () => masterAgreement({ seller, now }) },
-    { kind: "invoice_schedule", offerId, doc: () => invoiceSchedule({ seller, buyer, invoice, offer, now }) },
-    { kind: "assignment_notice", offerId, doc: () => assignmentNotice({ seller, buyer, invoice, collection, now }) },
+    { kind: "master", offerId: null, doc: () => masterAgreement({ seller, financier, country, now }) },
+    { kind: "invoice_schedule", offerId, doc: () => invoiceSchedule({ seller, buyer, invoice, offer, financier, penalBps: COLLECTIONS.penalBps, graceDays: COLLECTIONS.graceDays, now }) },
+    { kind: "assignment_notice", offerId, doc: () => assignmentNotice({ seller, buyer, invoice, collection, financier, now }) },
   ] as const;
   for (const d of docs) {
     const exists = await db.select({ id: agreements.id }).from(agreements).where(
       d.kind === "master" ? and(eq(agreements.businessId, seller.id), eq(agreements.kind, "master")) : and(eq(agreements.offerId, offerId), eq(agreements.kind, d.kind)));
     if (exists.length) continue;
-    const { ref, hash } = await putGenerated(await renderPdf(d.doc(), { footer: `Marichi Labs  ${d.kind.replaceAll("_", " ")}` }));
+    const { ref, hash } = await putGenerated(await renderPdf(d.doc(), { footer: `Marichi Labs  ${d.kind.replaceAll("_", " ")}  ${TEMPLATE_VERSION}` }));
     // The partial unique indexes make a concurrent duplicate a no-op rather than a second contract.
     await db.insert(agreements).values({ businessId: seller.id, offerId: d.offerId, kind: d.kind, documentRef: ref, documentHash: hash }).onConflictDoNothing();
   }
@@ -155,10 +161,12 @@ export async function canViewDocument(db: Database, user: { role: string; busine
   const [ag] = await db.select().from(agreements).where(eq(agreements.documentRef, ref));
   const [iv] = await db.select().from(invoices).where(eq(invoices.documentRef, ref));
   const [lic] = await db.select({ b: financierProfiles.businessId }).from(financierProfiles).where(eq(financierProfiles.licenceDocRef, ref));
-  if (!ag && !iv && !lic) return false;
+  const [rec] = await db.select({ i: invoices.id, s: invoices.sellerId, b: invoices.buyerId }).from(invoiceConfirmations).innerJoin(invoices, eq(invoices.id, invoiceConfirmations.invoiceId)).where(eq(invoiceConfirmations.recordRef, ref));
+  if (!ag && !iv && !lic && !rec) return false;
   if (STAFF.includes(user.role)) return true;
   if (!user.businessId) return false;
   if (lic) return user.role === "financier" && lic.b === user.businessId; // a financier's licence copy: its own company and staff only
+  if (rec) return (user.role === "seller" && rec.s === user.businessId) || (user.role === "buyer" && rec.b === user.businessId); // the two parties to the invoice
   if (user.role === "seller") return ag?.businessId === user.businessId || iv?.sellerId === user.businessId;
   if (user.role === "buyer") {
     if (iv?.buyerId === user.businessId) return true;

@@ -117,7 +117,7 @@ export function ConfirmFlow({ token, v }: { token: string; v: View }) {
               <PasswordInput label="Confirm password" name="confirm" required minLength={10} autoComplete="new-password" />
               {pw.err && <Alert>{pw.err}</Alert>}
               <SubmitButton pending={pw.busy}>{pw.busy ? "Creating" : "Create account"}</SubmitButton>
-              <p className="text-xs text-muted">This offer lasts about an hour. Later, ask your supplier to resend an invoice or use the invitation link.</p>
+              <p className="text-xs text-muted">By creating an account you accept the <a className="font-semibold text-p-700 underline" href="/terms" target="_blank">terms</a> and <a className="font-semibold text-p-700 underline" href="/privacy" target="_blank">privacy notice</a>. This offer lasts about an hour. Later, ask your supplier to resend an invoice or use the invitation link.</p>
             </form>
           )}
         </div>

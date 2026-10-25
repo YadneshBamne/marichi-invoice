@@ -10,6 +10,7 @@ import { acceptOffer, acceptOffers } from "../offers/service";
 import { acceptBid, placeBid } from "../marketplace/service";
 import { proposeEarlyPayment } from "../earlypay/service";
 import { assertCan, can, ForbiddenError, type Permission } from "../permissions";
+import { acknowledgeKeyFacts } from "../agreements/keyfacts";
 
 export const APPROVAL = {
   alwaysAbove: 10_00_000_00n, // a commitment this large needs a second person whatever the company's setting
@@ -21,19 +22,36 @@ type Who = { id: string; role: string; businessId: string | null };
 const who = (a: Actor): Who => ({ id: a.id, role: a.role, businessId: a.businessId });
 
 type Payloads = {
-  "offer.accept": { offerId: string };
-  "offer.accept_many": { offerIds: string[] };
-  "bid.accept": { bidId: string };
+  "offer.accept": { offerId: string; ack?: boolean };
+  "offer.accept_many": { offerIds: string[]; ack?: boolean };
+  "bid.accept": { bidId: string; ack?: boolean };
   "bid.place": { invoiceId: string; advanceBps: number; discountBps: number };
   "earlypay.propose": { invoiceId: string; discountBps: number };
 };
 export type Kind = keyof Payloads;
 
+const mustAck = (ack?: boolean) => { if (!ack) throw new Error("read the key facts for the offer and tick the box to confirm before accepting"); };
+
 /** What each kind of request needs to run, and who may prepare it or commit it directly. */
 const HANDLERS: { [K in Kind]: { commit: Permission; prepare: Permission; run: (db: Database, p: Payloads[K], a: Actor, gw: Adapters, now: Date) => Promise<unknown> } } = {
-  "offer.accept": { commit: "offer.answer", prepare: "offer.prepare", run: (db, p, a, _gw, now) => acceptOffer(db, p.offerId, who(a), now) },
-  "offer.accept_many": { commit: "offer.answer", prepare: "offer.prepare", run: (db, p, a, _gw, now) => acceptOffers(db, p.offerIds, who(a), now) },
-  "bid.accept": { commit: "offer.answer", prepare: "offer.prepare", run: (db, p, a, gw, now) => acceptBid(db, p.bidId, who(a), gw, now) },
+  "offer.accept": { commit: "offer.answer", prepare: "offer.prepare", run: async (db, p, a, _gw, now) => {
+    mustAck(p.ack);
+    const id = await acceptOffer(db, p.offerId, who(a), now);
+    await acknowledgeKeyFacts(db, p.offerId, a.id, now); // the person who commits is the person who read the sheet
+    return id;
+  } },
+  "offer.accept_many": { commit: "offer.answer", prepare: "offer.prepare", run: async (db, p, a, _gw, now) => {
+    mustAck(p.ack);
+    const r = await acceptOffers(db, p.offerIds, who(a), now);
+    for (const x of r) if (x.ok) await acknowledgeKeyFacts(db, x.offerId, a.id, now);
+    return r;
+  } },
+  "bid.accept": { commit: "offer.answer", prepare: "offer.prepare", run: async (db, p, a, gw, now) => {
+    mustAck(p.ack);
+    const offer = await acceptBid(db, p.bidId, who(a), gw, now);
+    await acknowledgeKeyFacts(db, offer.id, a.id, now);
+    return offer;
+  } },
   "bid.place": { commit: "bid.place", prepare: "bid.prepare", run: (db, p, a, gw, now) => placeBid(db, who(a), p, gw, now) },
   "earlypay.propose": { commit: "earlypay.propose", prepare: "earlypay.prepare", run: (db, p, a, gw, now) => proposeEarlyPayment(db, who(a), p, gw, now) },
 };

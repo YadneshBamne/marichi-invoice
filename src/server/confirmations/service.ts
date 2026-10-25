@@ -10,6 +10,7 @@ import { announceTicket } from "../support/service";
 import { formatINR } from "../../lib/money";
 import { ACCEPTANCE_VERSION, acceptanceText } from "./wording";
 import { sendToBuyerSide } from "./link";
+import { recordConfirmation } from "../agreements/records";
 
 type Invoice = typeof invoices.$inferSelect;
 export type Actor = { id: string; email: string; role: string; businessId: string | null; ip?: string; userAgent?: string };
@@ -101,6 +102,7 @@ export async function applyResponse(
     return { inv, status: invoiceStatus, disputeTicketId };
   });
   if (out.disputeTicketId) await announceTicket(db, out.disputeTicketId, gw); // ack + alert support (after commit)
+  if (p.decision === "confirm") await recordConfirmation(db, out.inv.id).catch((e) => console.error("[confirmation-record]", (e as Error).message));
 
   const template = { confirm: "invoice_confirmed", dispute: "invoice_disputed", clarify: "invoice_clarification_requested" }[p.decision];
   await notifyBusiness(db, out.inv.sellerId, template, { ...info(out.inv), note: note ?? "" }, gw);

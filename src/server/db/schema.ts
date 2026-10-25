@@ -110,6 +110,8 @@ export const users = pgTable("users", {
   businessId: uuid("business_id").references(() => businesses.id),
   kycStatus: kycStatus("kyc_status").notNull().default("draft"),
   tourSeenAt: timestamp("tour_seen_at", { withTimezone: true }), // null = show the guided product tour on next visit
+  termsVersion: text("terms_version"), // the platform terms and privacy notice this person accepted, and when
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
   orgRole: text("org_role").$type<OrgRole>(), // role in the ACTIVE company (mirrors memberships); null for platform staff
   mustChangePassword: boolean("must_change_password").notNull().default(false), // set when the owner issued the password
   suspendedAt: timestamp("suspended_at", { withTimezone: true }), // set = cannot sign in or use any page
@@ -277,6 +279,8 @@ export const invoiceConfirmations = pgTable("invoice_confirmations", {
   claimUntil: timestamp("claim_until", { withTimezone: true }), // for a minute window after a link decision, that person may create the buyer's account
   acceptanceVersion: text("acceptance_version"), // which wording the buyer was shown
   acceptanceText: text("acceptance_text"), // the exact wording, kept as the legal record
+  recordRef: text("record_ref"), // vault reference of the confirmation record (a PDF of the above plus who, when, from where)
+  recordHash: text("record_hash"),
 }, (t) => [uniqueIndex("conf_invoice").on(t.invoiceId)]);
 
 // ---- Module 5 / 6 / 7 ----
@@ -381,6 +385,9 @@ export const scfProgrammes = pgTable("scf_programmes", {
   decidedBy: uuid("decided_by"),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   decisionNote: text("decision_note"),
+  termsVersion: text("terms_version"), // the programme terms the buyer accepted when it applied
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+  termsAcceptedBy: uuid("terms_accepted_by"),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("scf_buyer").on(t.buyerId).where(sql`status in ('requested','active','paused')`)]);
 
@@ -391,6 +398,8 @@ export const scfSuppliers = pgTable("scf_suppliers", {
   status: text("status").notNull().default("invited"), // invited | active | declined | removed
   invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
   respondedAt: timestamp("responded_at", { withTimezone: true }),
+  termsVersion: text("terms_version"), // the programme terms the supplier accepted when it joined
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("scf_supplier").on(t.programmeId, t.sellerId)]);
 
 // A buyer's payment in a foreign currency, as received, and what it converted to. Kept for FX reporting and export-proof paperwork.
@@ -500,6 +509,10 @@ export const financierProfiles = pgTable("financier_profiles", {
   settlementIfsc: text("settlement_ifsc"),
   settlementName: text("settlement_name"),
   settlementVerified: boolean("settlement_verified").notNull().default(false),
+  termsVersion: text("terms_version"), // the participation terms it accepted, and a hash of their exact text
+  termsHash: text("terms_hash"),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+  termsAcceptedBy: uuid("terms_accepted_by"),
   status: text("status").notNull().default("draft"), // draft | submitted | info_requested | approved | rejected | suspended
   note: text("note"), // the reviewer's note to the applicant
   submittedAt: timestamp("submitted_at", { withTimezone: true }),

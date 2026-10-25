@@ -7,6 +7,7 @@ import { auditLog, businesses, buyerSellerRelationships, financingOffers, invoic
 import { gateway, type Adapters } from "../integrations/gateway";
 import { notifyBusiness } from "../notify";
 import { formatINR } from "../../lib/money";
+import { PROGRAMME_TERMS_VERSION } from "../agreements/templates";
 
 export const SCF = {
   minDiscountBps: 400, // 4% a year
@@ -26,14 +27,15 @@ export async function programmeOf(db: Database | Tx, buyerId: string) {
   return p;
 }
 
-export async function applyForProgramme(db: Database, actor: Actor, p: { name: string; limit: bigint }) {
+export async function applyForProgramme(db: Database, actor: Actor, p: { name: string; limit: bigint; acceptTerms?: boolean }, now = new Date()) {
   if (actor.role !== "buyer" || !actor.businessId) throw new Error("FORBIDDEN");
   if (!p.name.trim()) throw new Error("name the programme");
   if (p.limit <= 0n || p.limit > SCF.maxLimit) throw new Error("the requested limit is outside what a programme can be");
+  if (!p.acceptTerms) throw new Error("read and accept the supplier finance programme terms");
   const [b] = await db.select().from(businesses).where(eq(businesses.id, actor.businessId));
   if (b.kybStatus !== "approved") throw new Error("your verification is not approved yet");
   if (await programmeOf(db, actor.businessId)) throw new Error("your company already has a programme");
-  const [row] = await db.insert(scfProgrammes).values({ buyerId: actor.businessId, name: p.name.trim(), requestedLimit: p.limit }).returning();
+  const [row] = await db.insert(scfProgrammes).values({ buyerId: actor.businessId, name: p.name.trim(), requestedLimit: p.limit, termsVersion: PROGRAMME_TERMS_VERSION, termsAcceptedAt: now, termsAcceptedBy: actor.id }).returning();
   await db.insert(auditLog).values({ actorId: actor.id, action: "scf.apply", entity: "business", entityId: actor.businessId, after: { programmeId: row.id, limit: p.limit.toString() } });
   return row;
 }
@@ -105,13 +107,14 @@ export async function removeSupplier(db: Database, actor: Actor, programmeId: st
 }
 
 /** The supplier answers. Joining also links the buyer so invoices can be raised on it. */
-export async function respondInvite(db: Database, actor: Actor, programmeId: string, accept: boolean, now = new Date()) {
+export async function respondInvite(db: Database, actor: Actor, programmeId: string, accept: boolean, now = new Date(), acceptTerms = false) {
+  if (accept && !acceptTerms) throw new Error("read and accept the supplier finance programme terms to join");
   if (actor.role !== "seller" || !actor.businessId) throw new Error("FORBIDDEN");
   const [inv] = await db.select({ s: scfSuppliers, p: scfProgrammes }).from(scfSuppliers).innerJoin(scfProgrammes, eq(scfProgrammes.id, scfSuppliers.programmeId))
     .where(and(eq(scfSuppliers.programmeId, programmeId), eq(scfSuppliers.sellerId, actor.businessId)));
   if (!inv || inv.s.status !== "invited") throw new Error("there is no open invitation");
   await db.transaction(async (tx) => {
-    await tx.update(scfSuppliers).set({ status: accept ? "active" : "declined", respondedAt: now }).where(eq(scfSuppliers.id, inv.s.id));
+    await tx.update(scfSuppliers).set({ status: accept ? "active" : "declined", respondedAt: now, ...(accept ? { termsVersion: PROGRAMME_TERMS_VERSION, termsAcceptedAt: now } : {}) }).where(eq(scfSuppliers.id, inv.s.id));
     if (accept) await tx.insert(buyerSellerRelationships).values({ buyerId: inv.p.buyerId, sellerId: actor.businessId!, creditTermsDays: 60 }).onConflictDoNothing();
     await tx.insert(auditLog).values({ actorId: actor.id, action: `scf.${accept ? "join" : "decline"}`, entity: "business", entityId: actor.businessId!, after: { programmeId } });
   });

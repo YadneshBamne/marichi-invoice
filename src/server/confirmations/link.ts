@@ -11,6 +11,7 @@ import { render } from "../notify/templates";
 import { formatINR } from "../../lib/money";
 import type { Decision } from "./service";
 import { acceptanceText, CLARIFY_TEXT, DISPUTE_TEXT } from "./wording";
+import { PLATFORM_TERMS_VERSION } from "../agreements/templates";
 
 type Invoice = typeof invoices.$inferSelect;
 export const LINK = { tokenDays: 21, codeMinutes: 10, maxAttempts: 5, resendSeconds: 60 };
@@ -147,7 +148,7 @@ export async function claimAccount(
   return db.transaction(async (tx) => {
     const [owner] = await tx.select({ id: memberships.id }).from(memberships).where(eq(memberships.businessId, row.i.buyerId)).limit(1);
     if (owner) throw new Error("this company already has an account. Ask its owner to invite you");
-    const [u] = await tx.insert(users).values({ name: p.name.trim(), email, emailVerified: true, role: "buyer", businessId: row.i.buyerId, orgRole: "owner" }).returning();
+    const [u] = await tx.insert(users).values({ name: p.name.trim(), email, emailVerified: true, role: "buyer", businessId: row.i.buyerId, orgRole: "owner", termsVersion: PLATFORM_TERMS_VERSION, termsAcceptedAt: now }).returning();
     await tx.insert(account).values({ accountId: u.id, providerId: "credential", userId: u.id, password: passwordHash });
     await tx.insert(memberships).values({ userId: u.id, businessId: row.i.buyerId, orgRole: "owner" });
     await tx.update(businesses).set({ kind: "buyer" }).where(eq(businesses.id, row.i.buyerId));

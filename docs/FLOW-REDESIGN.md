@@ -117,4 +117,5 @@ Suggested order: roles, invitations and approvals first (everything depends on t
 - Done: invitations, five roles, maker-checker approvals, several companies per login (`6e20778`).
 - Done: buyer one-click acceptance by emailed link with a one-time code, recorded acceptance wording, pending buyers a supplier names, and the account claim afterwards.
 - Done: financier application with a licence record and staff review, mandate, per-buyer credit limits, standing bids, and a switch for the platform's own balance sheet.
-- Next: the full agreement stack and key-facts sheet, then the country-pack framework (India, Zambia), then the shell and visual redesign.
+- Done: the agreement stack. Key Facts sheet made with every offer and acknowledged before accepting; master agreement, schedule and notice rewritten (real assignee, servicing agent, registry, country law); confirmation record PDF; recorded acceptance of the platform, financier and programme terms; an admin page listing the whole stack (Admin > Legal documents). All clause text is draft for counsel.
+- Next: the country-pack framework (India, Zambia), then the shell and visual redesign.

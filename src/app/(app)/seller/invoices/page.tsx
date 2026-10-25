@@ -1,10 +1,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
-import { bids, businesses, buyerSellerRelationships, financingOffers, invoices, underwritingDecisions } from "@/server/db/schema";
+import { agreements, bids, businesses, buyerSellerRelationships, financingOffers, invoices, underwritingDecisions } from "@/server/db/schema";
 import { acceptOffer, acceptOffers, expireOffers, generateOffer, rejectOffer, repriceOffer } from "@/server/offers/service";
 import { describeOffer } from "@/server/offers/pricing";
 import { acceptBid, bidsFor } from "@/server/marketplace/service";
@@ -80,7 +80,7 @@ async function answerOffer(fd: FormData) {
     if (f.action === "reject") { await rejectOffer(db, f.offerId, { id: u.id, role: u.role, businessId: u.businessId }); return "Offer declined."; }
     const [o] = await db.select({ o: financingOffers, no: invoices.invoiceNumber }).from(financingOffers).innerJoin(invoices, eq(invoices.id, financingOffers.invoiceId)).where(eq(financingOffers.id, f.offerId));
     if (!o) throw new Error("offer not found");
-    const r = await submit(db, actorOf(u), "offer.accept", { offerId: f.offerId }, { summary: `Accept the offer on invoice ${o.no}: ${formatINR(describeOffer(o.o).netDisbursal)} paid to you`, amount: o.o.advanceAmount });
+    const r = await submit(db, actorOf(u), "offer.accept", { offerId: f.offerId, ack: fd.get("ack") === "on" }, { summary: `Accept the offer on invoice ${o.no}: ${formatINR(describeOffer(o.o).netDisbursal)} paid to you`, amount: o.o.advanceAmount });
     return r.status === "queued" ? QUEUED : "Offer accepted. Sign the agreement to receive the funds.";
   });
 }
@@ -93,7 +93,7 @@ async function acceptAll(fd: FormData) {
     const offers = await db.select().from(financingOffers).where(inArray(financingOffers.id, ids));
     const total = offers.reduce((a, o) => a + o.advanceAmount, 0n);
     const net = offers.reduce((a, o) => a + describeOffer(o).netDisbursal, 0n);
-    const sub = await submit(db, actorOf(u), "offer.accept_many", { offerIds: ids }, { summary: `Accept ${ids.length} offers: ${formatINR(net)} paid to you in total`, amount: total });
+    const sub = await submit(db, actorOf(u), "offer.accept_many", { offerIds: ids, ack: fd.get("ack") === "on" }, { summary: `Accept ${ids.length} offers: ${formatINR(net)} paid to you in total`, amount: total });
     if (sub.status === "queued") return QUEUED;
     const r = sub.result as { ok: boolean; error?: string }[];
     const ok = r.filter((x) => x.ok).length, bad = r.filter((x) => !x.ok);
@@ -130,7 +130,7 @@ async function chooseBid(fd: FormData) {
     const bidId = z.uuid().parse(fd.get("bidId"));
     const [b] = await db.select({ b: bids, no: invoices.invoiceNumber, fin: businesses.legalName }).from(bids).innerJoin(invoices, eq(invoices.id, bids.invoiceId)).innerJoin(businesses, eq(businesses.id, bids.financierId)).where(eq(bids.id, bidId));
     if (!b) throw new Error("bid not found");
-    const r = await submit(db, actorOf(u), "bid.accept", { bidId }, { summary: `Choose ${b.fin}'s bid on invoice ${b.no}: ${formatINR(describeOffer(b.b).netDisbursal)} paid to you`, amount: b.b.advanceAmount });
+    const r = await submit(db, actorOf(u), "bid.accept", { bidId, ack: fd.get("ack") === "on" }, { summary: `Choose ${b.fin}'s bid on invoice ${b.no}: ${formatINR(describeOffer(b.b).netDisbursal)} paid to you`, amount: b.b.advanceAmount });
     return r.status === "queued" ? QUEUED : "Bid accepted. Sign the agreement to receive the funds.";
   });
 }
@@ -176,6 +176,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
     listCreditNotes(db, ids),
   ]);
   const bidMap = await bidsFor(db, ids);
+  const keyFactsOf = new Map((await db.select({ o: agreements.offerId, ref: agreements.documentRef }).from(agreements).where(and(eq(agreements.businessId, u.businessId!), eq(agreements.kind, "key_facts")))).map((r) => [r.o ?? "", r.ref]));
   const earlyOffers = (await listEarlyPayments(db, { sellerId: u.businessId! })).filter((e) => e.e.status === "proposed" && e.e.expiresAt > new Date());
   const bidders = new Map<string, string>();
   const bidderIds = [...new Set([...bidMap.values()].flat().map((b) => b.financierId).concat(allOffers.flatMap((o) => (o.financierId ? [o.financierId] : []))))];
@@ -201,7 +202,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <form action={acceptAll} className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-card bg-p-100 p-5 ring-1 ring-p-400">
           {openOffers.map((o) => <input key={o.id} type="hidden" name="offerId" value={o.id} />)}
           <div><p className="font-semibold">{openOffers.length} offers are waiting for you</p><p className="text-muted">Accept them together to receive {formatINR(bulkNet)} in total once signed. Each offer stays its own agreement.</p></div>
-          {prepare ? <button className="btn btn-primary">{commit ? `Accept all ${openOffers.length}` : `Submit all ${openOffers.length} for approval`}</button> : <p className="max-w-xs text-xs text-s-600">Your role can view offers but not act on them.</p>}
+          {prepare ? <div className="flex flex-col items-end gap-2"><label className="flex items-start gap-2 text-xs text-muted"><input name="ack" type="checkbox" className="mt-0.5" /><span>I have read the key facts sheet of each offer.</span></label><button className="btn btn-primary">{commit ? `Accept all ${openOffers.length}` : `Submit all ${openOffers.length} for approval`}</button></div> : <p className="max-w-xs text-xs text-s-600">Your role can view offers but not act on them.</p>}
         </form>
       )}
 
@@ -275,6 +276,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                     <>
                       <form action={answerOffer} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="offerId" value={o.id} />
+                        <label className="flex w-full items-start gap-2 text-xs text-muted"><input name="ack" type="checkbox" className="mt-0.5" /><span>I have read the {keyFactsOf.get(o.id) ? <a className="font-semibold text-p-700 underline" href={`/api/documents/${keyFactsOf.get(o.id)}`} target="_blank">key facts sheet</a> : "key facts"} for this offer: what it costs, and what happens if the buyer pays late or not at all.</span></label>
                         <button name="action" value="accept" className="btn btn-primary">{commit ? "Accept offer" : "Submit for approval"}</button>
                         <button name="action" value="reject" className="btn btn-ghost">Decline</button>
                         <span className="w-full text-xs text-muted">Valid until {o.expiresAt.toLocaleString("en-IN")}</span>
@@ -310,7 +312,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                     { h: "All-in rate", align: "right", cell: (b) => `${(b.effectiveAprBps / 100).toFixed(2)}% p.a.` },
                     { h: "Valid until", cell: (b) => <span className="text-muted">{b.expiresAt.toLocaleString("en-IN")}</span> },
                     { h: "", align: "right", cell: (b) => prepare
-                      ? <form action={chooseBid}><input type="hidden" name="bidId" value={b.id} /><button className="btn btn-primary btn-sm">{commit ? "Choose this bid" : "Submit for approval"}</button></form>
+                      ? <form action={chooseBid} className="flex flex-col items-end gap-1"><input type="hidden" name="bidId" value={b.id} /><label className="flex items-start gap-1.5 text-xs text-muted"><input name="ack" type="checkbox" className="mt-0.5" />I have read the rate and cost above.</label><button className="btn btn-primary btn-sm">{commit ? "Choose this bid" : "Submit for approval"}</button></form>
                       : <span className="text-xs text-s-600">View only</span> },
                   ]} />
               </div>

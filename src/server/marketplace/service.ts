@@ -20,6 +20,7 @@ import { describeOffer, priceOffer } from "../offers/pricing";
 import { notifyBusiness } from "../notify";
 import { assertNoEarlyPayment } from "../earlypay/service";
 import { assertActiveFinancier, assertWithinMandate, exposureToBuyer } from "./financier";
+import { ensureKeyFacts } from "../agreements/keyfacts";
 import { formatINR } from "../../lib/money";
 
 export const MARKET = {
@@ -226,6 +227,7 @@ export async function acceptBid(db: Database, bidId: string, actor: SellerActor,
     return { offer, bid, inv };
   });
   if (!out) throw new Error("bid has expired");
+  await ensureKeyFacts(db, out.offer.id, now).catch((e) => console.error("[keyfacts]", (e as Error).message));
   await notifyBusiness(db, out.bid.financierId, "bid_accepted", { invoiceNumber: out.inv.invoiceNumber, advance: formatINR(out.bid.advanceAmount) }, gw);
   return out.offer;
 }
