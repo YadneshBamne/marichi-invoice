@@ -237,7 +237,7 @@ export async function runSurplusPayouts(db: Database, gw: Adapters = gateway) {
     if (!acct) continue;
     const rail = railPlan(p.amount)[Math.min(p.attempts, 1)];
     await db.update(sellerPayouts).set({ status: "processing" }).where(eq(sellerPayouts.id, p.id));
-    const res = await gw.payments.payout({ idempotencyKey: `${p.idempotencyKey}:${p.attempts}`, amount: p.amount, ifsc: acct.ifsc, account: acct.accountNumber, rail });
+    const res = await gw.payments.payout({ idempotencyKey: `${p.idempotencyKey}:${p.attempts}`, amount: p.amount, ifsc: acct.ifsc, account: acct.accountNumber, rail, beneficiaryName: acct.holderName });
     const status = res.status === "processing" && p.bankRef ? await gw.payments.payoutStatus(p.bankRef) : res.status;
     if (status === "succeeded") {
       await db.transaction(async (tx) => {

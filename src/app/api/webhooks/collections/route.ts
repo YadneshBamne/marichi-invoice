@@ -2,6 +2,7 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { verifyWebhook } from "@/server/agreements/service";
 import { recordIncomingPayment } from "@/server/collections/service";
+import { parseCashfreeCredit, verifyCashfreeWebhookSignature } from "@/server/integrations/cashfree";
 
 const Body = z.object({
   accountNumber: z.string().min(1),
@@ -11,8 +12,24 @@ const Body = z.object({
 });
 
 // Bank credit notification for a collection (virtual) account. HMAC-authenticated; idempotent on the UTR.
+// Cashfree sends its own signature headers and body shape; anything else uses the generic shape below.
 export async function POST(req: Request) {
   const raw = await req.text();
+  if (req.headers.get("x-webhook-signature")) {
+    if (!verifyCashfreeWebhookSignature(raw, req.headers.get("x-webhook-timestamp"), req.headers.get("x-webhook-signature"), process.env.PAYMENTS_WEBHOOK_SECRET ?? "")) {
+      return new Response("invalid signature", { status: 401 });
+    }
+    let body: unknown;
+    try { body = JSON.parse(raw); } catch { return new Response("bad request", { status: 400 }); }
+    const credit = parseCashfreeCredit(body);
+    if (!credit) return new Response("ignored"); // not a collection credit: acknowledge so it is not retried
+    try {
+      const r = await recordIncomingPayment(db, credit);
+      return Response.json({ status: r.status });
+    } catch (e) {
+      return new Response((e as Error).message, { status: 422 });
+    }
+  }
   if (!verifyWebhook(raw, req.headers.get("x-signature"), process.env.PAYMENTS_WEBHOOK_SECRET ?? "")) {
     return new Response("invalid signature", { status: 401 });
   }

@@ -5,6 +5,9 @@ import { harden } from "./harden";
 import { anthropicOcr } from "./anthropic-ocr";
 import { resendNotify } from "./resend-email";
 import { localOcr } from "./ocr/local";
+import { cashfreeKyc, cashfreePayments } from "./cashfree";
+import { digioEsign } from "./digio";
+import { msg91Notify } from "./msg91";
 
 export interface KycPort {
   verifyTaxId(taxId: string, name: string): Promise<{ valid: boolean; nameMatch: boolean }>;
@@ -23,7 +26,7 @@ export type { Rail } from "../../lib/countries";
 import type { Rail } from "../../lib/countries";
 export interface PaymentsPort {
   /** Idempotent on `idempotencyKey`: a retry must never move money twice. */
-  payout(p: { idempotencyKey: string; amount: bigint; ifsc: string; account: string; rail: Rail }): Promise<{ bankRef: string; status: "processing" | "succeeded" | "failed"; reason?: string }>;
+  payout(p: { idempotencyKey: string; amount: bigint; ifsc: string; account: string; rail: Rail; beneficiaryName?: string }): Promise<{ bankRef: string; status: "processing" | "succeeded" | "failed"; reason?: string }>;
   payoutStatus(bankRef: string): Promise<"processing" | "succeeded" | "failed">;
   /** Dedicated collection account for one invoice; idempotent on the key. Buyer credits to it reconcile automatically. */
   issueVirtualAccount(p: { idempotencyKey: string }): Promise<{ accountNumber: string; ifsc: string }>;
@@ -80,5 +83,19 @@ export type Adapters = {
 const ocrProvider = process.env.OCR_PROVIDER ?? (process.env.ANTHROPIC_API_KEY ? "claude" : process.env.VITEST ? "mock" : "local");
 const ocr = ocrProvider === "claude" && process.env.ANTHROPIC_API_KEY ? anthropicOcr() : ocrProvider === "mock" ? mock.ocr : localOcr();
 // Email goes out for real as soon as Resend is configured; SMS stays simulated until a provider and DLT registration exist.
-const notify = process.env.RESEND_API_KEY && process.env.MAIL_FROM ? resendNotify(mock.notify, { apiKey: process.env.RESEND_API_KEY, from: process.env.MAIL_FROM }) : mock.notify;
-export const gateway: Adapters = harden({ ...mock, ocr, notify });
+const email = process.env.RESEND_API_KEY && process.env.MAIL_FROM ? resendNotify(mock.notify, { apiKey: process.env.RESEND_API_KEY, from: process.env.MAIL_FROM }) : mock.notify;
+
+// Each provider below switches on when its keys are set, and never under tests, so a developer's .env cannot make a test call out.
+// All are written from the providers' public documents and have not been run against the real services: see DEPLOY.md section 7.
+const env = process.env, live = !env.VITEST;
+const sandbox = (name: string) => (env[name] === "production" ? "production" : "sandbox") as "sandbox" | "production";
+const notify = live && env.MSG91_AUTH_KEY && env.MSG91_SENDER_ID ? msg91Notify(email, { authKey: env.MSG91_AUTH_KEY, senderId: env.MSG91_SENDER_ID }) : email;
+const kyc = live && env.CASHFREE_VERIFY_CLIENT_ID && env.CASHFREE_VERIFY_CLIENT_SECRET
+  ? cashfreeKyc(mock.kyc, { clientId: env.CASHFREE_VERIFY_CLIENT_ID, clientSecret: env.CASHFREE_VERIFY_CLIENT_SECRET, env: sandbox("CASHFREE_ENV") }) : mock.kyc;
+const payments = live && env.CASHFREE_PAYOUT_CLIENT_ID && env.CASHFREE_PAYOUT_CLIENT_SECRET
+  ? cashfreePayments(mock.payments, {
+    clientId: env.CASHFREE_PAYOUT_CLIENT_ID, clientSecret: env.CASHFREE_PAYOUT_CLIENT_SECRET, env: sandbox("CASHFREE_ENV"),
+    collect: env.CASHFREE_PG_CLIENT_ID && env.CASHFREE_PG_CLIENT_SECRET ? { clientId: env.CASHFREE_PG_CLIENT_ID, clientSecret: env.CASHFREE_PG_CLIENT_SECRET } : undefined,
+  }) : mock.payments;
+const esign = live && env.DIGIO_CLIENT_ID && env.DIGIO_CLIENT_SECRET ? digioEsign({ clientId: env.DIGIO_CLIENT_ID, clientSecret: env.DIGIO_CLIENT_SECRET, env: sandbox("DIGIO_ENV") }) : mock.esign;
+export const gateway: Adapters = harden({ ...mock, ocr, notify, kyc, payments, esign });

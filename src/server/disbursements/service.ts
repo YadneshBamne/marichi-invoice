@@ -168,7 +168,7 @@ export async function executeDisbursement(db: Database, id: string, gw: Adapters
   if (claim.done) return { status: "succeeded" as const };
 
   const { d, rail, acct } = claim;
-  const res = await gw.payments.payout({ idempotencyKey: `${d.idempotencyKey}:${d.attempts}`, amount: d.amount, ifsc: acct.ifsc, account: acct.accountNumber, rail });
+  const res = await gw.payments.payout({ idempotencyKey: `${d.idempotencyKey}:${d.attempts}`, amount: d.amount, ifsc: acct.ifsc, account: acct.accountNumber, rail, beneficiaryName: acct.holderName });
   if (res.status === "succeeded") { await finalize(db, d, res.bankRef, now, gw); return { status: "succeeded" as const }; }
   if (res.status === "failed") { await fail(db, d, res.reason ?? `${rail} failed`, gw); return { status: "failed" as const }; }
   await db.update(disbursements).set({ bankRef: res.bankRef }).where(eq(disbursements.id, id));

@@ -56,7 +56,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Partial financing | Built |
 | Credit notes with automatic clawback | Built |
 | Line items and tax breakup stored | Built |
-| ERP connectors: Tally agent, Zoho Books, QuickBooks, SAP, NetSuite | Not built (API keys, CSV import and webhooks only) |
+| ERP connectors: Tally agent, Zoho Books, QuickBooks, SAP, NetSuite | Tally: upload route and customer-side script written, untested against Tally. Zoho Books and QuickBooks: library code written, no connect screen yet, untested. SAP and NetSuite: not built |
 | Debit notes | Built. A debit note is its own linked invoice that the buyer confirms |
 | Bundling several invoices into one facility | Built. One buyer, one bid and one acceptance for the group, all or nothing; each invoice is still signed, paid out and collected on its own |
 | IRN generation mode (we create the IRN for sellers without e-invoicing) | Not built |
@@ -98,7 +98,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Requirement | Status |
 |---|---|
 | Master agreement, invoice schedule, assignment notice from templates | Built, clause text is draft for counsel |
-| E-signature | Built, simulated provider; in-app click-to-sign records who, when, from where |
+| E-signature | Built; in-app click-to-sign records who, when, from where. A Digio adapter is written from its public docs (switched on by keys), not yet tried against Digio |
 | Assignment notice to the buyer before payout | Built |
 | Document vault | Built (private storage once configured) |
 | Payout blocked until both agreements are signed | Built, no bypass |
@@ -111,7 +111,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 |---|---|
 | Maker-checker above a threshold | Built |
 | Escrow account in the ledger; funds in escrow before payout | Built |
-| Idempotent payout; automatic retry on the alternate rail; status polling | Built, simulated rails |
+| Idempotent payout; automatic retry on the alternate rail; status polling | Built; a Cashfree payouts and collection-account adapter is written, untried; rails still simulated by default |
 | Payout advice to the seller | Built |
 | Rail chosen by amount | Built (India: IMPS/NEFT/RTGS; Zambia: EFT/ZIPSS) |
 | Funds from several financiers for one invoice, pro rata | Built. Part-bids are combined by the seller into one offer at the blended rate; money is split by share |
@@ -164,7 +164,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Requirement | Status |
 |---|---|
 | Email | Built (real once Resend is configured) |
-| SMS | Built, simulated (needs a provider and, in India, DLT registration) |
+| SMS | Built; an MSG91 adapter is written (switched on by keys), not yet tried. India still needs DLT registration |
 | WhatsApp Business, push notifications | Not built |
 | Event templates; preferences; delivery status; retry; critical notices on two channels | Built |
 | KYC document expiry reminders | Not built |
@@ -224,9 +224,9 @@ The gateway and the mock adapter for each port are built. **No real provider is 
 | 12.6 Rating agencies | Not built |
 | 12.7 Payment rails and BaaS | Simulated; Account Aggregator not built |
 | 12.8 ERP/accounting | CSV, API keys and webhooks only |
-| 12.9 E-signature and e-stamping | Simulated e-sign; e-stamping not built |
+| 12.9 E-signature and e-stamping | Digio e-sign adapter written, untried; e-stamping not built |
 | 12.10 AML screening | Simulated; ongoing monitoring not built |
-| 12.11 Communication | Email real; SMS simulated; WhatsApp and push not built |
+| 12.11 Communication | Email real; MSG91 SMS adapter written, untried; WhatsApp and push not built |
 | 12.12 Regulatory reporting | Drafts built; filing itself stays with the compliance officer (registry filing at CERSAI/PACRA is built, simulated) |
 | 12.13 Governance | Metrics in System health; version pinning and vendor-risk register not built |
 

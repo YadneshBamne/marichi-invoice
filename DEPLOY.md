@@ -80,10 +80,14 @@ Since `0017`, a financier company cannot hold funds or bid until staff approve i
 
 ## 7. What is real and what is simulated
 Everything below runs end to end in the product, but the outside world is stood in for until you sign the provider:
-- **Payments rails, virtual accounts, bank statements, bureau, KYC/AML, e-invoice registry, e-sign, e-NACH**: mock adapters
-  behind `src/server/integrations/gateway.ts`. Each is one adapter file to replace; nothing else changes.
+- **Written from public documents, switched on by keys, not yet run against the real services**: Cashfree (PAN and bank-account checks, payouts,
+  collection accounts), Digio (e-sign), MSG91 (SMS), and the Tally upload route (`POST /api/v1/erp/tally`, with `scripts/tally-agent.mjs` for the customer's PC).
+  Each file lists what could not be confirmed as `UNVERIFIED:` comments; try each in its sandbox before relying on it. Zoho Books and QuickBooks
+  connectors exist as library code (`src/server/erp/connectors`) but have no connect screen yet.
+- **Still mock**: sanctions/AML screening, bureau, e-invoice registry lookup, e-NACH mandates, bank statements. Each is one adapter file to replace;
+  nothing else changes. Not started: video KYC, e-stamping, bank-statement analysis, SAP and NetSuite.
 - **FX rates** (cross-border): fixed sandbox rates. A treasury or bank rate feed goes in `fx.rate`.
-- **SMS**: simulated until a provider and DLT template registration exist.
+- **SMS**: simulated until `MSG91_AUTH_KEY` and `MSG91_SENDER_ID` are set and the DLT templates are registered with MSG91.
 - **Invoice reading**: real and free. Digital PDFs are read from their text (pdf.js); scans and photos with Tesseract; fields by rules; an optional local or free model gives a second opinion on the extracted text only. The English reading data ships in `node_modules`, so nothing is downloaded at run time. On a serverless host the first scan after idle takes a few seconds; reading is capped at four pages.
 - **Email**: real once `RESEND_API_KEY` and `MAIL_FROM` are set.
 - **Model-assisted underwriting**: the scoring model is an expert-weighted prior, not trained on your data. It starts in shadow mode.

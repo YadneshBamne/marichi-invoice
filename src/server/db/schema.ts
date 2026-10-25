@@ -275,7 +275,7 @@ export const invoices = pgTable("invoices", {
   poReference: text("po_reference"),
   irn: text("irn"),
   contentHash: text("content_hash").notNull(),
-  source: text("source").notNull().default("upload"), // upload | api | csv: how the invoice reached us
+  source: text("source").notNull().default("upload"), // upload | api | csv | erp: how the invoice reached us
   // Export invoices: `amount` is always rupees (the locked conversion), so the rest of the platform needs no change.
   currency: text("currency").notNull().default("INR"),
   foreignAmount: paise("foreign_amount"), // minor units (cents) of `currency`, when it is not INR

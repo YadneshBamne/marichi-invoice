@@ -27,7 +27,7 @@ export class ApiError extends Error {
 }
 
 /** Raise an invoice for a seller company from structured data. Returns the new invoice, or throws ApiError. */
-export async function createSellerInvoice(db: Database, sellerId: string, input: InvoiceInputT, source: "api" | "csv") {
+export async function createSellerInvoice(db: Database, sellerId: string, input: InvoiceInputT, source: "api" | "csv" | "erp") {
   const [buyer] = await db.select({ id: businesses.id }).from(buyerSellerRelationships).innerJoin(businesses, eq(businesses.id, buyerSellerRelationships.buyerId))
     .where(and(eq(buyerSellerRelationships.sellerId, sellerId), eq(businesses.gstin, input.buyerGstin)));
   if (!buyer) throw new ApiError(422, "BUYER_NOT_LINKED", `${input.buyerGstin} is not one of your linked buyers. Add the buyer in the app first.`);
