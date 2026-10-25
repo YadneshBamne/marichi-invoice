@@ -4,7 +4,8 @@
 // so a large book is covered over several runs rather than all at once.
 import { and, asc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { auditLog, businesses, financierProfiles, financingOffers, invoices, sentReminders, ubos } from "../db/schema";
+import { auditLog, businessDocuments, businesses, financierProfiles, financingOffers, invoices, sentReminders, ubos } from "../db/schema";
+import { market } from "../../lib/countries";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { KYB_AML_RULE, openCase } from "../fraud/service";
 import { validateIrn } from "../invoices/service";
@@ -144,6 +145,35 @@ export async function requestRekyc(db: Database, staff: { id: string; role: stri
   await db.update(businesses).set({ kybStatus: "rekyc_due", kybNote: note.trim() }).where(eq(businesses.id, businessId));
   await db.insert(auditLog).values({ actorId: staff.id, action: "kyb.rekyc_requested", entity: "business", entityId: businessId, after: { note: note.trim() } });
   await notifyBusiness(db, businessId, "kyb_rekyc_due", { date: isoDay(now) }, gw, now);
+}
+
+// ---- 4a. Company documents that expire --------------------------------------------------------------------------------------
+
+/** A document with a validity date (a tax clearance certificate) gets the same notices as a licence. When a required one lapses, the company is asked to verify again. */
+export async function remindDocuments(db: Database, gw: Adapters = gateway, now = new Date()) {
+  const docs = await db.select().from(businessDocuments).where(and(isNull(businessDocuments.supersededAt), isNotNull(businessDocuments.validUntil)));
+  const today = isoDay(now);
+  const out = { notices: 0, lapsed: 0 };
+  for (const d of docs) {
+    const spec = market().documents.find((s) => s.kind === d.kind);
+    const label = spec?.label.replace(/\s*\(.*\)$/, "") ?? d.kind;
+    const left = Math.ceil((Date.parse(d.validUntil!) - Date.parse(today)) / DAY);
+    if (left < 0) {
+      if (!(await once(db, `doc-expired:${d.id}`, now))) continue;
+      await notifyBusiness(db, d.businessId, "document_expired", { document: label }, gw, now);
+      if (spec?.required) {
+        const r = await db.update(businesses).set({ kybStatus: "rekyc_due", kybNote: `The ${label} has expired. Upload a current one.` }).where(and(eq(businesses.id, d.businessId), eq(businesses.kybStatus, "approved"))).returning({ id: businesses.id });
+        if (r.length) await db.insert(auditLog).values({ action: "kyb.document_expired", entity: "business", entityId: d.businessId, after: { kind: d.kind } });
+      }
+      out.lapsed++;
+      continue;
+    }
+    const step = [...MONITOR.licenceNoticeDays].sort((a, b) => a - b).find((n) => left <= n);
+    if (step === undefined || !(await once(db, `doc:${d.id}:${step}`, now))) continue;
+    await notifyBusiness(db, d.businessId, "document_expiring", { document: label, days: String(left), date: d.validUntil! }, gw, now);
+    out.notices++;
+  }
+  return out;
 }
 
 // ---- 4. Licence expiry notices ---------------------------------------------------------------------------------------------

@@ -13,12 +13,14 @@ import { submitForeignKyb } from "@/server/crossborder/service";
 import { Card, PageHead } from "@/components/ui/cards";
 import { Icon } from "@/components/ui/icons";
 import { market } from "@/lib/countries";
+import { Documents } from "./documents";
 
 // The identifiers are checked against the country pack inside the service, so this only shapes the form data.
 const Form = z.object({
   pan: z.string(),
   gstin: z.string().optional(),
   cin: z.string().optional(),
+  udyam: z.string().optional(),
   uboName: z.string().min(2),
   uboDin: z.string().optional(),
   accountNumber: z.string(),
@@ -47,6 +49,7 @@ async function submit(fd: FormData) {
     pan: f.pan,
     gstin: f.gstin || undefined,
     cin: f.cin || undefined,
+    udyam: f.udyam || undefined,
     // ponytail: single UBO at 100% in the form; multi-director entry when needed (PRD edge case).
     ubos: [{ name: f.uboName, din: f.uboDin || undefined, shareholdingBps: 10000 }],
     bank: { accountNumber: f.accountNumber, ifsc: f.ifsc, holderName: f.holderName },
@@ -76,7 +79,8 @@ const input = "field font-normal";
 const STAGES = [["draft", "Details"], ["under_review", "Review"], ["approved", "Verified"]] as const;
 const stageOf = (s: string) => (s === "approved" ? 2 : s === "under_review" || s === "submitted" ? 1 : 0);
 
-export default async function Onboarding() {
+export default async function Onboarding({ searchParams }: { searchParams: Promise<{ docError?: string }> }) {
+  const q = await searchParams;
   const user = await requireUser();
   if (["ops", "compliance", "admin"].includes(user.role)) redirect("/admin");
   const [biz] = await db.select().from(businesses).where(eq(businesses.id, user.businessId!));
@@ -141,6 +145,7 @@ export default async function Onboarding() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block font-medium">{oneId ? ids.kyb.label : `Business ${ids.kyb.label}`}<input name="pan" required className={input} />{hint(ids.kyb.hint)}</label>
               {!oneId && <label className="block font-medium">{ids.taxReg.label}<input name="gstin" required className={input} />{hint(ids.taxReg.hint)}</label>}
+              {ids.msme && <label className="block font-medium sm:col-span-2">{ids.msme.label} <span className="font-normal text-faint">(if applicable)</span><input name="udyam" className={input} />{hint(ids.msme.hint)}</label>}
               {ids.companyReg && <label className="block font-medium sm:col-span-2">{ids.companyReg.label} <span className="font-normal text-faint">(if applicable)</span><input name="cin" className={input} />{hint(ids.companyReg.hint)}</label>}
             </div>
           </Card>
@@ -162,6 +167,7 @@ export default async function Onboarding() {
           <button className="btn btn-primary">Submit for verification</button>
         </form>
       )}
+      {!buyer && <div className="mt-4"><Documents businessId={biz.id} error={q.docError} /></div>}
     </div>
   );
 }

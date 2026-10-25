@@ -57,10 +57,29 @@ export const businesses = pgTable("businesses", {
   dualControl: boolean("dual_control").notNull().default(false), // every commitment of company money needs a second approver
   country: text("country"), // ISO-3166 alpha-2; null means India
   taxId: text("tax_id"), // an overseas company's tax or registration number (no GSTIN)
+  udyam: text("udyam"), // the MSME registration number, where the country has one
   kybApprovedAt: timestamp("kyb_approved_at", { withTimezone: true }), // when verification last became approved: re-verification is due a set time after
   amlScreenedAt: timestamp("aml_screened_at", { withTimezone: true }), // the last time the company and its owners were checked against the sanctions lists
   createdAt: createdAt(),
 });
+
+// A document a company uploaded for verification (certificate, PAN card, bank letter). We read it, compare it with what the company
+// declared, and show staff the result and any doubts. A newer upload of the same kind replaces the older one, which is kept.
+export const businessDocuments = pgTable("business_documents", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  kind: text("kind").notNull(),
+  documentRef: text("document_ref").notNull(),
+  documentHash: text("document_hash").notNull(),
+  filename: text("filename").notNull(),
+  reading: text("reading").notNull().default("read"), // read | unreadable: whether text could be taken from the file
+  extracted: jsonb("extracted"), // the fields read from it
+  flags: jsonb("flags").$type<string[]>().notNull().default(sql`'[]'::jsonb`), // things staff should look at: a name that differs, an edited file
+  validUntil: date("valid_until"), // for documents that expire
+  uploadedBy: uuid("uploaded_by"),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index("bizdoc_business").on(t.businessId, t.kind)]);
 
 // Something that is told to a person once: a deadline notice, a reminder. The key says what and for which date, so a re-run never repeats it.
 export const sentReminders = pgTable("sent_reminders", {
@@ -244,6 +263,7 @@ export const invoices = pgTable("invoices", {
   documentRef: text("document_ref"), // vault reference to the uploaded PDF/image
   // absent = no IRN supplied (compensating controls apply); pending = IRP down, auto-retried
   irnStatus: text("irn_status").notNull().default("absent"), // absent | verified | mismatch | pending
+  docFingerprint: jsonb("doc_fingerprint"), // what the uploaded file says about how it was made (tool, dates, pages): see integrations/ocr/forensics.ts
   irnRecheckedAt: timestamp("irn_rechecked_at", { withTimezone: true }), // the last time a financed invoice's e-invoice was looked up again
   reviewNote: text("review_note"),
   status: invoiceStatus("status").notNull().default("uploaded"),

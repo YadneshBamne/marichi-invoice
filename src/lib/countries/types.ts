@@ -7,6 +7,9 @@ export type Rail = "IMPS" | "NEFT" | "RTGS" | "ZIPSS" | "EFT";
 /** One identifier a person types: the label to show, the pattern it must match, and a hint under the field. */
 export type IdSpec = { label: string; pattern: RegExp; hint: string };
 
+/** A document a company is asked to upload for verification. `expires` ones carry a validity date we remind about. */
+export type DocSpec = { kind: string; label: string; required: boolean; expires?: boolean };
+
 export type Pack = {
   code: string; name: string; adjective: string;
   currency: {
@@ -18,9 +21,11 @@ export type Pack = {
     kyb: IdSpec; // the company's taxpayer identity, checked at verification
     taxReg: IdSpec; // the number on its invoices that names it as a buyer; one company each
     companyReg: IdSpec | null; // the company registry number, if the country has one
+    msme: IdSpec | null; // the small-business registration number, where the country has one (India: Udyam)
     bankCode: IdSpec; bankAccount: IdSpec;
     director: string; // what a director or owner is identified by
   };
+  documents: DocSpec[];
   tax: { name: string; rateBps: number }; // on the platform's own fees; the financing discount is not taxed
   eInvoice: { short: string; long: string; authority: string };
   registry: { text: string; short: string; when: "before_payout" | "after_assignment"; withinDays: number | null } | null;

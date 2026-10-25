@@ -2,12 +2,14 @@
 // the case threshold (or any single high-severity signal) opens a case, which freezes the invoice until a reviewer decides.
 // Every signal carries a plain-language reason, so a reviewer sees exactly why something was flagged.
 // The rules look at patterns across invoices and businesses; the existing duplicate and e-invoice checks stay where they are.
-import { and, asc, desc, eq, gte, inArray, lt, ne, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, ne, notInArray } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { businessBankAccounts, businesses, fraudScans, invoices } from "../db/schema";
 import { openCase } from "./service";
 import { formatMoney } from "../../lib/money";
 import { market } from "../../lib/countries";
+import { readDocument } from "../vault";
+import { fingerprint, forensicSignals, type Fingerprint } from "../integrations/ocr/forensics";
 
 /** Editable in Policy (group "Fraud engine"). */
 export const FRAUD = {
@@ -24,7 +26,7 @@ const DAY = 86_400_000;
 const CLOSED = ["paid", "rejected", "written_off"] as const;
 const panOf = (gstin: string | null) => (gstin && gstin.length >= 12 ? gstin.slice(2, 12).toUpperCase() : null); // chars 3-12 of a GSTIN are the holder's PAN
 
-/** Score one invoice. Pure reads: nothing is changed. */
+/** Score one invoice. It changes nothing except to remember the uploaded file's fingerprint the first time it is seen. */
 export async function scoreInvoice(db: Database, invoiceId: string, now = new Date()): Promise<Signal[]> {
   const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!inv) throw new Error("invoice not found");
@@ -89,6 +91,23 @@ export async function scoreInvoice(db: Database, invoiceId: string, now = new Da
   // 8. Possible duplicate: same buyer, same amount, same invoice date, different number.
   const twin = history.find((h) => h.buyerId === inv.buyerId && h.amount === inv.amount && h.date === inv.invoiceDate);
   if (twin) add({ rule: "possible_duplicate", label: "Same buyer, amount and date as another invoice", severity: "medium", score: 30, detail: { otherInvoice: twin.id } });
+
+  // 9. The file itself: the tool that made it, when, whether it was edited, and whether it looks like this seller's other invoices.
+  // The first time a file is seen its fingerprint is stored, so the seller's history is there to compare with next time.
+  if (inv.documentRef) {
+    try {
+      let fp = inv.docFingerprint as Fingerprint | null;
+      if (!fp) {
+        const doc = await readDocument(inv.documentRef);
+        if (doc.contentType === "application/pdf") { fp = await fingerprint(new Uint8Array(doc.bytes)); if (fp) await db.update(invoices).set({ docFingerprint: fp }).where(eq(invoices.id, inv.id)); }
+      }
+      if (fp) {
+        const prior = await db.select({ fp: invoices.docFingerprint }).from(invoices)
+          .where(and(eq(invoices.sellerId, inv.sellerId), ne(invoices.id, inv.id), isNotNull(invoices.docFingerprint))).orderBy(desc(invoices.createdAt)).limit(10);
+        for (const s of forensicSignals(fp, { invoiceDate: inv.invoiceDate, now, history: prior.map((r) => r.fp as Fingerprint) })) add(s);
+      }
+    } catch { /* a file we cannot open adds no signal */ }
+  }
 
   return out;
 }

@@ -5,6 +5,8 @@ import { gateway, type Adapters } from "../integrations/gateway";
 import { resolveInvites } from "../relationships/service";
 import { KYB_AML_RULE, openCase } from "../fraud/service";
 import { notifyBusiness } from "../notify";
+import { KYB_RULES } from "./rules";
+import { missingRequired } from "./documents";
 import { checkId, market } from "../../lib/countries";
 
 export type KybStatus = typeof businesses.$inferSelect.kybStatus;
@@ -15,6 +17,7 @@ export type KybInput = {
   pan: string;
   gstin?: string; // the tax registration on this seller's invoices (GSTIN, or the TPIN in Zambia); needed for e-invoice cross-checks
   cin?: string; // company registry number (CIN, PACRA number)
+  udyam?: string; // small-business registration number, where the country has one
   ubos: { name: string; din?: string; shareholdingBps: number }[];
   bank: { accountNumber: string; ifsc: string; holderName: string };
 };
@@ -46,6 +49,11 @@ export async function submitKyb(db: Database, input: KybInput, gw: Adapters = ga
   const taxId = checkId(ids.kyb, input.pan)!;
   const gstin = checkId(ids.taxReg, input.gstin, true) ?? (ids.kyb.label === ids.taxReg.label ? taxId : undefined); // in Zambia one number does both jobs
   const cin = ids.companyReg ? checkId(ids.companyReg, input.cin, true) : undefined;
+  const udyam = ids.msme ? checkId(ids.msme, input.udyam, true) : undefined;
+  if (KYB_RULES.requireDocuments === 1) {
+    const missing = await missingRequired(db, input.businessId);
+    if (missing.length) throw new Error(`upload the required documents first: ${missing.join("; ")}`);
+  }
   checkId(ids.bankCode, input.bank.ifsc); checkId(ids.bankAccount, input.bank.accountNumber);
   if (gstin) await assertGstinFree(db, gstin, biz.id);
 
@@ -74,7 +82,7 @@ export async function submitKyb(db: Database, input: KybInput, gw: Adapters = ga
 
   await db.transaction(async (tx) => {
     await tx.update(businesses)
-      .set({ pan: taxId, cin, gstin, kybStatus: status, kybNote: reasons.join("; ") || null, ...approvedAt(status) })
+      .set({ pan: taxId, cin, gstin, ...(udyam ? { udyam } : {}), kybStatus: status, kybNote: reasons.join("; ") || null, ...approvedAt(status) })
       .where(eq(businesses.id, biz.id));
     await tx.delete(ubos).where(eq(ubos.businessId, biz.id));
     await tx.insert(ubos).values(

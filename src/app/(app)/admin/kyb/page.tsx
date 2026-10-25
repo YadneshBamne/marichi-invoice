@@ -8,6 +8,7 @@ import { reviewKyb } from "@/server/kyb/service";
 import { requestRekyc } from "@/server/compliance/monitoring";
 import { EmptyState, KV, PageHead, Panel, Pop, PopField, ReviewCard, StatusPill } from "@/components/ui/page";
 import { market } from "@/lib/countries";
+import { currentDocuments } from "@/server/kyb/documents";
 
 export const metadata = { title: "KYB review" };
 
@@ -40,6 +41,8 @@ async function askAgain(fd: FormData) {
 export default async function KybQueue() {
   await requireUser(["ops", "compliance", "admin"]);
   const rows = await db.select().from(businesses).where(inArray(businesses.kybStatus, ["under_review", "submitted"]));
+  const docs = new Map(await Promise.all(rows.map(async (b) => [b.id, await currentDocuments(db, b.id)] as const)));
+  const spec = new Map(market().documents.map((d) => [d.kind, d]));
   return (
     <>
       <PageHead title="KYB review" sub="Businesses waiting for identity and compliance checks. Sanctions or AML hits are decided here.">
@@ -65,6 +68,22 @@ export default async function KybQueue() {
                 </form>
               }>
               <KV rows={[[market().ids.taxReg.label, b.gstin ?? "Not provided"], [market().ids.kyb.label, b.pan ? `${b.pan.slice(0, 2)}${"•".repeat(6)}${b.pan.slice(-2)}` : "Not provided"], ...(market().ids.companyReg ? [[market().ids.companyReg!.label, b.cin ?? "Not provided"] as [string, string]] : []), ["Verification level", b.kybLevel], ...(b.kybNote ? [["System note", b.kybNote] as [string, string]] : [])]} />
+              <div className="mt-4 border-t border-hair pt-3 text-sm">
+                <p className="mb-1.5 font-semibold">Documents</p>
+                {(docs.get(b.id) ?? []).length === 0 ? <p className="text-muted">None uploaded.</p> : (
+                  <ul className="space-y-2">
+                    {docs.get(b.id)!.map((d) => (
+                      <li key={d.id}>
+                        <a className="font-medium text-p-700 underline" href={`/api/documents/${d.documentRef}`} target="_blank">{spec.get(d.kind)?.label ?? d.kind}</a>
+                        <span className="text-muted"> · {d.reading === "unreadable" ? "could not be read" : d.extracted ? Object.values(d.extracted as Record<string, string>).join(" · ") : ""}</span>
+                        {d.flags.map((f) => <p key={f} className="text-[13px] text-s-600">{f}</p>)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {market().documents.filter((s) => s.required && !(docs.get(b.id) ?? []).some((d) => d.kind === s.kind)).map((s) => <p key={s.kind} className="mt-1 text-[13px] text-r-600">Missing: {s.label}</p>)}
+                {b.udyam && <p className="mt-1 text-[13px] text-muted">{market().ids.msme?.label}: {b.udyam}</p>}
+              </div>
             </ReviewCard>
           ))}
         </div>

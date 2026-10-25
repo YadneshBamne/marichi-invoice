@@ -2,7 +2,7 @@ import { IN } from "./in";
 import { ZM } from "./zm";
 import type { Pack } from "./types";
 import type { IdSpec } from "./types";
-export type { IdSpec, Pack, Rail } from "./types";
+export type { DocSpec, IdSpec, Pack, Rail } from "./types";
 
 export const PACKS: Record<string, Pack> = { IN, ZM };
 
