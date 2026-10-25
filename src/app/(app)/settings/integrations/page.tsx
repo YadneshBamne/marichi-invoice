@@ -4,6 +4,7 @@ import { listApiKeys } from "@/server/erp/keys";
 import { listEndpoints, recentDeliveries } from "@/server/erp/events";
 import { DataTable, Notice, Panel, StatusPill } from "@/components/ui/page";
 import { NewEndpointForm, NewKeyForm } from "./forms";
+import { AccountingPanel } from "./accounting";
 import { revokeKey, testEndpoint, toggleEndpoint } from "./actions";
 
 export const metadata = { title: "Integrations" };
@@ -28,7 +29,8 @@ curl -X POST https://YOUR-DOMAIN/api/v1/invoices \\
   -H "Authorization: Bearer mk_live_..." -H "content-type: application/json" \\
   -d '{"buyerGstin":"29BBBBB2222B1Z5","invoiceNumber":"INV-002","invoiceDate":"2026-10-01","dueDate":"2026-12-01","amount":"118000.00"}'`;
 
-export default async function Integrations() {
+export default async function Integrations({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
+  const q = await searchParams;
   const u = await requireUser(["seller", "buyer"]);
   requireApp(u, "integrations");
   const owner = u.orgRole === "owner";
@@ -37,7 +39,10 @@ export default async function Integrations() {
 
   return (
     <div className="space-y-5">
+      {q.ok && <Notice tone="good">{q.ok}</Notice>}
+      {q.error && <Notice tone="bad">{q.error}</Notice>}
       {!owner && <Notice tone="warn">Only the company owner can create keys or webhooks. You can see what is set up.</Notice>}
+      {seller && <AccountingPanel businessId={u.businessId!} owner={owner} />}
 
       <Panel title="API keys" sub={`Let your accounting system or a script read your invoices${seller ? " and raise new ones" : " and answer them"}. A key works for this company only.`} flush={keys.length > 0}>
         {owner && <div className={keys.length ? "border-b border-hair p-5 sm:p-6" : ""}><NewKeyForm /></div>}

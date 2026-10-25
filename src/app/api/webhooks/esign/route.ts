@@ -2,6 +2,7 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { completeSignature, verifyWebhook } from "@/server/agreements/service";
 import { parseDigioWebhook } from "@/server/integrations/digio";
+import { parseZohoSignWebhook } from "@/server/integrations/zoho-sign";
 
 const Body = z.object({ requestId: z.string().min(1), status: z.enum(["signed", "failed"]), signerEmail: z.email().optional() });
 
@@ -9,9 +10,10 @@ const Body = z.object({ requestId: z.string().min(1), status: z.enum(["signed", 
 // Digio sends its own checksum header and body shape; anything else uses the generic shape below (also what the sandbox sends).
 export async function POST(req: Request) {
   const raw = await req.text();
-  if (req.headers.get("x-digio-checksum")) {
+  const digio = req.headers.get("x-digio-checksum"), zoho = req.headers.get("x-zs-webhook-signature");
+  if (digio || zoho) {
     let ev;
-    try { ev = parseDigioWebhook(raw, req.headers, process.env.ESIGN_WEBHOOK_SECRET ?? ""); } catch { return new Response("invalid signature", { status: 401 }); }
+    try { ev = digio ? parseDigioWebhook(raw, req.headers, process.env.ESIGN_WEBHOOK_SECRET ?? "") : parseZohoSignWebhook(raw, req.headers, process.env.ESIGN_WEBHOOK_SECRET ?? ""); } catch { return new Response("invalid signature", { status: 401 }); }
     if (!ev) return new Response("ignored"); // an event we do not act on: still a 200, so Digio does not keep retrying
     try {
       await completeSignature(db, { requestId: ev.requestId, outcome: ev.outcome, signer: ev.signer });

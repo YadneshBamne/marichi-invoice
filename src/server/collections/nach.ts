@@ -1,7 +1,7 @@
 // Auto-debit (e-NACH in India, direct debit elsewhere; the pack names it). A buyer authorises a mandate on their bank account; on the day an invoice falls due we present a debit,
 // and a successful debit is booked exactly like a buyer's own transfer (it goes through the collections waterfall).
 // Safety rules: one debit in flight per invoice, a hard cap per debit, a notice the day before, three tries then manual.
-import { and, count, desc, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { auditLog, collectionEvents, invoiceCollections, invoices, mandates, nachDebits, virtualAccounts } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
@@ -50,6 +50,23 @@ export async function applyMandateStatus(db: Database, providerRef: string, stat
   if (status === "active") await notifyBusiness(db, m.businessId, "mandate_active", { account: maskTail(m.accountNumber) }, gw, now);
   else await notifyBusiness(db, m.businessId, "mandate_rejected", { reason: reason ?? "no reason given" }, gw, now);
   return u;
+}
+
+/**
+ * Ask the provider about every mandate still waiting for the bank and book the answers. Used when a provider's callback cannot say
+ * which mandate it is about (Razorpay's token events carry no reference). Safe to run any time: decided mandates are left alone.
+ */
+export async function reconcilePendingMandates(db: Database, check: (providerRef: string) => Promise<{ status: "pending" | "active" | "rejected" | "cancelled"; reason?: string }>, gw: Adapters = gateway, now = new Date()) {
+  const open = await db.select().from(mandates).where(and(eq(mandates.status, "pending"), isNotNull(mandates.providerRef))).limit(100);
+  const n = { active: 0, rejected: 0, revoked: 0 };
+  for (const m of open) {
+    try {
+      const r = await check(m.providerRef!);
+      if (r.status === "active" || r.status === "rejected") { await applyMandateStatus(db, m.providerRef!, r.status, r.reason, gw, now); n[r.status]++; }
+      else if (r.status === "cancelled") { await db.update(mandates).set({ status: "revoked", revokedAt: now }).where(and(eq(mandates.id, m.id), eq(mandates.status, "pending"))); n.revoked++; }
+    } catch (e) { console.error("[mandate] check", m.id, (e as Error).message); } // one failing lookup must not stop the others
+  }
+  return n;
 }
 
 export async function revokeMandate(db: Database, actor: MandateActor, mandateId: string, gw: Adapters = gateway, now = new Date()) {

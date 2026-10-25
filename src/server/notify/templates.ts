@@ -4,11 +4,15 @@ import type { Channel } from "../integrations/gateway";
 // (PRD 12.11: critical notices on at least two channels). `sms` text must match the DLT-registered template exactly in India
 // (TRAI), so the wording below is what gets registered. dltTemplateId values are placeholders until the sender is registered.
 // Merge fields are `{{name}}`; every field must be listed in `fields` (checked by a unit test).
+// `whatsapp` names a template approved in Meta's WhatsApp Manager: `params` are the `fields` that fill its {{1}}, {{2}}... in order.
+// `push` is the browser notification (the url opens when it is tapped). Both are sent only to people who have set that channel up.
 export type Template = {
   fields: string[];
   critical?: boolean;
   email: { subject: string; body: string };
   sms?: { text: string; dltTemplateId: string };
+  whatsapp?: { template: string; language: string; params: string[] };
+  push?: { title: string; body: string; url?: string };
 };
 
 const DLT = "DLT-PENDING-REGISTRATION";
@@ -112,6 +116,19 @@ export const TEMPLATES: Record<string, Template> = {
   fraud_case_opened: { fields: ["caseId", "rule", "severity"], email: { subject: "New {{severity}} fraud case: {{rule}}", body: "Case {{caseId}} ({{rule}}, {{severity}}) was opened and is awaiting review." } },
 };
 
+// WhatsApp and push variants, only where they clearly help. The WhatsApp template body (to approve at Meta) is the push text with
+// {{1}}, {{2}}... in the order of `params`; template names are "marichi_" + the key here.
+const wa = (template: string, params: string[]) => ({ template: `marichi_${template}`, language: "en", params });
+const EXTRA: Record<string, Pick<Template, "whatsapp" | "push">> = {
+  disbursed: { whatsapp: wa("disbursed", ["amount", "invoiceNumber"]), push: { title: "Payout sent", body: "{{amount}} was paid to your bank account for invoice {{invoiceNumber}}.", url: "/notifications" } },
+  payment_overdue: { whatsapp: wa("payment_overdue", ["invoiceNumber", "amount", "due"]), push: { title: "Invoice {{invoiceNumber}} is overdue", body: "{{amount}} was due on {{due}}. Late charges apply.", url: "/notifications" } },
+  legal_notice: { whatsapp: wa("legal_notice", ["noticeNo", "invoiceNumber", "amount", "cureBy"]), push: { title: "Legal notice {{noticeNo}}", body: "Invoice {{invoiceNumber}}: pay {{amount}} by {{cureBy}}.", url: "{{link}}" } },
+  recourse_notice: { whatsapp: wa("recourse_notice", ["invoiceNumber", "amount", "dpd"]), push: { title: "Recourse notice: invoice {{invoiceNumber}}", body: "Your buyer has not paid {{amount}}, {{dpd}} days past due. You are now liable for it.", url: "/notifications" } },
+  offer_ready: { whatsapp: wa("offer_ready", ["advance", "invoiceNumber", "expires"]), push: { title: "Financing offer ready", body: "{{advance}} advance for invoice {{invoiceNumber}}, valid until {{expires}}.", url: "/notifications" } },
+  confirmation_requested: { whatsapp: wa("confirmation_requested", ["invoiceNumber", "amount", "link"]), push: { title: "Please confirm invoice {{invoiceNumber}}", body: "A supplier submitted {{amount}} against you.", url: "{{link}}" } },
+};
+for (const [k, v] of Object.entries(EXTRA)) Object.assign(TEMPLATES[k], v);
+
 /** Fixed OTP wording (not in the registry: the code must never be stored in the notifications log). */
 export const OTP_SMS = { text: "Marichi: {{code}} is your verification code. It expires in 10 minutes. Do not share it.", dltTemplateId: DLT };
 
@@ -133,5 +150,14 @@ export function render(template: string, channel: Channel, data: Record<string, 
     return { body: fill(t.sms.text, data, true).replaceAll("₹", "Rs."), dltTemplateId: t.sms.dltTemplateId };
   }
   const flat = (s: string) => fill(s, data, true);
+  if (channel === "whatsapp") {
+    if (!t.whatsapp) return null;
+    // The queue keeps only the rendered row, so the parameter values are stored as JSON. WhatsApp refuses empty values.
+    return { body: JSON.stringify(t.whatsapp.params.map((n) => flat(`{{${n}}}`).trim() || "-")) };
+  }
+  if (channel === "push") {
+    if (!t.push) return null;
+    return { subject: flat(t.push.title), body: JSON.stringify({ body: flat(t.push.body), url: t.push.url ? flat(t.push.url) : undefined }) };
+  }
   return { subject: flat(t.email.subject), body: t.email.body.replace(/\{\{(\w+)\}\}/g, (_, k: string) => String(data[k] ?? "")) };
 }

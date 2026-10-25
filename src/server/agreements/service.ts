@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, asc, eq, or } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { agreements, auditLog, businessDocuments, legalNotices, businesses, financingOffers, invoiceConfirmations, invoices, users, financierProfiles } from "../db/schema";
+import { agreements, auditLog, businessDocuments, businessStatements, legalNotices, businesses, financingOffers, invoiceConfirmations, invoices, users, financierProfiles } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { ensureVirtualAccount } from "../collections/virtual-accounts";
 import { notifyBusiness } from "../notify";
@@ -168,11 +168,13 @@ export async function canViewDocument(db: Database, user: { role: string; busine
   const [rec] = await db.select({ i: invoices.id, s: invoices.sellerId, b: invoices.buyerId }).from(invoiceConfirmations).innerJoin(invoices, eq(invoices.id, invoiceConfirmations.invoiceId)).where(eq(invoiceConfirmations.recordRef, ref));
   const [bd] = await db.select({ b: businessDocuments.businessId }).from(businessDocuments).where(eq(businessDocuments.documentRef, ref));
   const [ln] = await db.select({ to: legalNotices.addresseeId }).from(legalNotices).where(eq(legalNotices.documentRef, ref));
-  if (!ag && !iv && !lic && !rec && !bd && !ln) return false;
+  const [bs] = await db.select({ b: businessStatements.businessId }).from(businessStatements).where(eq(businessStatements.documentRef, ref));
+  if (!ag && !iv && !lic && !rec && !bd && !ln && !bs) return false;
   if (STAFF.includes(user.role)) return true;
   if (!user.businessId) return false;
   if (bd) return bd.b === user.businessId; // a company's verification documents: its own people and staff only
   if (ln) return ln.to === user.businessId; // a legal notice: the company it is addressed to and staff
+  if (bs) return user.role === "seller" && bs.b === user.businessId; // a bank statement: the seller that uploaded it and staff only
   if (lic) return user.role === "financier" && lic.b === user.businessId; // a financier's licence copy: its own company and staff only
   if (rec) return (user.role === "seller" && rec.s === user.businessId) || (user.role === "buyer" && rec.b === user.businessId); // the two parties to the invoice
   if (user.role === "seller") return ag?.businessId === user.businessId || iv?.sellerId === user.businessId;

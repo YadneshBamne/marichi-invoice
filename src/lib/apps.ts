@@ -14,6 +14,7 @@ export const APPS: AppDef[] = [
       { href: "/seller/invoices", label: "Invoices", icon: "invoice", tour: "nav-invoices" },
       { href: "/seller/buyers", label: "Buyers", icon: "users", tour: "nav-buyers" },
       { href: "/seller/agreements", label: "Agreements", icon: "file", tour: "nav-agreements" },
+      { href: "/seller/statements", label: "Bank statements", icon: "bank", tour: "nav-statements" },
     ],
   },
   {

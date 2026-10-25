@@ -17,6 +17,7 @@ import { formatMoney, rupeesToPaise } from "@/lib/money";
 import { myMandate } from "@/server/collections/nach";
 import { maskTail } from "@/server/crypto";
 import { Autopay } from "./autopay";
+import { razorpayConfigFromEnv, registrationLink } from "@/server/integrations/razorpay-mandates";
 import { acceptanceText } from "@/server/confirmations/wording";
 import { market } from "@/lib/countries";
 import { PopField } from "@/components/ui/page";
@@ -80,7 +81,10 @@ export default async function BuyerInvoices() {
   const pending = rows.filter((r) => r.i.status === "sent_for_confirmation");
   const done = rows.filter((r) => r.i.status !== "sent_for_confirmation" && r.c);
   const lead = can(u, "invoice.confirm");
-  const mandate = mandateRow && { id: mandateRow.id, status: mandateRow.status, maskedAccount: maskTail(mandateRow.accountNumber), ifsc: mandateRow.ifsc, maxLabel: formatMoney(mandateRow.maxAmount) };
+  // With Razorpay the buyer authorises at a page Razorpay hosts; a failed lookup just means no link is shown yet.
+  const rzp = razorpayConfigFromEnv();
+  const authUrl = mandateRow?.status === "pending" && mandateRow.providerRef && rzp ? await registrationLink(rzp, mandateRow.providerRef).catch(() => null) : null;
+  const mandate = mandateRow && { id: mandateRow.id, status: mandateRow.status, maskedAccount: maskTail(mandateRow.accountNumber), ifsc: mandateRow.ifsc, maxLabel: formatMoney(mandateRow.maxAmount), authUrl };
 
   return (
     <>

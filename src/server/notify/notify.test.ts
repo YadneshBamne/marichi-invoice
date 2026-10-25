@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { businesses, notifications, phoneOtps, users } from "../db/schema";
+import { businesses, notifications, phoneOtps, pushSubscriptions, users } from "../db/schema";
 import { testDb } from "../testdb";
 import { mock } from "../integrations/mock";
 import type { Database } from "../db/client";
@@ -33,9 +33,21 @@ const data = { invoiceNumber: "INV-1", amount: "₹5,000.00", due: "2026-11-20",
 describe("template registry", () => {
   it("every placeholder is a declared field", () => {
     for (const [key, t] of Object.entries(TEMPLATES)) {
-      const used = [...placeholders(t.email.subject), ...placeholders(t.email.body), ...(t.sms ? placeholders(t.sms.text) : [])];
+      const used = [...placeholders(t.email.subject), ...placeholders(t.email.body), ...(t.sms ? placeholders(t.sms.text) : []),
+        ...(t.push ? [...placeholders(t.push.title), ...placeholders(t.push.body), ...placeholders(t.push.url ?? "")] : []), ...(t.whatsapp?.params ?? [])];
       for (const f of used) expect(t.fields, `${key} uses {{${f}}}`).toContain(f);
     }
+  });
+  it("WhatsApp and push are rendered for the templates that have them: parameters in order as JSON, title and link for push", () => {
+    const d = { ...data, noticeNo: "LN-1", cureBy: "2026-11-30", link: "https://app.example.com/n/1", advance: "₹4,000.00", expires: "2026-10-30" };
+    expect(JSON.parse(render("disbursed", "whatsapp", d)!.body)).toEqual(["₹5,000.00", "INV-1"]);
+    expect(JSON.parse(render("disbursed", "whatsapp", { ...d, amount: "" })!.body)).toEqual(["-", "INV-1"]); // WhatsApp refuses empty values
+    expect(TEMPLATES.legal_notice.whatsapp!.template).toBe("marichi_legal_notice");
+    const p = render("legal_notice", "push", { ...d, noticeNo: "LN-1\nx" })!;
+    expect(p).toMatchObject({ subject: "Legal notice LN-1 x" });
+    expect(JSON.parse(p.body)).toEqual({ body: "Invoice INV-1: pay ₹5,000.00 by 2026-11-30.", url: "https://app.example.com/n/1" });
+    expect(render("payment_received", "whatsapp", d)).toBeNull();
+    expect(render("payment_received", "push", d)).toBeNull();
   });
   it("SMS stays GSM-7 safe and short even with ₹ amounts", () => {
     for (const [key, t] of Object.entries(TEMPLATES)) {
@@ -62,6 +74,26 @@ describe("channel choice", () => {
     expect(channelsFor("disbursed", u({ phoneVerified: false }), new Set())).toEqual(["email"]); // unverified number never gets SMS
     expect(channelsFor("disbursed", u({ phone: null }), new Set())).toEqual(["email"]);
   });
+  it("WhatsApp needs a verified number, a template that has it and an explicit opt-in (even when critical)", () => {
+    const yes = { optedIn: new Set(["whatsapp"]) };
+    expect(channelsFor("disbursed", u(), new Set())).toEqual(["email", "sms"]); // no opt-in: off
+    expect(channelsFor("disbursed", u(), new Set(), yes)).toEqual(["email", "sms", "whatsapp"]);
+    expect(channelsFor("disbursed", u({ phoneVerified: false }), new Set(), yes)).toEqual(["email"]);
+    expect(channelsFor("disbursed", u({ phone: null }), new Set(), yes)).toEqual(["email"]);
+    expect(channelsFor("disbursed", u(), new Set(["whatsapp"]), { optedIn: new Set() })).toEqual(["email", "sms"]); // opted out is off
+    expect(channelsFor("payment_received", u(), new Set(), yes)).toEqual(["email"]); // template has no WhatsApp text
+    expect(channelsFor("offer_ready", u(), new Set(["email"]), yes)).toEqual(["whatsapp"]); // opt-in is independent of the email opt-out
+  });
+  it("push needs a subscription and a template with push text; only a non-critical template respects a push opt-out", () => {
+    const sub = { hasPush: true };
+    expect(channelsFor("disbursed", u(), new Set(), sub)).toEqual(["email", "sms", "push"]);
+    expect(channelsFor("disbursed", u({ phone: null }), new Set(["push"]), sub)).toEqual(["email", "push"]); // critical ignores the opt-out
+    expect(channelsFor("disbursed", u(), new Set(), { hasPush: false })).toEqual(["email", "sms"]);
+    expect(channelsFor("payment_received", u(), new Set(), sub)).toEqual(["email"]); // no push text
+    expect(channelsFor("offer_ready", u(), new Set(), sub)).toEqual(["email", "push"]);
+    expect(channelsFor("offer_ready", u(), new Set(["push"]), sub)).toEqual(["email"]);
+    expect(channelsFor("disbursed", u(), new Set(), { hasPush: true, optedIn: new Set(["whatsapp"]) })).toEqual(["email", "sms", "whatsapp", "push"]);
+  });
 });
 
 describe("notifyBusiness", () => {
@@ -86,7 +118,38 @@ describe("notifyBusiness", () => {
     expect(calls).toHaveLength(0);
     await notifyBusiness(db, bizId, "disbursed", data, gw, T0);
     expect(calls.map((c) => c.channel)).toEqual(["email", "sms"]);
-    expect(await getPreferences(db, userId)).toEqual({ email: false, sms: true });
+    expect(await getPreferences(db, userId)).toEqual({ email: false, sms: true, whatsapp: false });
+  });
+
+  it("WhatsApp goes out only after an opt-in; push makes one row per subscribed browser with the endpoint as address", async () => {
+    await db.insert(pushSubscriptions).values([
+      { userId, endpoint: "https://fcm.googleapis.com/fcm/send/one", p256dh: "k1", auth: "a1" },
+      { userId, endpoint: "https://fcm.googleapis.com/fcm/send/two", p256dh: "k2", auth: "a2" },
+    ]);
+    await notifyBusiness(db, bizId, "disbursed", data, gw, T0);
+    expect(calls.map((c) => c.channel)).toEqual(["email", "sms", "push", "push"]);
+    const push = calls.filter((c) => c.channel === "push");
+    expect(push.map((c) => c.to)).toEqual(["https://fcm.googleapis.com/fcm/send/one", "https://fcm.googleapis.com/fcm/send/two"]);
+    expect(push[0]).toMatchObject({ subject: "Payout sent", dltTemplateId: undefined });
+    expect(JSON.parse(push[0].body)).toEqual({ body: "₹5,000.00 was paid to your bank account for invoice INV-1.", url: "/notifications" });
+    expect(JSON.stringify(await rows())).not.toContain("p256dh"); // keys never copied into the outbox
+
+    calls = [];
+    await setPreference(db, userId, "whatsapp", true);
+    expect(await getPreferences(db, userId)).toMatchObject({ whatsapp: true });
+    await notifyBusiness(db, bizId, "disbursed", data, gw, T0);
+    const wa = calls.find((c) => c.channel === "whatsapp")!;
+    expect(wa).toMatchObject({ to: "+919876543210", template: "disbursed", dltTemplateId: undefined });
+    expect(JSON.parse(wa.body)).toEqual(["₹5,000.00", "INV-1"]);
+  });
+
+  it("an error marked permanent is not retried", async () => {
+    const dead = { ...mock, notify: { send: async () => { throw Object.assign(new Error("subscription expired (410)"), { permanent: true }); } } };
+    await db.insert(pushSubscriptions).values({ userId, endpoint: "https://fcm.googleapis.com/fcm/send/gone", p256dh: "k", auth: "a" });
+    await notifyBusiness(db, bizId, "disbursed", data, dead, T0);
+    const pushRow = (await rows()).find((r) => r.channel === "push")!;
+    expect(pushRow).toMatchObject({ status: "failed", attempts: 1, error: "subscription expired (410)", toAddress: "https://fcm.googleapis.com/fcm/send/gone" });
+    expect(await deliverQueued(db, gw, min(100_000))).toBe(0);
   });
 
   it("notifyStaff reaches only the given roles", async () => {

@@ -1059,6 +1059,82 @@ export const privacyRequests = pgTable("privacy_requests", {
   createdAt: createdAt(),
 }, (t) => [index("privacy_user").on(t.userId), index("privacy_open").on(t.status, t.dueAt)]);
 
+// Public sanctions lists (OFAC SDN, UN consolidated, EU consolidated), one row per name or alias, normalised for matching. Reloaded by the worker.
+export const sanctionsEntries = pgTable("sanctions_entries", {
+  id: id(),
+  list: text("list").notNull(), // ofac_sdn | un | eu
+  externalId: text("external_id").notNull(), // the list's own id for the person or entity
+  name: text("name").notNull(),
+  norm: text("norm").notNull(), // lower case, accents and punctuation removed, words sorted-friendly (see aml/normalize)
+  kind: text("kind").notNull(), // individual | entity | other
+  isAlias: boolean("is_alias").notNull().default(false),
+  program: text("program"),
+  country: text("country"),
+  loadedAt: timestamp("loaded_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("sanctions_list").on(t.list), index("sanctions_norm").on(t.norm)]);
+
+// One row per list per load: how fresh each list is, so a stale or empty list can fail closed.
+export const sanctionsLoads = pgTable("sanctions_loads", {
+  id: id(),
+  list: text("list").notNull(),
+  sourceUrl: text("source_url").notNull(),
+  sha256: text("sha256").notNull(),
+  entries: integer("entries").notNull(),
+  loadedAt: timestamp("loaded_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("sanctions_loads_list").on(t.list, t.loadedAt)]);
+
+// A company's own bank statement, uploaded for underwriting. The figures are read from the file; the file stays in the vault.
+export const businessStatements = pgTable("business_statements", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  uploadedBy: uuid("uploaded_by").notNull(),
+  documentRef: text("document_ref").notNull(),
+  fileName: text("file_name").notNull(),
+  bankName: text("bank_name"),
+  accountLast4: text("account_last4"),
+  periodFrom: date("period_from"),
+  periodTo: date("period_to"),
+  status: text("status").notNull().default("parsed"), // parsed | failed
+  failure: text("failure"),
+  summary: jsonb("summary"), // computed figures: turnover, balances, returns, counterparties, flags
+  createdAt: createdAt(),
+}, (t) => [index("statements_business").on(t.businessId)]);
+
+export const businessStatementLines = pgTable("business_statement_lines", {
+  id: id(),
+  statementId: uuid("statement_id").notNull().references(() => businessStatements.id, { onDelete: "cascade" }),
+  on: date("on").notNull(),
+  narration: text("narration").notNull(),
+  debit: paise("debit").notNull().default(sql`0`),
+  credit: paise("credit").notNull().default(sql`0`),
+  balance: paise("balance"),
+}, (t) => [index("statement_lines_statement").on(t.statementId)]);
+
+// Browsers that agreed to receive push messages (Web Push). One row per browser.
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: createdAt(),
+}, (t) => [index("push_user").on(t.userId)]);
+
+// A seller's link to an accounting system (Zoho Books, QuickBooks, ...). The refresh token is stored encrypted.
+export const erpConnections = pgTable("erp_connections", {
+  id: id(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  provider: text("provider").notNull(), // zoho | quickbooks | sap | netsuite
+  externalOrg: text("external_org"), // Zoho organisation id, QuickBooks realm id
+  refreshToken: encrypted("refresh_token").notNull(),
+  status: text("status").notNull().default("active"), // active | expired
+  connectedBy: uuid("connected_by").notNull(),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastSyncNote: text("last_sync_note"),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("erp_conn_biz_provider").on(t.businessId, t.provider)]);
+
 // Suspicious Transaction Report tracking. Filing itself happens with the regulator; we record that it was done.
 export const strReports = pgTable("str_reports", {
   id: id(),

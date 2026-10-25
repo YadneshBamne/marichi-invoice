@@ -2,26 +2,13 @@
 // headers, date styles and rupee formatting; strict about everything that matters. A dry run checks without saving.
 import { and, eq } from "drizzle-orm";
 import type { Database } from "../db/client";
+import { parseCsv } from "../util/csv";
 import { businesses, buyerSellerRelationships, invoices } from "../db/schema";
 import { ApiError, createSellerInvoice, InvoiceInput } from "./invoices";
 
 export const MAX_ROWS = 200;
 
-/** RFC 4180: quoted fields, doubled quotes, commas and line breaks inside quotes. */
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = []; let row: string[] = [], cur = "", q = false;
-  const src = text.replace(/^﻿/, "");
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    if (q) { if (c === '"') { if (src[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
-    else if (c === '"') q = true;
-    else if (c === ",") { row.push(cur); cur = ""; }
-    else if (c === "\n" || c === "\r") { if (c === "\r" && src[i + 1] === "\n") i++; row.push(cur); cur = ""; if (row.some((x) => x.trim() !== "")) rows.push(row); row = []; }
-    else cur += c;
-  }
-  row.push(cur); if (row.some((x) => x.trim() !== "")) rows.push(row);
-  return rows;
-}
+export { parseCsv };
 
 const ALIASES: Record<string, string> = {
   invoice_number: "invoiceNumber", invoice_no: "invoiceNumber", invoice: "invoiceNumber", number: "invoiceNumber", bill_no: "invoiceNumber",

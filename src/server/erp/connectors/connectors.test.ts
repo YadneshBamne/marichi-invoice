@@ -41,7 +41,7 @@ describe("Zoho Books connector", () => {
   it("builds the data-centre authorize URL asking for a refresh token", () => {
     const u = new URL(zohoBooks(zcfg).authorizeUrl("st8"));
     expect(u.origin + u.pathname).toBe("https://accounts.zoho.in/oauth/v2/auth");
-    expect(Object.fromEntries(u.searchParams)).toMatchObject({ scope: "ZohoBooks.invoices.READ", client_id: "cid", response_type: "code", access_type: "offline", prompt: "consent", state: "st8", redirect_uri: "https://app.test/cb" });
+    expect(Object.fromEntries(u.searchParams)).toMatchObject({ scope: "ZohoBooks.invoices.READ,ZohoBooks.settings.READ", client_id: "cid", response_type: "code", access_type: "offline", prompt: "consent", state: "st8", redirect_uri: "https://app.test/cb" });
     expect(zohoBooks({ ...zcfg, dc: "eu" }).authorizeUrl("s")).toContain("https://accounts.zoho.eu/");
   });
   it("exchanges a code and refreshes (keeping the refresh token)", async () => {

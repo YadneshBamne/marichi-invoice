@@ -70,7 +70,7 @@ Run it on any always-on host (Railway, Render, Fly, a small VM) as a **worker se
 
 ## 6. Before you go live: migrations
 Run `npm run db:migrate` against the production database before the first deploy and after every update that adds a file under
-`drizzle/` (the latest are `0010_marketplace` to `0028_legal_notices`; 0015 converts the old manager/member roles to approver/maker and creates a membership for every existing user). Then create the first admin with `scripts/seed-staff.ts`; every other staff member is invited by email from **Admin > Users and roles** (they choose their own password and set up two-step verification).
+`drizzle/` (the latest are `0010_marketplace` to `0029_sanctions_statements_push_erp`; 0015 converts the old manager/member roles to approver/maker and creates a membership for every existing user). Then create the first admin with `scripts/seed-staff.ts`; every other staff member is invited by email from **Admin > Users and roles** (they choose their own password and set up two-step verification).
 
 ### One deployment per country
 Set `NEXT_PUBLIC_MARKET` (IN or ZM; India if unset) in **both** the web project and the worker, at build time. It picks the country pack: currency, identifiers asked for, tax on fees, registry, rails, law and complaint route. Each country should be its own deployment with its own database in that country's region; do not point two markets at one database. The worker also runs `registry.file`, which files each financed invoice's assignment at the registry (mock until CERSAI or PACRA credentials exist). Check the result under **Admin > Market and registry**.
@@ -84,8 +84,13 @@ Everything below runs end to end in the product, but the outside world is stood 
   collection accounts), Digio (e-sign), MSG91 (SMS), and the Tally upload route (`POST /api/v1/erp/tally`, with `scripts/tally-agent.mjs` for the customer's PC).
   Each file lists what could not be confirmed as `UNVERIFIED:` comments; try each in its sandbox before relying on it. Zoho Books and QuickBooks
   connectors exist as library code (`src/server/erp/connectors`) but have no connect screen yet.
-- **Still mock**: sanctions/AML screening, bureau, e-invoice registry lookup, e-NACH mandates, bank statements. Each is one adapter file to replace;
-  nothing else changes. Not started: video KYC, e-stamping, bank-statement analysis, SAP and NetSuite.
+- **Also written, switched on by keys, untried against the real services**: Zoho Sign (e-sign, if Digio is not set), Razorpay e-mandates, India's
+  e-invoice portal (IRN lookup), WhatsApp (Meta Cloud API), and browser push (free; generate keys with `node scripts/vapid-keys.mjs`).
+  Zoho Books and QuickBooks have a connect screen under Settings > Integrations (register the return addresses in `.env.example`).
+  SAP and NetSuite connectors exist as library code only.
+- **Real and free**: sanctions screening on the public OFAC, UN and EU lists. Load them with `npx tsx --env-file=.env scripts/refresh-sanctions.ts`,
+  then set `AML_PROVIDER=local`; the worker reloads them nightly and screening refuses to answer if the lists go stale. Bank-statement analysis works on uploaded files.
+- **Still mock**: credit bureau, PEP lists, bank statement feeds for the escrow account. Not started: video KYC, e-stamping, Account Aggregator, CKYC.
 - **FX rates** (cross-border): fixed sandbox rates. A treasury or bank rate feed goes in `fx.rate`.
 - **SMS**: simulated until `MSG91_AUTH_KEY` and `MSG91_SENDER_ID` are set and the DLT templates are registered with MSG91.
 - **Invoice reading**: real and free. Digital PDFs are read from their text (pdf.js); scans and photos with Tesseract; fields by rules; an optional local or free model gives a second opinion on the extracted text only. The English reading data ships in `node_modules`, so nothing is downloaded at run time. On a serverless host the first scan after idle takes a few seconds; reading is capped at four pages.

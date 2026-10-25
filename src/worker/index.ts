@@ -27,6 +27,7 @@ import { expireOffers, generateOffers } from "../server/offers/service";
 import { underwriteEligible } from "../server/underwriting/service";
 import { dispatchValidated, runConfirmationSla } from "../server/confirmations/service";
 import { runRetention } from "../server/privacy/service";
+import { refreshSanctionLists } from "../server/aml/service";
 
 const boss = new PgBoss((process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL)!); // job queue wants a direct, session-capable connection
 boss.on("error", (e) => console.error("[boss]", e));
@@ -61,6 +62,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "aml.rescreen": { cron: "0 2 * * *", run: async () => { await rescreenParties(db); } },     // PRD 12.10: ongoing sanctions monitoring (each company again after a week, a batch a night)
   "limits.rescore": { cron: "0 5 * * *", run: async () => { await rescoreLimits(db); } },          // PRD Module 5: periodic review of seller credit limits
   "kyb.rekyc": { cron: "0 4 * * *", run: async () => { await runRekyc(db); } },               // PRD Module 1: periodic re-verification
+  "aml.lists": { cron: "0 1 * * *", run: async () => { for (const r of await refreshSanctionLists(db)) if (!r.ok) console.error("[aml.lists]", r.list, r.error); } }, // reload the public sanctions lists before the nightly re-screen
   "retention.sweep": { cron: "30 3 * * *", run: async () => { await runRetention(db); } },        // delete what the retention policy says has outlived its purpose
   "licences.expiry": { cron: "30 4 * * *", run: async () => { await remindLicences(db); await remindDocuments(db); } },  // financier licence and company document expiry notices
 };

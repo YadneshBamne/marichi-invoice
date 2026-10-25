@@ -21,7 +21,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | MFA on every account | Built |
 | KYB: legal name, entity type, company number, tax numbers, directors/UBOs | Built (India: PAN, GSTIN, CIN; Zambia: TPIN, PACRA number) |
 | Bank account verification (penny drop) | Built, simulated |
-| Directors/UBO sanctions and PEP screening, hit goes to a compliance case, never auto-approved | Built, simulated provider |
+| Directors/UBO sanctions and PEP screening, hit goes to a compliance case, never auto-approved | Built. Sanctions: free screening on the public OFAC, UN and EU lists (switch on with AML_PROVIDER=local). PEP lists are not free, so PEP screening is still simulated |
 | Name mismatch goes to a manual queue | Built |
 | Light onboarding for buyers; upgrade to full KYB to sponsor a programme | Built |
 | No offer before KYB is approved | Built |
@@ -50,7 +50,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Requirement | Status |
 |---|---|
 | Upload with OCR; API and CSV import | Built (OCR real with a key) |
-| IRN validation against the government registry | Built, simulated |
+| IRN validation against the government registry | Built. An adapter for India's e-invoice portal is written (switched on by keys), untried; it can only look up recent invoices |
 | Duplicate detection: file hash, IRN, seller+number, same buyer/amount/date | Built |
 | Eligibility rules: age, buyer status, dispute flag, min/max ticket | Built |
 | Partial financing | Built |
@@ -80,7 +80,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Bureau data with recorded consent | Built, simulated |
 | Seller limit, per-buyer limit, per-invoice cap | Built |
 | Manual referral queue, reasons given for a decline | Built |
-| Bank-statement cash-flow analysis; Account Aggregator | Not built |
+| Bank-statement cash-flow analysis; Account Aggregator | Statement analysis built for uploaded CSV and text PDFs (turnover, balances, returns, payers, tampering checks). Account Aggregator not built (needs a regulated registration) |
 | GST filing trend, e-way bill, utility data, financial statements | Not built |
 | Buyer ratings from rating agencies | Not built |
 | Periodic re-scoring of active limits | Not built |
@@ -103,7 +103,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Document vault | Built (private storage once configured) |
 | Payout blocked until both agreements are signed | Built, no bypass |
 | Version control of documents | Partial. Template versions are recorded; the vault does not keep edit histories |
-| Stamp-duty calculation and e-stamping | Not built |
+| Stamp-duty calculation and e-stamping | Not built. State e-stamping providers publish no open documentation to build from |
 | Aadhaar eSign, Leegality, DocuSign | Not built (needs a provider) |
 
 ### Module 8. Disbursement
@@ -123,7 +123,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Virtual collection account per invoice, automatic matching | Built, simulated bank |
 | Waterfall: principal, discount, fees, penal charges | Built |
 | Reminders, due-date notices, overdue ladder | Built for email and SMS (SMS simulated) |
-| Grace period; recourse trigger; auto-debit of the seller (e-NACH) | Built, simulated mandate provider |
+| Grace period; recourse trigger; auto-debit of the seller (e-NACH) | Built. A Razorpay e-mandate adapter is written (switched on by keys), untried; mandates are simulated by default |
 | Non-recourse loss and write-off review | Built |
 | Part payments; delinquency buckets to 90+ | Built |
 | Phone call and legal-notice steps; handoff to a recovery case system | Partial. A legal notice (PDF, dated, with a pay-by date) goes to the buyer or, with recourse, the seller, and recovery can be handed to a named agency after the notice period. The notice wording is a draft for counsel. Phone calls and a case system are not built |
@@ -154,7 +154,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Case queue; frozen invoices; financier notified; blacklist | Built |
 | Sanctions/PEP screening on onboarding | Built, simulated provider |
 | STR tracking (record that it was filed) | Built |
-| Ongoing sanctions re-screening of all parties | **Not built.** The weekly job exists but is empty |
+| Ongoing sanctions re-screening of all parties | Built (nightly), now on the real public lists when AML_PROVIDER=local |
 | Re-check of financed invoices' IRN for later cancellation | **Not built.** The nightly job exists but is empty |
 | Forgery detection on PDFs (metadata, template mismatch) | Not built |
 | Adverse-media screening | Not built |
@@ -165,7 +165,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 |---|---|
 | Email | Built (real once Resend is configured) |
 | SMS | Built; an MSG91 adapter is written (switched on by keys), not yet tried. India still needs DLT registration |
-| WhatsApp Business, push notifications | Not built |
+| WhatsApp Business, push notifications | Built. Browser push works with no provider (free); WhatsApp adapter written for Meta's Cloud API, untried and needs approved message templates |
 | Event templates; preferences; delivery status; retry; critical notices on two channels | Built |
 | KYC document expiry reminders | Not built |
 
@@ -219,14 +219,14 @@ The gateway and the mock adapter for each port are built. **No real provider is 
 |---|---|
 | 12.2 Identity, video KYC, CKYC, MCA | Simulated PAN/TPIN and bank checks only |
 | 12.3 GSTN, Udyam, MCA charges search | Not built |
-| 12.4 IRN validation | Simulated; generation mode and post-financing cancellation check not built |
+| 12.4 IRN validation | Adapter for the e-invoice portal written, untried; post-financing re-check built; generation mode not built |
 | 12.5 Credit bureaus | Simulated; consent recorded |
 | 12.6 Rating agencies | Not built |
-| 12.7 Payment rails and BaaS | Simulated; Account Aggregator not built |
+| 12.7 Payment rails and BaaS | Cashfree adapter written, untried (needs a business account); Account Aggregator not built |
 | 12.8 ERP/accounting | CSV, API keys and webhooks only |
-| 12.9 E-signature and e-stamping | Digio e-sign adapter written, untried; e-stamping not built |
-| 12.10 AML screening | Simulated; ongoing monitoring not built |
-| 12.11 Communication | Email real; MSG91 SMS adapter written, untried; WhatsApp and push not built |
+| 12.9 E-signature and e-stamping | Digio and Zoho Sign adapters written, untried; e-stamping not built |
+| 12.10 AML screening | Sanctions on free public lists (opt in); PEP and adverse media simulated; ongoing re-screening built |
+| 12.11 Communication | Email real; MSG91 SMS adapter, WhatsApp adapter and free browser push written, untried |
 | 12.12 Regulatory reporting | Drafts built; filing itself stays with the compliance officer (registry filing at CERSAI/PACRA is built, simulated) |
 | 12.13 Governance | Metrics in System health; version pinning and vendor-risk register not built |
 

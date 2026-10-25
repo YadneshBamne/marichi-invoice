@@ -15,6 +15,7 @@
 // The public pages do not show an export of Sales vouchers with these fields, so every tag or TDL name below that the pages do
 // not show is marked UNVERIFIED. Test the request against a real Tally company before relying on it.
 import type { ErpInvoiceRow } from "./types";
+import { kids, parseXml, text, type XNode } from "../../util/xml";
 
 const COLLECTION = "MarichiSalesVouchers";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -57,63 +58,9 @@ export function tallyExportRequest({ company, from, to }: { company: string; fro
   ].join("\n");
 }
 
-// ---------- A small, forgiving XML reader (Tally's XML is not always strictly valid) ----------
+// ---------- Reading the reply (the XML reader lives in util/xml) ----------
 
-type XNode = { name: string; text: string; kids: XNode[] };
-
-// Tally can emit control characters, often as numeric references like &#4; which XML 1.0 forbids. Drop them, keep tab / newline.
-const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
-const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
-
-function decode(s: string): string {
-  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e: string) => {
-    if (e[0] === "#") {
-      const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
-    }
-    return NAMED[e.toLowerCase()] ?? all; // an unknown entity stays as written
-  }).replace(CONTROL, "");
-}
-
-/** Reads XML into a tree of element names, text and children. Attributes are skipped (nothing here needs them). */
-function parseXml(xml: string): XNode {
-  const src = xml.replace(/^﻿/, "").replace(CONTROL, " ");
-  const root: XNode = { name: "#root", text: "", kids: [] };
-  const stack: XNode[] = [root];
-  let i = 0;
-  while (i < src.length) {
-    const lt = src.indexOf("<", i);
-    const top = stack[stack.length - 1];
-    if (lt < 0) { top.text += decode(src.slice(i)); break; }
-    if (lt > i) top.text += decode(src.slice(i, lt));
-    if (src.startsWith("<!--", lt)) { const e = src.indexOf("-->", lt + 4); i = e < 0 ? src.length : e + 3; continue; }
-    if (src.startsWith("<![CDATA[", lt)) { const e = src.indexOf("]]>", lt + 9); top.text += src.slice(lt + 9, e < 0 ? src.length : e); i = e < 0 ? src.length : e + 3; continue; }
-    if (src[lt + 1] === "?" || src[lt + 1] === "!") { const e = src.indexOf(">", lt); i = e < 0 ? src.length : e + 1; continue; }
-    // Find the end of the tag, skipping any ">" inside quoted attribute values.
-    let j = lt + 1, quote = "";
-    for (; j < src.length; j++) {
-      const c = src[j];
-      if (quote) { if (c === quote) quote = ""; } else if (c === '"' || c === "'") quote = c; else if (c === ">") break;
-    }
-    const inner = src.slice(lt + 1, j);
-    i = j + 1;
-    if (inner[0] === "/") {
-      const name = inner.slice(1).trim().toUpperCase();
-      // Close the nearest open element of that name; a stray closing tag with no match is ignored.
-      for (let k = stack.length - 1; k > 0; k--) if (stack[k].name === name) { stack.length = k; break; }
-      continue;
-    }
-    const name = /^[^\s/>]+/.exec(inner)?.[0].toUpperCase();
-    if (!name) continue;
-    const node: XNode = { name, text: "", kids: [] };
-    top.kids.push(node);
-    if (!inner.endsWith("/")) stack.push(node);
-  }
-  return root;
-}
-
-const kids = (n: XNode, name: string) => n.kids.filter((k) => k.name === name);
-const text = (n: XNode, name: string) => kids(n, name)[0]?.text.trim() ?? "";
+const parse = (xml: string) => parseXml(xml, { upperNames: true });
 const yes = (s: string) => s.toLowerCase() === "yes";
 
 /** Every VOUCHER element, wherever it sits (a collection reply and an import-style TALLYMESSAGE both work). */
@@ -172,7 +119,7 @@ function dueDate(raw: string, invoiceIso: string): string | null {
  */
 export function parseTallyVouchers(xml: string, currency = "INR"): ErpInvoiceRow[] {
   const rows: ErpInvoiceRow[] = [];
-  for (const v of vouchersIn(parseXml(xml))) {
+  for (const v of vouchersIn(parse(xml))) {
     if (yes(text(v, "ISCANCELLED")) || yes(text(v, "ISOPTIONAL"))) continue;
     const invoiceNumber = text(v, "VOUCHERNUMBER"), invoiceDate = ymd(text(v, "DATE")), buyerName = text(v, "PARTYLEDGERNAME");
     if (!invoiceNumber || !invoiceDate || !buyerName) continue;

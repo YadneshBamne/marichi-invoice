@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { memberships, notificationPreferences, notifications, users } from "../db/schema";
+import { memberships, notificationPreferences, notifications, pushSubscriptions, users } from "../db/schema";
 import { gateway, type Adapters, type Channel } from "../integrations/gateway";
 import { render, TEMPLATES } from "./templates";
 
@@ -16,13 +16,19 @@ export const appUrl = () => (process.env.BETTER_AUTH_URL ?? "http://localhost:30
 const absolutize = (data: Record<string, string>) =>
   Object.fromEntries(Object.entries(data).map(([k, v]) => [k, k === "link" && v.startsWith("/") ? appUrl() + v : v]));
 
-/** Which channels this user gets for this template. Critical = every channel they have; otherwise respect opt-outs. */
-export function channelsFor(template: string, u: Recipient, optedOut: Set<string>): Channel[] {
+/**
+ * Which channels this user gets for this template. Critical = every channel they have; otherwise respect opt-outs.
+ * WhatsApp is the other way round: it needs a verified number AND an explicit opt-in (`optedIn`), critical or not.
+ * Push needs at least one browser subscription (`hasPush`).
+ */
+export function channelsFor(template: string, u: Recipient, optedOut: Set<string>, opts: { optedIn?: Set<string>; hasPush?: boolean } = {}): Channel[] {
   const t = TEMPLATES[template];
   if (!t) throw new Error(`unknown notification template: ${template}`);
   const out: Channel[] = [];
   if (t.critical || !optedOut.has("email")) out.push("email");
   if (t.sms && u.phone && u.phoneVerified && (t.critical || !optedOut.has("sms"))) out.push("sms");
+  if (t.whatsapp && u.phone && u.phoneVerified && opts.optedIn?.has("whatsapp")) out.push("whatsapp");
+  if (t.push && opts.hasPush && (t.critical || !optedOut.has("push"))) out.push("push");
   return out;
 }
 
@@ -32,19 +38,25 @@ export async function send(db: Database, gw: Adapters, to: Recipient[], template
   if (!t) throw new Error(`unknown notification template: ${template}`);
   const d = absolutize(data);
   const ids = to.map((u) => u.id);
-  const prefs = ids.length ? await db.select().from(notificationPreferences).where(and(inArray(notificationPreferences.userId, ids), eq(notificationPreferences.enabled, false))) : [];
+  const prefs = ids.length ? await db.select().from(notificationPreferences).where(inArray(notificationPreferences.userId, ids)) : [];
+  // Push goes to every browser the person signed up (one outbox row each). Nothing to look up if the template has no push text.
+  const subs = t.push && ids.length ? await db.select({ userId: pushSubscriptions.userId, endpoint: pushSubscriptions.endpoint }).from(pushSubscriptions).where(inArray(pushSubscriptions.userId, ids)) : [];
   const created: string[] = [];
   let reached = 0;
   for (const u of to) {
-    const off = new Set(prefs.filter((p) => p.userId === u.id).map((p) => p.channel));
-    const channels = channelsFor(template, u, off);
+    const mine = prefs.filter((p) => p.userId === u.id);
+    const off = new Set(mine.filter((p) => !p.enabled).map((p) => p.channel));
+    const endpoints = subs.filter((x) => x.userId === u.id).map((x) => x.endpoint);
+    const channels = channelsFor(template, u, off, { optedIn: new Set(mine.filter((p) => p.enabled).map((p) => p.channel)), hasPush: endpoints.length > 0 });
     for (const channel of channels) {
       const r = render(template, channel, d)!;
-      const [row] = await db.insert(notifications).values({
-        userId: u.id, channel, template, critical: !!t.critical, toAddress: channel === "email" ? u.email : u.phone,
-        subject: "subject" in r ? r.subject : null, body: r.body, nextAttemptAt: now,
-      }).returning({ id: notifications.id });
-      created.push(row.id);
+      for (const to of channel === "push" ? endpoints : [channel === "email" ? u.email : u.phone]) {
+        const [row] = await db.insert(notifications).values({
+          userId: u.id, channel, template, critical: !!t.critical, toAddress: to,
+          subject: "subject" in r ? r.subject : null, body: r.body, nextAttemptAt: now,
+        }).returning({ id: notifications.id });
+        created.push(row.id);
+      }
     }
     if (channels.length) reached++;
   }
@@ -95,9 +107,11 @@ async function attempt(db: Database, gw: Adapters, id: string, now: Date, data?:
     return true;
   } catch (e) {
     const attempts = row.attempts + 1;
+    // An adapter marks an error `permanent` when a retry cannot help (a dead push subscription, a number that is not on WhatsApp).
+    const permanent = (e as { permanent?: boolean }).permanent === true;
     await db.update(notifications).set({
       attempts, error: String((e as Error).message).slice(0, 300),
-      status: attempts >= MAX_ATTEMPTS ? "failed" : "queued",
+      status: permanent || attempts >= MAX_ATTEMPTS ? "failed" : "queued",
       nextAttemptAt: new Date(now.getTime() + (BACKOFF_SECONDS[attempts - 1] ?? 7200) * 1000),
     }).where(eq(notifications.id, id));
     return false;
@@ -143,6 +157,7 @@ export async function setPreference(db: Database, userId: string, channel: Chann
 export async function getPreferences(db: Database, userId: string) {
   const rows = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
   const off = (c: Channel) => rows.some((r) => r.channel === c && !r.enabled);
-  return { email: !off("email"), sms: !off("sms") };
+  // WhatsApp is off until the person opts in.
+  return { email: !off("email"), sms: !off("sms"), whatsapp: rows.some((r) => r.channel === "whatsapp" && r.enabled) };
 }
 

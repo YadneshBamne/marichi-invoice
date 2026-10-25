@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { get, put } from "@vercel/blob";
 
 const ALLOWED: Record<string, string> = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg" };
-const MIME: Record<string, string> = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", webp: "image/webp", html: "text/html; charset=utf-8" };
+const MIME: Record<string, string> = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", webp: "image/webp", html: "text/html; charset=utf-8", csv: "text/csv; charset=utf-8" };
 const LOGO: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }; // never SVG: it can carry script
 // Vercel rejects request bodies over 4.5 MB, so documents stop at 4 MB (the rest of the form needs a little room).
 export const MAX_DOC_BYTES = 4 * 1024 * 1024;
-const REF = /^[a-f0-9]{64}\.(pdf|png|jpg|webp|html)$/; // the only shape that ever touches a path or a blob name
+const REF = /^[a-f0-9]{64}\.(pdf|png|jpg|webp|html|csv)$/; // the only shape that ever touches a path or a blob name
 
 /**
  * Document vault. Content-addressed, so the same bytes always give the same ref and hash.
@@ -38,6 +38,12 @@ export async function putDocument(bytes: Buffer, mime: string) {
   if (!ext) throw new Error("only PDF, PNG or JPEG files are accepted");
   if (bytes.length === 0 || bytes.length > MAX_DOC_BYTES) throw new Error("the file must be between 1 byte and 4 MB");
   return store(bytes, ext);
+}
+
+/** A bank statement as the bank gave it: a PDF, or the CSV export. */
+export async function putStatementFile(bytes: Buffer, kind: "pdf" | "csv") {
+  if (bytes.length === 0 || bytes.length > MAX_DOC_BYTES) throw new Error("the file must be between 1 byte and 4 MB");
+  return store(bytes, kind);
 }
 
 /** Company picture. Small raster images only. */

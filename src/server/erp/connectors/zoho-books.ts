@@ -8,7 +8,8 @@ import { ConnectorError, requestJson, str, isoDay, toMinor, type ErpInvoiceRow, 
 
 export type ZohoConfig = { clientId: string; clientSecret: string; redirectUri: string; dc: "in" | "com" | "eu"; fetch?: typeof fetch };
 
-const SCOPE = "ZohoBooks.invoices.READ";
+// UNVERIFIED: the organisations list needs ZohoBooks.settings.READ as well (scopes are comma separated).
+const SCOPE = "ZohoBooks.invoices.READ,ZohoBooks.settings.READ";
 const PER_PAGE = 200;   // documented maximum for List invoices
 const MAX_PAGES = 100;  // stops a runaway loop: 20,000 invoices
 // Money keys quoted before JSON.parse so decimals never pass through a float; invoice_id because Zoho ids can exceed 2^53.
@@ -36,6 +37,13 @@ export function zohoBooks(cfg: ZohoConfig) {
     requestJson(f, "Zoho Books", `${api}${path}?${new URLSearchParams(q)}`, { headers: { authorization: `Zoho-oauthtoken ${accessToken}`, accept: "application/json" } }, KEYS, errorOf);
 
   return {
+    /** The Zoho organisations this login can reach, to pick the one to read invoices from. */
+    async organizations(accessToken: string): Promise<{ id: string; name: string }[]> {
+      const b = await call("/organizations", accessToken, {});
+      if (!Array.isArray(b.organizations)) throw new ConnectorError("Zoho Books sent an organisation list that could not be read");
+      return (b.organizations as Record<string, unknown>[]).map((o) => ({ id: str(o.organization_id), name: str(o.name) })).filter((o) => o.id);
+    },
+
     /** Send the seller here. access_type=offline + prompt=consent is what makes Zoho return a refresh token. */
     authorizeUrl: (state: string) =>
       `${accounts}/oauth/v2/auth?${new URLSearchParams({ scope: SCOPE, client_id: cfg.clientId, response_type: "code", redirect_uri: cfg.redirectUri, access_type: "offline", prompt: "consent", state })}`,

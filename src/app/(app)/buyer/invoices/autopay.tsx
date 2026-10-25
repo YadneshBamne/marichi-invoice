@@ -5,7 +5,7 @@ import { Panel, StatusPill } from "@/components/ui/page";
 import { authoriseAutopay, revokeAutopay, setupAutopay, type AutopayState } from "./autopay-actions";
 import { market } from "@/lib/countries";
 
-export type MandateView = { id: string; status: string; maskedAccount: string; ifsc: string; maxLabel: string } | null;
+export type MandateView = { id: string; status: string; maskedAccount: string; ifsc: string; maxLabel: string; authUrl?: string | null } | null;
 
 /** Auto-pay: let Marichi debit the company's bank account on the day a financed invoice falls due. */
 export function Autopay({ mandate, canManage, mock }: { mandate: MandateView; canManage: boolean; mock: boolean }) {
@@ -21,6 +21,7 @@ export function Autopay({ mandate, canManage, mock }: { mandate: MandateView; ca
           {mandate.status === "pending" && <p className="text-muted">Waiting for your bank to authorise the mandate.</p>}
           {canManage && (
             <div className="flex flex-wrap gap-2">
+              {mandate.status === "pending" && mandate.authUrl && <a className="btn btn-primary btn-sm" href={mandate.authUrl} target="_blank" rel="noreferrer">Authorise at your bank</a>}
               {mandate.status === "pending" && mock && <form action={authoriseAutopay}><button className="btn btn-primary btn-sm">Authorise (simulated bank page)</button></form>}
               <form action={revokeAutopay}><input type="hidden" name="mandateId" value={mandate.id} /><button className="btn btn-ghost btn-sm">Turn auto-pay off</button></form>
             </div>
