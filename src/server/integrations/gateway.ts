@@ -4,6 +4,7 @@ import { mock } from "./mock";
 import { harden } from "./harden";
 import { anthropicOcr } from "./anthropic-ocr";
 import { resendNotify } from "./resend-email";
+import { localOcr } from "./ocr/local";
 
 export interface KycPort {
   verifyTaxId(taxId: string, name: string): Promise<{ valid: boolean; nameMatch: boolean }>;
@@ -66,7 +67,7 @@ export type OcrFields = {
 };
 export interface OcrPort {
   /** Read an invoice document. Values are suggestions to pre-fill a form: the seller confirms them. `simulated` = sandbox data, not a real reading. */
-  extractInvoice(p: { bytes: Uint8Array; mime: string }): Promise<{ fields: OcrFields; simulated: boolean }>;
+  extractInvoice(p: { bytes: Uint8Array; mime: string }): Promise<{ fields: OcrFields; simulated: boolean; warnings?: string[] }>;
 }
 
 export type Adapters = {
@@ -74,8 +75,10 @@ export type Adapters = {
 };
 
 // ponytail: mock only; add real adapters per provider when licences exist, select via INTEGRATIONS_MODE.
-// Invoice reading is not a licensed service, so it goes live as soon as an Anthropic key exists, independent of INTEGRATIONS_MODE.
-const ocr = process.env.ANTHROPIC_API_KEY && process.env.OCR_PROVIDER !== "mock" ? anthropicOcr() : mock.ocr;
+// Invoice reading is not a licensed service, so it is live whatever INTEGRATIONS_MODE says.
+// Default is the free open-source reader (pdf.js + Tesseract + rules). OCR_PROVIDER=claude (with a key) uses Claude instead; "mock" is for tests.
+const ocrProvider = process.env.OCR_PROVIDER ?? (process.env.ANTHROPIC_API_KEY ? "claude" : process.env.VITEST ? "mock" : "local");
+const ocr = ocrProvider === "claude" && process.env.ANTHROPIC_API_KEY ? anthropicOcr() : ocrProvider === "mock" ? mock.ocr : localOcr();
 // Email goes out for real as soon as Resend is configured; SMS stays simulated until a provider and DLT registration exist.
 const notify = process.env.RESEND_API_KEY && process.env.MAIL_FROM ? resendNotify(mock.notify, { apiKey: process.env.RESEND_API_KEY, from: process.env.MAIL_FROM }) : mock.notify;
 export const gateway: Adapters = harden({ ...mock, ocr, notify });

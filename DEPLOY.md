@@ -36,7 +36,7 @@ The web app runs on Vercel. The background worker does not (see step 5). Files a
 | `BETTER_AUTH_SECRET` | new random value: `openssl rand -base64 32` (never reuse the dev one) |
 | `BETTER_AUTH_URL` | your public URL, e.g. `https://app.example.com` (no trailing slash). Sign-in fails if it does not match the domain |
 | `ESIGN_WEBHOOK_SECRET`, `PAYMENTS_WEBHOOK_SECRET`, `NOTIFY_WEBHOOK_SECRET`, `MANDATE_WEBHOOK_SECRET` | four different random values |
-| `ANTHROPIC_API_KEY` (optional) | Turns on real invoice reading. Without it the upload form uses clearly labelled simulated values. `OCR_MODEL` overrides the model |
+| `OCR_PROVIDER`, `OCR_LLM_URL`, `OCR_LLM_MODEL`, `OCR_LLM_KEY`, `ANTHROPIC_API_KEY` (all optional) | Invoice reading is free and open source by default (no key). `OCR_LLM_URL` adds any OpenAI-compatible model (Ollama, LM Studio, vLLM, a free tier) as a second opinion; `OCR_PROVIDER=claude` with `ANTHROPIC_API_KEY` uses Claude instead |
 | `RESEND_API_KEY`, `MAIL_FROM` (optional) | Both set = email is sent for real. Without them emails are only recorded. SMS stays simulated either way |
 | `DATA_ENCRYPTION_KEY` | `openssl rand -base64 32`. Encrypts PAN and bank account numbers. **Keep a copy: losing it makes them unreadable** |
 | `INTEGRATIONS_MODE` | `mock` for now |
@@ -84,7 +84,7 @@ Everything below runs end to end in the product, but the outside world is stood 
   behind `src/server/integrations/gateway.ts`. Each is one adapter file to replace; nothing else changes.
 - **FX rates** (cross-border): fixed sandbox rates. A treasury or bank rate feed goes in `fx.rate`.
 - **SMS**: simulated until a provider and DLT template registration exist.
-- **Invoice reading**: real once `ANTHROPIC_API_KEY` is set.
+- **Invoice reading**: real and free. Digital PDFs are read from their text (pdf.js); scans and photos with Tesseract; fields by rules; an optional local or free model gives a second opinion on the extracted text only. The English reading data ships in `node_modules`, so nothing is downloaded at run time. On a serverless host the first scan after idle takes a few seconds; reading is capped at four pages.
 - **Email**: real once `RESEND_API_KEY` and `MAIL_FROM` are set.
 - **Model-assisted underwriting**: the scoring model is an expert-weighted prior, not trained on your data. It starts in shadow mode.
 - **Overseas buyers** have no Indian bureau record, so every export invoice goes to an analyst; there is no overseas credit-report feed yet.
