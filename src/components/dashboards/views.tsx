@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icons";
 import { formatCompactMoney, formatMoney } from "@/lib/money";
 import { buyerSteps, sellerSteps } from "@/lib/next-steps";
 import { NextSteps } from "./next-steps";
+import { Downloads } from "@/components/ui/downloads";
 
 // Pure presentation: data in, JSX out. Pages fetch; /design/dashboards renders the same views with sample data.
 export type SellerData = Awaited<ReturnType<typeof sellerDashboard>>;
@@ -35,7 +36,7 @@ export function SellerDashboardView({ d, first, exports = true, company }: { d: 
     <>
       <PageHead title={`Hello, ${first}`} sub={`${company ? company + " · " : ""}Your financing at a glance.`}>
         <Link className="btn btn-primary" href="/seller/invoices">Upload invoice</Link>
-        {exports && <a className="btn btn-ghost" href="/api/export/invoices">Export CSV</a>}
+        {exports && <Downloads href="/api/export/invoices" label="Invoices" small={false} />}
       </PageHead>
       <NextSteps steps={sellerSteps({ kyb: d.kyb, ...d.setup })} />
       {d.kyb !== "approved" ? <Empty>Your limit, balances and invoices appear here once your business is verified.</Empty> : <>
@@ -108,7 +109,7 @@ export function BuyerDashboardView({ d, first, exports = true, company }: { d: B
     <>
       <PageHead title={`Hello, ${first}`} sub={`${company ? company + " · " : ""}Invoices to confirm and payments coming due.`}>
         <Link className="btn btn-primary" href="/buyer/invoices">Review invoices</Link>
-        {exports && <a className="btn btn-ghost" href="/api/export/invoices">Export CSV</a>}
+        {exports && <Downloads href="/api/export/invoices" label="Invoices" small={false} />}
       </PageHead>
       <NextSteps steps={buyerSteps({ kyb: d.kyb, confirmed: d.confirmed, autopay: d.autopay })} />
       <div data-tour="kpis" className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -178,7 +179,7 @@ export function OpsDashboardView({ d }: { d: OpsData }) {
   return (
     <>
       <PageHead title="Operations overview" sub="Volume, book health and the work waiting for your team.">
-        <a className="btn btn-ghost" href="/api/export/invoices">Export invoices</a>
+        <Downloads href="/api/export/invoices" label="Invoices" small={false} />
         <Link className="btn btn-ghost" href="/admin/ledger">Ledger & revenue</Link>
       </PageHead>
 

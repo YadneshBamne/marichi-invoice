@@ -33,9 +33,10 @@ export type Pack = {
   rails: { small: Rail[]; large: Rail[]; largeAbove: bigint };
   mandate: string; // what the recurring-debit scheme is called
   terms: { law: string; forum: string; esign: string; grievance: string };
-  privacy: { law: string; regulator: string; breachHours: number; residency: string };
+  privacy: { law: string; regulator: string; breachHours: number; residency: string; retentionYears: number };
   ombudsman: { name: string; url: string };
   regulator: string; // who licenses lenders, for the financier form
+  returns: { fiu: string; bureau: string; capitalRule: string }; // who receives suspicious-transaction reports and credit data, and the capital rule the draft inputs are for
   institutions: Record<string, string>;
   phone: string; timezone: string;
   platformFunds: boolean; // may the platform lend from its own balance sheet here (licence), or only financiers

@@ -744,6 +744,33 @@ export const unmatchedCredits = pgTable("unmatched_credits", {
   createdAt: createdAt(),
 });
 
+// The formal step after reminders have not worked: a written demand to the buyer (or, where the seller carries recourse, to the seller)
+// with a date to pay by. When that date passes unpaid, staff can hand the invoice to a recovery agency or lawyer. Every notice is a PDF in the vault.
+export const legalNotices = pgTable("legal_notices", {
+  id: id(),
+  seq: integer("seq").generatedAlwaysAsIdentity().notNull(), // human number: LN-00012
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  addressee: text("addressee").notNull(), // buyer | seller
+  addresseeId: uuid("addressee_id").notNull().references(() => businesses.id),
+  amountDue: paise("amount_due").notNull(), // principal + discount + penal on the day it was issued
+  breakdown: jsonb("breakdown").notNull(), // { principal, discount, penal } as strings
+  dpd: integer("dpd").notNull(),
+  cureBy: date("cure_by").notNull(),
+  documentRef: text("document_ref").notNull(),
+  status: text("status").notNull().default("issued"), // issued | handed_over | cured | closed
+  issuedBy: uuid("issued_by").notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  agency: text("agency"), // who recovery was handed to
+  handoffNote: text("handoff_note"),
+  handedOverBy: uuid("handed_over_by"),
+  handedOverAt: timestamp("handed_over_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("legal_seq").on(t.seq),
+  uniqueIndex("legal_live").on(t.invoiceId, t.addressee).where(sql`status in ('issued', 'handed_over')`), // one live notice per party per invoice
+  index("legal_status").on(t.status),
+]);
+
 // Dedupe for reminders/notices: one row per (invoice, step) so a sweep that re-runs never re-sends.
 export const collectionEvents = pgTable("collection_events", {
   id: id(),
@@ -1016,6 +1043,21 @@ export const blacklist = pgTable("blacklist", {
   liftedAt: timestamp("lifted_at", { withTimezone: true }),
   liftedBy: uuid("lifted_by"),
 }, (t) => [uniqueIndex("blacklist_active").on(t.businessId).where(sql`lifted_at is null`)]);
+
+// A person's request about their own data. A request for a copy is answered at once from what we hold; the others are worked by staff against a due date.
+export const privacyRequests = pgTable("privacy_requests", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(), // access | correction | erasure | objection
+  details: text("details"), // what to correct, or which uses to stop
+  status: text("status").notNull().default("received"), // received | completed | refused
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+  resolution: text("resolution"), // what was done, or why not
+  handledBy: uuid("handled_by"),
+  exportData: jsonb("export_data"), // access requests: the copy itself, removed after a few days (retention.exportDays)
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index("privacy_user").on(t.userId), index("privacy_open").on(t.status, t.dueAt)]);
 
 // Suspicious Transaction Report tracking. Filing itself happens with the regulator; we record that it was done.
 export const strReports = pgTable("str_reports", {

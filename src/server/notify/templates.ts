@@ -14,6 +14,17 @@ export type Template = {
 const DLT = "DLT-PENDING-REGISTRATION";
 
 export const TEMPLATES: Record<string, Template> = {
+  // --- legal notices and recovery ---
+  legal_notice: { fields: ["invoiceNumber", "amount", "cureBy", "noticeNo", "link"], critical: true, email: { subject: "Legal notice {{noticeNo}}: invoice {{invoiceNumber}}", body: "A formal notice ({{noticeNo}}) has been issued about invoice {{invoiceNumber}}. {{amount}} is overdue and must be paid by {{cureBy}}. Read the notice: {{link}}" }, sms: { text: "Marichi: legal notice {{noticeNo}} on invoice {{invoiceNumber}}. Pay {{amount}} by {{cureBy}}. See your email or log in.", dltTemplateId: DLT } },
+  recovery_handoff: { fields: ["invoiceNumber", "noticeNo", "agency"], critical: true, email: { subject: "Recovery started: invoice {{invoiceNumber}}", body: "The notice period for {{noticeNo}} has ended and invoice {{invoiceNumber}} remains unpaid. Recovery has been handed to {{agency}}. If you pay now, pay only into the collection account in the notice." } },
+  legal_notice_due: { fields: ["invoiceNumber", "dpd", "link"], email: { subject: "Legal notice can be issued: invoice {{invoiceNumber}}", body: "Invoice {{invoiceNumber}} is {{dpd}} days past due. A formal legal notice can now be issued.\n{{link}}" } },
+  legal_cure_lapsed: { fields: ["invoiceNumber", "noticeNo", "link"], email: { subject: "Notice period over: {{noticeNo}}", body: "The notice period for {{noticeNo}} (invoice {{invoiceNumber}}) has ended without payment. Recovery can be handed over.\n{{link}}" } },
+
+  // --- privacy requests ---
+  privacy_request_received: { fields: ["kind", "due"], email: { subject: "We received your request: {{kind}}", body: "We received your request ({{kind}}). We will answer by {{due}}. You can follow it under Settings, then Privacy." } },
+  privacy_request_done: { fields: ["kind", "outcome", "note"], email: { subject: "Your privacy request: {{outcome}}", body: "Your request ({{kind}}) is {{outcome}}.\n{{note}}" } },
+  privacy_request_new: { fields: ["kind", "due", "link"], email: { subject: "New privacy request: {{kind}}", body: "A privacy request ({{kind}}) is waiting and is due by {{due}}.\n{{link}}" } },
+
   // --- onboarding ---
   kyb_decision: { fields: ["status", "note"], email: { subject: "Your Marichi Labs verification: {{status}}", body: "Your business verification status is now: {{status}}.\n{{note}}" } },
 

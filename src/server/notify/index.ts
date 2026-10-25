@@ -26,7 +26,8 @@ export function channelsFor(template: string, u: Recipient, optedOut: Set<string
   return out;
 }
 
-async function send(db: Database, gw: Adapters, to: Recipient[], template: string, data: Record<string, string>, now: Date) {
+/** Send to people we already have addresses for, without looking them up again (used after an erasure, when the account no longer holds the address). */
+export async function send(db: Database, gw: Adapters, to: Recipient[], template: string, data: Record<string, string>, now: Date) {
   const t = TEMPLATES[template];
   if (!t) throw new Error(`unknown notification template: ${template}`);
   const d = absolutize(data);

@@ -16,6 +16,7 @@ import { runAutoBids } from "../server/marketplace/auto";
 import { expireEarlyPayments } from "../server/earlypay/service";
 import { runReconciliation } from "../server/recon/service";
 import { runCollectionsSweep, runSurplusPayouts } from "../server/collections/service";
+import { runLegalSweep } from "../server/collections/legal";
 import { presentDebits, sendPreDebitNotices } from "../server/collections/nach";
 import { runDisbursements } from "../server/disbursements/service";
 import { prepareAllAccepted } from "../server/agreements/service";
@@ -25,6 +26,7 @@ import { recheckIrns, remindDocuments, remindLicences, rescreenParties, runRekyc
 import { expireOffers, generateOffers } from "../server/offers/service";
 import { underwriteEligible } from "../server/underwriting/service";
 import { dispatchValidated, runConfirmationSla } from "../server/confirmations/service";
+import { runRetention } from "../server/privacy/service";
 
 const boss = new PgBoss((process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL)!); // job queue wants a direct, session-capable connection
 boss.on("error", (e) => console.error("[boss]", e));
@@ -41,6 +43,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "disbursements.run": { cron: "*/2 * * * *", run: async () => { await runDisbursements(db); } },       // Module 8
   "invoice.sla-escalation": { cron: "*/15 * * * *", run: async () => { await runConfirmationSla(db); } },   // Module 4 (24h/48h/72h)
   "collections.sweep": { cron: "0 9 * * *", run: async () => { await runCollectionsSweep(db); } },        // Module 9: accrual, reminders, recourse
+  "collections.legal": { cron: "20 9 * * *", run: async () => { await runLegalSweep(db); } },        // close notices on invoices that were paid; tell staff when a notice is due or its date has passed
   "collections.nach-notices": { cron: "30 8 * * *", run: async () => { await sendPreDebitNotices(db); } },   // auto-pay: the day-before notice
   "collections.nach-debits": { cron: "0 10 * * *", run: async () => { await presentDebits(db); } },        // auto-pay: present debits for invoices due today
   "collections.surplus-payouts": { cron: "*/10 * * * *", run: async () => { await runSurplusPayouts(db); } },
@@ -58,6 +61,7 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "aml.rescreen": { cron: "0 2 * * *", run: async () => { await rescreenParties(db); } },     // PRD 12.10: ongoing sanctions monitoring (each company again after a week, a batch a night)
   "limits.rescore": { cron: "0 5 * * *", run: async () => { await rescoreLimits(db); } },          // PRD Module 5: periodic review of seller credit limits
   "kyb.rekyc": { cron: "0 4 * * *", run: async () => { await runRekyc(db); } },               // PRD Module 1: periodic re-verification
+  "retention.sweep": { cron: "30 3 * * *", run: async () => { await runRetention(db); } },        // delete what the retention policy says has outlived its purpose
   "licences.expiry": { cron: "30 4 * * *", run: async () => { await remindLicences(db); await remindDocuments(db); } },  // financier licence and company document expiry notices
 };
 

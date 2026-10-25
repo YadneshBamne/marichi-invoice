@@ -109,7 +109,7 @@ export async function resolveCase(db: Database, p: { caseId: string; staff: { id
         await tx.insert(auditLog).values({ actorId: p.staff.id, action: "blacklist.add", entity: "business", entityId: subject, after: { caseId: c.id } });
       }
       await tx.insert(strReports).values({
-        caseId: c.id, narrative: `Rule ${c.ruleTriggered} on ${c.entityType} ${c.entityId}. ${JSON.stringify(c.details ?? {})}. Reviewer: ${p.note}`,
+        caseId: c.id, narrative: `Rule ${c.ruleTriggered} on ${c.entityType} ${c.entityId}. ${JSON.stringify(c.details ?? {})}. Reviewer: ${p.note}`, createdAt: now,
       }).onConflictDoNothing();
     }
     await tx.update(fraudCases).set({ status: "closed", outcome: p.outcome, resolution: p.note, resolvedBy: p.staff.id, resolvedAt: now }).where(eq(fraudCases.id, c.id));

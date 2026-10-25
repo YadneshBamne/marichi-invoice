@@ -3,6 +3,8 @@ export const COLLECTIONS = {
   graceDays: 5, // PRD: 3-7 days after the due date before recourse/default classification
   penalBps: 1200, // illustrative: 12% p.a. on overdue principal, on top of the contractual discount
   writeOffAfterDpd: 90, // NPA threshold
+  legalNoticeAfterDpd: 45, // staff are told a formal notice is due, and may issue one, from this many days past due
+  legalNoticeCureDays: 15, // a notice gives this long to pay before recovery can be handed over
 };
 
 export type State = { principal: bigint; discount: bigint; penal: bigint; lastAccrued: string };

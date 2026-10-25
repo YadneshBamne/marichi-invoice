@@ -5,7 +5,7 @@ import { requireUser } from "@/server/rbac";
 import { portfolioXirr, revenueReport, trialBalance } from "@/server/ledger/reports";
 import { DataTable, KV, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
-import { Icon } from "@/components/ui/icons";
+import { Downloads } from "@/components/ui/downloads";
 import { formatCompactMoney, formatMoney } from "@/lib/money";
 import { market } from "@/lib/countries";
 
@@ -26,8 +26,8 @@ export default async function Ledger() {
   return (
     <>
       <PageHead title="Ledger and reconciliation" sub="Every rupee is booked twice. The trial balance must balance, and the bank statement must tie out each day.">
-        <a className="btn btn-ghost btn-sm" href="/api/admin/ledger-export?type=trial-balance"><Icon name="download" className="h-4 w-4" />Trial balance CSV</a>
-        <a className="btn btn-ghost btn-sm" href="/api/admin/ledger-export?type=general-ledger"><Icon name="download" className="h-4 w-4" />General ledger CSV</a>
+        <Downloads href="/api/admin/ledger-export?type=trial-balance" label="Trial balance" />
+        <Downloads href="/api/admin/ledger-export?type=general-ledger" label="General ledger" />
       </PageHead>
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

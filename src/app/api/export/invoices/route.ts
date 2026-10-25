@@ -3,12 +3,14 @@ import { getMe } from "@/server/me";
 import { effectivePicks, enabledApps } from "@/lib/apps";
 import { db } from "@/server/db/client";
 import { businesses, invoices } from "@/server/db/schema";
-import { toCsv } from "@/server/ledger/reports";
+import { tableResponse } from "@/server/exports/table";
 import { toDecimal } from "@/lib/money";
+import { market } from "@/lib/countries";
 import { alias } from "drizzle-orm/pg-core";
 
 // Invoice export scoped to the caller: sellers get theirs, buyers get invoices raised against them, staff get all.
-export async function GET() {
+// ?format=csv (default), xlsx or pdf.
+export async function GET(req: Request) {
   const u = await getMe();
   if (!u || !u.twoFactorEnabled || u.suspendedAt) return new Response("not found", { status: 404 });
   // Company users need the "Reports and exports" app switched on.
@@ -23,9 +25,8 @@ export async function GET() {
     : null;
   if (!rows) return new Response("not found", { status: 404 });
 
-  const body = toCsv([
-    ["invoice_number", "seller", "buyer", "invoice_date", "due_date", "amount_inr", "status", "irn_status"],
-    ...rows.map(({ i, seller: se, buyer: bu }) => [i.invoiceNumber, se, bu, i.invoiceDate, i.dueDate, toDecimal(i.amount), i.status, i.irnStatus]),
-  ]);
-  return new Response(body, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="invoices.csv"', "cache-control": "private, no-store" } });
+  return tableResponse({
+    title: "Invoices", head: ["Invoice number", "Seller", "Buyer", "Invoice date", "Due date", `Amount ${market().currency.code}`, "Status", "e-Invoice"],
+    rows: rows.map(({ i, seller: se, buyer: bu }) => [i.invoiceNumber, se, bu, i.invoiceDate, i.dueDate, toDecimal(i.amount), i.status, i.irnStatus]),
+  }, new URL(req.url).searchParams.get("format"), "invoices");
 }

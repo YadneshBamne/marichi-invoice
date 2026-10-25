@@ -32,10 +32,12 @@ export const ZM: Pack = {
   },
   privacy: {
     law: "the Data Protection Act, 2021", regulator: "the Office of the Data Protection Commissioner",
+    retentionYears: 10, // financial and verification records (Financial Intelligence Centre Act). Counsel confirms.
     breachHours: 24, residency: "Personal data is stored in Zambia unless a transfer condition in the Act is met. Counsel must confirm how this applies to our hosting.",
   },
   ombudsman: { name: "Bank of Zambia (consumer complaints)", url: "https://www.boz.zm" },
   regulator: "Bank of Zambia",
+  returns: { fiu: "the Financial Intelligence Centre", bureau: "the credit reference bureau", capitalRule: "the Bank of Zambia capital requirements for non-bank financial institutions" },
   institutions: { bank: "Commercial bank", nbfi: "Non-bank financial institution", dfi: "Development finance institution", fund: "Fund or private lender", other: "Other licensed institution" },
   phone: "+260", timezone: "Africa/Lusaka",
   platformFunds: false,

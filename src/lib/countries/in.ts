@@ -32,9 +32,11 @@ export const IN: Pack = {
   privacy: {
     law: "the Digital Personal Data Protection Act, 2023 and its Rules", regulator: "the Data Protection Board of India (and CERT-In for cyber incidents)",
     breachHours: 6, residency: "Payment data is kept in India. Other personal data may be processed abroad except in countries the government restricts.",
+    retentionYears: 8, // accounting records (Companies Act) are the longest; verification and transaction records (PMLA) need five. Counsel confirms.
   },
   ombudsman: { name: "RBI Integrated Ombudsman Scheme", url: "https://cms.rbi.org.in" },
   regulator: "RBI",
+  returns: { fiu: "FIU-IND", bureau: "the credit information companies (CIBIL, Equifax, Experian, CRIF High Mark)", capitalRule: "the RBI capital adequacy rules for NBFC-Factors" },
   institutions: { bank: "Bank", nbfc_factor: "NBFC-Factor or factoring company", nbfc: "NBFC or lender", mfi: "Microfinance institution", fund: "Fund", other: "Other licensed institution" },
   phone: "+91", timezone: "Asia/Kolkata",
   platformFunds: true,

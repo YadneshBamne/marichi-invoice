@@ -126,7 +126,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Grace period; recourse trigger; auto-debit of the seller (e-NACH) | Built, simulated mandate provider |
 | Non-recourse loss and write-off review | Built |
 | Part payments; delinquency buckets to 90+ | Built |
-| Phone call and legal-notice steps; handoff to a recovery case system | Not built |
+| Phone call and legal-notice steps; handoff to a recovery case system | Partial. A legal notice (PDF, dated, with a pay-by date) goes to the buyer or, with recourse, the seller, and recovery can be handed to a named agency after the notice period. The notice wording is a draft for counsel. Phone calls and a case system are not built |
 
 ### Module 10. Ledger and reconciliation
 | Requirement | Status |
@@ -175,9 +175,9 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Seller, buyer, financier and operations dashboards | Built |
 | Funnel, turnaround, delinquency, fraud, capital use, vintage, concentration, cash-flow forecast | Built (concentration is bars, not a heat map) |
 | Scheduled reports by email; CSV export | Built |
-| PDF and Excel export | Not built |
+| PDF and Excel export | Built. Every report and export can be downloaded as CSV, Excel or PDF |
 | Warehouse / BI connection | Not built |
-| Regulatory returns (portfolio at risk, capital adequacy inputs, credit-bureau monthly file) | Not built |
+| Regulatory returns (portfolio at risk, capital adequacy inputs, credit-bureau monthly file) | Drafts built (and suspicious-transaction report drafts). They use the usual layout, not a regulator's own form; counsel confirms the form before filing |
 
 ### Module 15. Admin console
 | Requirement | Status |
@@ -208,9 +208,9 @@ All built: tickets with context, dispute workflow that pauses financing and coll
 | VAPT; PCI-style controls | Not done (a task for an outside tester) |
 | 99.9% uptime; RPO 15 min, RTO 4 h; backups | Not verified: depends on how the database and hosting are configured |
 | Decision under 5 minutes, API under 500 ms | Not measured: no load test yet |
-| Record retention of 7 to 10 years, enforced | Not built (nothing is deleted today; no policy job) |
+| Record retention of 7 to 10 years, enforced | Built for housekeeping data: a nightly sweep deletes expired sign-ins, old messages, report files, webhook records and logs. Regulated records are never swept and are kept for the country's retention years, which counsel confirms |
 | Data localisation | Designed (one deployment per country), not yet deployed in a country region |
-| DPDP / Data Protection Act rights: access, correction, breach clocks | Partial. A privacy notice and the clocks are stated; no request-handling workflow |
+| DPDP / Data Protection Act rights: access, correction, breach clocks | Built: a person can ask for a copy (ready at once), correction, deletion or to stop optional uses; each has a due date and a staff queue; deletion is guarded and keeps the records the law requires. Breach clocks are stated, not automated |
 
 ## Section 12: third-party integrations
 The gateway and the mock adapter for each port are built. **No real provider is connected** except email and invoice reading.
@@ -227,7 +227,7 @@ The gateway and the mock adapter for each port are built. **No real provider is 
 | 12.9 E-signature and e-stamping | Simulated e-sign; e-stamping not built |
 | 12.10 AML screening | Simulated; ongoing monitoring not built |
 | 12.11 Communication | Email real; SMS simulated; WhatsApp and push not built |
-| 12.12 Regulatory reporting | Not built (registry filing at CERSAI/PACRA is built, simulated) |
+| 12.12 Regulatory reporting | Drafts built; filing itself stays with the compliance officer (registry filing at CERSAI/PACRA is built, simulated) |
 | 12.13 Governance | Metrics in System health; version pinning and vendor-risk register not built |
 
 ## Section 11: phases
@@ -256,10 +256,10 @@ Invitations, five company roles and maker-checker approvals; one-click buyer acc
 6. Feature flags.
 7. (done) Debit notes; invoice bundling; pooled funding from several financiers.
 8. (done) TDS on interest.
-9. PDF and Excel exports; regulatory-return drafts.
-10. Data-subject request workflow and retention policy.
+9. (done) PDF and Excel exports; regulatory-return drafts.
+10. (done) Data-subject request workflow and retention policy.
 11. Forgery heuristics on uploaded PDFs; a rules editor for fraud signals.
-12. Recovery handoff and legal-notice step in collections.
+12. (done, except phone calls and a case system) Recovery handoff and legal-notice step in collections.
 
 **B. Needs a provider, licence or partner**
 Every real adapter in Section 12 (KYC, video KYC, CKYC, GSTN, IRP, bureau, rating, Account Aggregator, BaaS and escrow bank, e-sign and e-stamp, AML data, SMS, WhatsApp), ERP connectors, and regulator filings.

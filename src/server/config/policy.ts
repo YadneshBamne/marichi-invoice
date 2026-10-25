@@ -18,6 +18,7 @@ import { CROSS } from "../crossborder/rules";
 import { SLA_HOURS } from "../support/policy";
 import { MONITOR } from "../compliance/monitoring";
 import { KYB_RULES } from "../kyb/rules";
+import { PRIVACY } from "../privacy/rules";
 import { POLICY, type Grade } from "../underwriting/policy";
 import { formatMoney, rupeesToPaise, toDecimal } from "../../lib/money";
 import { market } from "../../lib/countries";
@@ -37,7 +38,7 @@ const def = (key: string, group: string, label: string, kind: Kind, min: Num, ma
 
 const P = POLICY as unknown as Bag, O = OFFER as unknown as Bag, D = DISBURSE as unknown as Bag, C = COLLECTIONS as unknown as Bag, R = RULES as unknown as Bag;
 const F = FRAUD as unknown as Bag, M = ML as unknown as Bag, K = MARKET as unknown as Bag, E = DD as unknown as Bag, S = SCF as unknown as Bag, X = CROSS as unknown as Bag, AP = APPROVAL as unknown as Bag;
-const MO = MONITOR as unknown as Bag, KR = KYB_RULES as unknown as Bag;
+const MO = MONITOR as unknown as Bag, KR = KYB_RULES as unknown as Bag, PV = PRIVACY as unknown as Bag;
 const GRADES: Grade[] = ["A", "B", "C", "D", "E"];
 
 export const DEFS: Def[] = [
@@ -105,6 +106,13 @@ export const DEFS: Def[] = [
   def("monitor.rekycMonths", "Compliance", "A company's verification is valid for (months)", "int", 6, 60, MO, "rekycMonths", "After this long it is asked to confirm its details again, and financing waits until it has."),
   def("monitor.rescreenDays", "Compliance", "A clean sanctions check stays fresh for (days)", "int", 1, 90, MO, "rescreenDays", "Companies and their owners are checked against the lists again after this long."),
 
+  def("privacy.responseDays", "Privacy and retention", "A privacy request must be answered within (days)", "int", 1, 90, PV, "responseDays", "Shown to the person as the due date, and flagged to staff when it passes."),
+  def("retention.exportDays", "Privacy and retention", "A data copy stays available to download for (days)", "int", 1, 90, PV, "exportDays", "After this the copy is deleted; the person can ask for a new one."),
+  def("retention.notificationDays", "Privacy and retention", "Sent messages are kept for (days)", "int", 30, 3650, PV, "notificationDays", "The messages we sent to people, not the records of what happened."),
+  def("retention.reportRunDays", "Privacy and retention", "Scheduled report files are kept for (days)", "int", 7, 3650, PV, "reportRunDays"),
+  def("retention.webhookDays", "Privacy and retention", "Delivered webhook records are kept for (days)", "int", 7, 3650, PV, "webhookDays"),
+  def("retention.logDays", "Privacy and retention", "Technical call logs are kept for (days)", "int", 7, 3650, PV, "logDays"),
+
   def("fraud.caseThreshold", "Fraud engine", "Score that opens a fraud case", "int", 10, 300, F, "caseThreshold", "Each signal adds points; any single high-severity signal also opens a case."),
   def("fraud.velocityPerDay", "Fraud engine", "Invoices from one seller in a day that count as a burst", "int", 2, 500, F, "velocityPerDay"),
   def("fraud.outlierMultiple", "Fraud engine", "Invoice this many times the seller's average is unusual", "int", 2, 100, F, "outlierMultiple"),
@@ -113,6 +121,8 @@ export const DEFS: Def[] = [
 
   def("collections.graceDays", "Collections", "Grace period after the due date (days)", "int", 0, 30, C, "graceDays"),
   def("collections.penalBps", "Collections", "Penal rate on overdue principal (per year)", "percent", 0, 6000, C, "penalBps"),
+  def("collections.legalNoticeAfterDpd", "Collections", "A formal legal notice can be issued after (days past due)", "int", 15, 180, C, "legalNoticeAfterDpd", "Staff are told when an invoice reaches this."),
+  def("collections.legalNoticeCureDays", "Collections", "A legal notice gives this long to pay (days)", "int", 7, 60, C, "legalNoticeCureDays", "Recovery can be handed to an agency or lawyer only after this."),
   def("collections.writeOffAfterDpd", "Collections", "Review for write-off after (days past due)", "int", 30, 365, C, "writeOffAfterDpd"),
 
   ...(["query", "complaint", "dispute", "grievance"] as const).flatMap((k) => [

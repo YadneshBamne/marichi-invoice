@@ -23,6 +23,8 @@ const STAFF: Section[] = [
     { href: "/admin/models", label: "Model monitor", icon: "target", tour: "nav-models" },
     { href: "/admin/ledger", label: "Ledger", icon: "chart", tour: "nav-ledger" },
     { href: "/admin/tds", label: "Tax held back", icon: "receipt", tour: "nav-tds" },
+    { href: "/admin/privacy", label: "Privacy requests", icon: "lock", tour: "nav-privacy" },
+    { href: "/admin/regulatory", label: "Regulatory drafts", icon: "scale", tour: "nav-regulatory" },
     { href: "/admin/analytics", label: "Analytics", icon: "trend", tour: "nav-analytics" },
     { href: "/admin/support", label: "Support queue", icon: "help", tour: "nav-support" },
   ] },
@@ -83,5 +85,5 @@ export const CRUMBS: Record<string, string> = {
   collections: "Collections", fraud: "Fraud cases", ledger: "Ledger", support: "Support", users: "Users & roles", audit: "Audit log",
   system: "System health", policy: "Policy", models: "Model monitor", invoices: "Invoices", buyers: "Buyers", agreements: "Agreements", settings: "Settings", dashboard: "Dashboard",
   onboarding: "Verification", soon: "Coming soon", notifications: "Notifications", profile: "Profile", security: "Security", organization: "Company",
-  apps: "Apps", team: "Team", approvals: "Approvals", legal: "Legal documents", market: "Market and registry", tds: "Tax held back", flags: "Feature flags", mandate: "Mandate and limits", application: "Application", invite: "Invitation", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
+  apps: "Apps", team: "Team", approvals: "Approvals", legal: "Legal documents", market: "Market and registry", tds: "Tax held back", privacy: "Privacy", regulatory: "Regulatory drafts", flags: "Feature flags", mandate: "Mandate and limits", application: "Application", invite: "Invitation", financier: "Financier", "early-payment": "Pay early", analytics: "Analytics", programme: "Supplier finance", export: "Export invoices", "cross-border": "Cross-border", programmes: "Programmes", financiers: "Financiers", deals: "Deal flow", bids: "My bids", portfolio: "Portfolio", statement: "Statement",
 };

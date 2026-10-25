@@ -7,6 +7,7 @@ import { Stat } from "@/components/ui/cards";
 import { Bars } from "@/components/ui/charts";
 import { formatCompactMoney, formatMoney } from "@/lib/money";
 import { schedule } from "./actions";
+import { Downloads } from "@/components/ui/downloads";
 
 const COPY: Record<string, { title: string; sub: string }> = {
   seller: { title: "Analytics", sub: "When your buyers will pay, how your financed invoices are performing, and which buyers you depend on." },
@@ -40,12 +41,12 @@ export async function Analytics({ scope, userId, path }: { scope: Scope; userId:
       </div>
 
       <Panel title="Cash-flow forecast" sub="Expected by due date, week by week from today" className="mb-5"
-        action={<a className="btn btn-ghost btn-sm" href="/api/analytics/forecast">Download CSV</a>}>
+        action={<Downloads href="/api/analytics/forecast" />}>
         <Bars data={fc.weeks.map((w, i) => ({ label: i === 0 ? "This wk" : `+${i}w`, value: Number(weekTotal(w.values) / 100n) }))} format={(n) => formatCompactMoney(BigInt(n) * 100n)} />
       </Panel>
 
       <div className="mb-5 grid gap-5 xl:grid-cols-2">
-        <Panel title="Vintages" sub="Each month's funding, followed over time" flush action={<a className="btn btn-ghost btn-sm" href="/api/analytics/vintage">Download CSV</a>}>
+        <Panel title="Vintages" sub="Each month's funding, followed over time" flush action={<Downloads href="/api/analytics/vintage" />}>
           <DataTable rows={vin} rowKey={(v) => v.month} empty="Nothing funded yet."
             cols={[
               { h: "Funded in", cell: (v) => v.month },
@@ -56,7 +57,7 @@ export async function Analytics({ scope, userId, path }: { scope: Scope; userId:
               { h: "Lost", align: "right", cell: (v) => `${v.lossPct}%` },
             ]} />
         </Panel>
-        <Panel title="Concentration" sub={`Share of the open book by ${staff ? "buyer and seller" : "buyer"}`} flush action={<a className="btn btn-ghost btn-sm" href="/api/analytics/concentration">Download CSV</a>}>
+        <Panel title="Concentration" sub={`Share of the open book by ${staff ? "buyer and seller" : "buyer"}`} flush action={<Downloads href="/api/analytics/concentration" />}>
           <DataTable rows={[...con.byBuyer.top.map((x) => ({ ...x, side: "Buyer" })), ...(staff ? con.bySeller.top.map((x) => ({ ...x, side: "Seller" })) : [])]} rowKey={(x) => x.side + x.name} empty="No open advances."
             cols={[
               { h: "", cell: (x) => <span className="text-xs font-normal text-faint">{x.side}</span> },

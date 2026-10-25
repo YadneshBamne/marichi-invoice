@@ -115,6 +115,47 @@ export function assignmentNotice(d: NoticeData) {
   ]);
 }
 
+export type LegalNoticeData = {
+  noticeNo: string; addressee: "buyer" | "seller"; to: { legalName: string }; seller: { legalName: string }; buyer: { legalName: string };
+  invoice: { invoiceNumber: string; invoiceDate: string; dueDate: string; amount: bigint }; dpd: number;
+  due: { principal: bigint; discount: bigint; penal: bigint }; cureBy: string; cureDays: number;
+  collection: { accountNumber: string; ifsc: string } | null; financier?: Party; country?: CountryTerms; now: Date;
+};
+export function legalNotice(d: LegalNoticeData) {
+  const f = d.financier ?? PLATFORM, country = d.country ?? termsFor(null), total = d.due.principal + d.due.discount + d.due.penal;
+  const fin = f.platform ? "Marichi Labs" : "the Financier";
+  const why: Run[] = d.addressee === "buyer"
+    ? ["The right to receive payment of this invoice was assigned to ", { b: f.legalName }, ", and you were told of the assignment and of the account to pay into. The invoice is now ", { b: String(d.dpd) }, " days past its due date, and the following is owing."]
+    : ["Under the recourse term of your agreement, you must repay what is owing on this invoice if your buyer, ", { b: d.buyer.legalName }, ", has not paid it within the grace period after its due date. The invoice is now ", { b: String(d.dpd) }, " days past its due date, and the following is owing."];
+  const rest: Run[] = d.addressee === "buyer"
+    ? ["If the total is not received by that date, " + fin + " may take steps to recover it without further notice. These may include legal proceedings in ", country.forum, " under ", country.law, ", and reporting the default to credit bureaus where the law allows. You may also be asked to pay the reasonable costs of recovery and interest as the law and your agreement with ", d.seller.legalName, " allow."]
+    : ["If the total is not received by that date, " + fin + " may enforce your repurchase obligation without further notice. This may include legal proceedings in ", country.forum, " under ", country.law, ", and reporting the default to credit bureaus where the law allows. Costs of recovery may be added as your agreement and the law allow."];
+  return doc("Demand Notice", [
+    { h: "Demand Notice for Overdue Payment" },
+    { p: [`Notice no. ${d.noticeNo}. Date: ${date(d.now)}. Template ${TEMPLATE_VERSION}.`] },
+    { p: ["To: ", { b: d.to.legalName }] },
+    { p: f.platform ? ["From: ", { b: "Marichi Labs" }, "."] : ["From: ", { b: "Marichi Labs" }, ", as servicing and collection agent for ", { b: f.legalName }, " (the “Financier”)."] },
+    { p: ["Subject: payment of invoice ", { b: d.invoice.invoiceNumber }, ` dated ${d.invoice.invoiceDate} for `, { b: formatMoney(d.invoice.amount) }, " raised by ", { b: d.seller.legalName }, ", due on ", { b: d.invoice.dueDate }, "."] },
+    { p: why },
+    { table: [
+      ["Principal", formatMoney(d.due.principal)],
+      ["Discount", formatMoney(d.due.discount)],
+      ["Penal charges", formatMoney(d.due.penal)],
+      ["Total due on " + date(d.now), formatMoney(total)],
+    ] },
+    { p: ["Pay the total within ", { b: `${d.cureDays} days` }, ", that is by ", { b: d.cureBy }, ", into the collection account below. Payment to any other account will not discharge the amount owing."] },
+    ...(d.collection ? [{ table: [
+      ["Beneficiary", "Marichi Labs, collection account"],
+      ["Account number", d.collection.accountNumber],
+      [market().ids.bankCode.label, d.collection.ifsc],
+      ["Reference", `Invoice ${d.invoice.invoiceNumber}`],
+    ] as [string, string][] }] : []),
+    { p: ["If you believe any of this is wrong, tell us in writing before ", { b: d.cureBy }, ", quoting the notice number, with the reason and any supporting document. If you have already paid, send the payment reference."] },
+    { p: rest },
+    { p: ["[Counsel to confirm, for this country, the statutory references and the form of notice the law requires before proceedings.]"] },
+  ]);
+}
+
 export type KeyFactsData = {
   seller: { legalName: string }; buyer: { legalName: string }; financier?: Party; country?: CountryTerms;
   invoice: { invoiceNumber: string; invoiceDate: string; dueDate: string; amount: bigint };

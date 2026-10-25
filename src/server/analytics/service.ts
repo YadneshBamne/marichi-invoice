@@ -7,7 +7,7 @@ import { splitAmount } from "../marketplace/pool";
 import { daysBetween, isoDay } from "../collections/waterfall";
 import { notifyUser } from "../notify";
 import { gateway, type Adapters } from "../integrations/gateway";
-import { toCsv } from "../ledger/reports";
+import { tableCsv, type Table } from "../exports/table";
 import { toDecimal } from "../../lib/money";
 import { financierShare } from "../marketplace/service";
 
@@ -136,25 +136,25 @@ export async function forecast(db: Database, scope: Scope, now = new Date(), wee
   return out;
 }
 
-export const forecastCsv = (f: Forecast) => toCsv([
-  ["week_starting", ...f.columns.map((c) => c.toLowerCase().replaceAll(/[^a-z]+/g, "_"))],
-  ["overdue", ...f.columns.map((c) => toDecimal(f.overdue[c]))],
-  ...f.weeks.map((w) => [w.start, ...f.columns.map((c) => toDecimal(w.values[c]))]),
-]);
-export const vintageCsv = (v: Awaited<ReturnType<typeof vintages>>) => toCsv([
-  ["cohort", "invoices", "advanced", "repaid_principal", "outstanding", "late_30_plus", "written_off", "earned", "repaid_pct", "late_30_pct", "loss_pct"],
-  ...v.map((e) => [e.month, e.invoices, toDecimal(e.advanced), toDecimal(e.repaid), toDecimal(e.outstanding), toDecimal(e.late30), toDecimal(e.lost), toDecimal(e.earned), e.repaidPct, e.late30Pct, e.lossPct]),
-]);
-export const concentrationCsv = (c: Awaited<ReturnType<typeof concentration>>) => toCsv([
-  ["dimension", "name", "exposure", "share_pct"],
-  ...c.byBuyer.top.map((x) => ["buyer", x.name, toDecimal(x.exposure), x.share]), ...c.bySeller.top.map((x) => ["seller", x.name, toDecimal(x.exposure), x.share]),
-]);
+export const forecastTable = (f: Forecast): Table => ({
+  title: "Cash-flow forecast", head: ["Week starting", ...f.columns],
+  rows: [["Overdue", ...f.columns.map((c) => toDecimal(f.overdue[c]))], ...f.weeks.map((w) => [w.start, ...f.columns.map((c) => toDecimal(w.values[c]))])],
+});
+export const vintageTable = (v: Awaited<ReturnType<typeof vintages>>): Table => ({
+  title: "Vintage analysis", head: ["Cohort", "Invoices", "Advanced", "Repaid principal", "Outstanding", "Late 30+", "Written off", "Earned", "Repaid %", "Late 30 %", "Loss %"],
+  rows: v.map((e) => [e.month, e.invoices, toDecimal(e.advanced), toDecimal(e.repaid), toDecimal(e.outstanding), toDecimal(e.late30), toDecimal(e.lost), toDecimal(e.earned), e.repaidPct, e.late30Pct, e.lossPct]),
+});
+export const concentrationTable = (c: Awaited<ReturnType<typeof concentration>>): Table => ({
+  title: "Concentration", head: ["Dimension", "Name", "Exposure", "Share %"],
+  rows: [...c.byBuyer.top.map((x) => ["buyer", x.name, toDecimal(x.exposure), x.share]), ...c.bySeller.top.map((x) => ["seller", x.name, toDecimal(x.exposure), x.share])],
+});
+export const forecastCsv = (f: Forecast) => tableCsv(forecastTable(f));
 
 // ---- scheduled reports ----
 export const REPORTS = {
-  forecast: { label: "Cash-flow forecast", build: async (db: Database, s: Scope, now: Date) => forecastCsv(await forecast(db, s, now)) },
-  vintage: { label: "Vintage analysis", build: async (db: Database, s: Scope, now: Date) => vintageCsv(await vintages(db, s, now)) },
-  concentration: { label: "Concentration", build: async (db: Database, s: Scope) => concentrationCsv(await concentration(db, s)) },
+  forecast: { label: "Cash-flow forecast", table: async (db: Database, s: Scope, now: Date) => forecastTable(await forecast(db, s, now)) },
+  vintage: { label: "Vintage analysis", table: async (db: Database, s: Scope, now: Date) => vintageTable(await vintages(db, s, now)) },
+  concentration: { label: "Concentration", table: async (db: Database, s: Scope) => concentrationTable(await concentration(db, s)) },
 } as const;
 export type ReportKind = keyof typeof REPORTS;
 export const FREQUENCIES = { weekly: 7, monthly: 28 } as const; // monthly = every four weeks, so it never skips a month on a short one
@@ -177,7 +177,7 @@ export async function runDueReports(db: Database, gw: Adapters = gateway, now = 
   for (const s of due) {
     if (s.lastRunAt && now.getTime() - s.lastRunAt.getTime() < FREQUENCIES[s.frequency as Frequency] * 86_400_000 - 3_600_000) continue;
     try {
-      const content = await REPORTS[s.kind as ReportKind].build(db, { role: s.role, businessId: s.businessId }, now);
+      const content = tableCsv(await REPORTS[s.kind as ReportKind].table(db, { role: s.role, businessId: s.businessId }, now));
       const [run] = await db.insert(reportRuns).values({ scheduleId: s.id, userId: s.userId, kind: s.kind, filename: `${s.kind}-${isoDay(now)}.csv`, content }).returning();
       await db.update(reportSchedules).set({ lastRunAt: now }).where(eq(reportSchedules.id, s.id));
       void run;

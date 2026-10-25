@@ -8,6 +8,7 @@ const TABS = [
   { href: "/settings/team", label: "Team" },
   { href: "/settings/security", label: "Security" },
   { href: "/settings/notifications", label: "Notifications" },
+  { href: "/settings/privacy", label: "Privacy" },
 ];
 
 export function SettingsTabs({ integrations = false }: { integrations?: boolean }) {
