@@ -80,7 +80,7 @@ export default async function Onboarding() {
   const user = await requireUser();
   if (["ops", "compliance", "admin"].includes(user.role)) redirect("/admin");
   const [biz] = await db.select().from(businesses).where(eq(businesses.id, user.businessId!));
-  const canSubmit = ["draft", "info_requested", "rejected"].includes(biz.kybStatus);
+  const canSubmit = ["draft", "info_requested", "rejected", "rekyc_due"].includes(biz.kybStatus);
   const stage = stageOf(biz.kybStatus);
   const buyer = user.role === "buyer";
   const { ids } = market();

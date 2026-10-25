@@ -68,7 +68,7 @@ export async function submitForeignKyb(db: Database, p: { businessId: string; co
   const status = aml.hit ? ("under_review" as const) : ("approved" as const);
   const note = aml.hit ? "sanctions/PEP screening hit" : null;
   await db.transaction(async (tx) => {
-    await tx.update(businesses).set({ country, taxId, kybLevel: "light", kybStatus: status, kybNote: note }).where(eq(businesses.id, biz.id));
+    await tx.update(businesses).set({ country, taxId, kybLevel: "light", kybStatus: status, kybNote: note, ...(status === "approved" ? { kybApprovedAt: new Date() } : {}) }).where(eq(businesses.id, biz.id));
     if (aml.hit) await openCase(tx, { entityType: "business", entityId: biz.id, rule: KYB_AML_RULE, subjectBusinessId: biz.id, details: { screenedNames: [biz.legalName], country } });
     await tx.insert(auditLog).values({ action: "kyb.submit_foreign", entity: "business", entityId: biz.id, before: { status: biz.kybStatus }, after: { status, country } });
     if (status === "approved") await resolveForeignInvites(tx, biz.id, country, taxId);

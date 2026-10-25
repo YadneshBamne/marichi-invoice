@@ -57,7 +57,15 @@ export const businesses = pgTable("businesses", {
   dualControl: boolean("dual_control").notNull().default(false), // every commitment of company money needs a second approver
   country: text("country"), // ISO-3166 alpha-2; null means India
   taxId: text("tax_id"), // an overseas company's tax or registration number (no GSTIN)
+  kybApprovedAt: timestamp("kyb_approved_at", { withTimezone: true }), // when verification last became approved: re-verification is due a set time after
+  amlScreenedAt: timestamp("aml_screened_at", { withTimezone: true }), // the last time the company and its owners were checked against the sanctions lists
   createdAt: createdAt(),
+});
+
+// Something that is told to a person once: a deadline notice, a reminder. The key says what and for which date, so a re-run never repeats it.
+export const sentReminders = pgTable("sent_reminders", {
+  key: text("key").primaryKey(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // The scoring model's verdict on each underwriting decision, kept next to the rules' verdict for comparison.
@@ -236,6 +244,7 @@ export const invoices = pgTable("invoices", {
   documentRef: text("document_ref"), // vault reference to the uploaded PDF/image
   // absent = no IRN supplied (compensating controls apply); pending = IRP down, auto-retried
   irnStatus: text("irn_status").notNull().default("absent"), // absent | verified | mismatch | pending
+  irnRecheckedAt: timestamp("irn_rechecked_at", { withTimezone: true }), // the last time a financed invoice's e-invoice was looked up again
   reviewNote: text("review_note"),
   status: invoiceStatus("status").notNull().default("uploaded"),
   disputeFlag: boolean("dispute_flag").notNull().default(false),

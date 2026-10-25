@@ -1,11 +1,12 @@
 import { revalidatePath } from "next/cache";
-import { inArray } from "drizzle-orm";
+import { eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { reviewKyb } from "@/server/kyb/service";
-import { EmptyState, KV, PageHead, ReviewCard, StatusPill } from "@/components/ui/page";
+import { requestRekyc } from "@/server/compliance/monitoring";
+import { EmptyState, KV, PageHead, Panel, Pop, PopField, ReviewCard, StatusPill } from "@/components/ui/page";
 import { market } from "@/lib/countries";
 
 export const metadata = { title: "KYB review" };
@@ -24,12 +25,32 @@ async function decide(fd: FormData) {
   revalidatePath("/admin/kyb");
 }
 
+/** Ask an approved company to confirm its details again, for example after a risk flag. Financing for it pauses until it has. */
+async function askAgain(fd: FormData) {
+  "use server";
+  const u = await requireUser(["ops", "compliance", "admin"]);
+  const f = z.object({ who: z.string().trim().min(3), note: z.string() }).parse(Object.fromEntries(fd));
+  const id = f.who.toUpperCase();
+  const [b] = await db.select({ id: businesses.id }).from(businesses).where(or(eq(businesses.gstin, id), eq(businesses.legalName, f.who)));
+  if (!b) throw new Error(`no company found for "${f.who}"`);
+  await requestRekyc(db, u, b.id, f.note);
+  revalidatePath("/admin/kyb");
+}
+
 export default async function KybQueue() {
   await requireUser(["ops", "compliance", "admin"]);
   const rows = await db.select().from(businesses).where(inArray(businesses.kybStatus, ["under_review", "submitted"]));
   return (
     <>
-      <PageHead title="KYB review" sub="Businesses waiting for identity and compliance checks. Sanctions or AML hits are decided here." />
+      <PageHead title="KYB review" sub="Businesses waiting for identity and compliance checks. Sanctions or AML hits are decided here.">
+        <Pop id="rekyc" label="Ask for re-verification" cls="btn btn-ghost btn-sm">
+          <form action={askAgain} className="space-y-2">
+            <PopField label={`Company's ${market().ids.taxReg.label} or exact legal name`}><input name="who" required className="field !py-2 text-sm font-normal" /></PopField>
+            <PopField label="Why (the company will be told to confirm its details)"><input name="note" required minLength={5} className="field !py-2 text-sm font-normal" /></PopField>
+            <button className="btn btn-primary btn-sm w-full">Pause financing and ask</button>
+          </form>
+        </Pop>
+      </PageHead>
       {rows.length === 0 ? <EmptyState title="Nothing waiting">New verification requests will appear here.</EmptyState> : (
         <div className="grid gap-5 xl:grid-cols-2">
           {rows.map((b) => (

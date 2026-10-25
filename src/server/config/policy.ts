@@ -16,6 +16,7 @@ import { SCF } from "../scf/service";
 import { APPROVAL } from "../approvals/service";
 import { CROSS } from "../crossborder/rules";
 import { SLA_HOURS } from "../support/policy";
+import { MONITOR } from "../compliance/monitoring";
 import { POLICY, type Grade } from "../underwriting/policy";
 import { formatMoney, rupeesToPaise, toDecimal } from "../../lib/money";
 import { market } from "../../lib/countries";
@@ -35,6 +36,7 @@ const def = (key: string, group: string, label: string, kind: Kind, min: Num, ma
 
 const P = POLICY as unknown as Bag, O = OFFER as unknown as Bag, D = DISBURSE as unknown as Bag, C = COLLECTIONS as unknown as Bag, R = RULES as unknown as Bag;
 const F = FRAUD as unknown as Bag, M = ML as unknown as Bag, K = MARKET as unknown as Bag, E = DD as unknown as Bag, S = SCF as unknown as Bag, X = CROSS as unknown as Bag, AP = APPROVAL as unknown as Bag;
+const MO = MONITOR as unknown as Bag;
 const GRADES: Grade[] = ["A", "B", "C", "D", "E"];
 
 export const DEFS: Def[] = [
@@ -92,6 +94,9 @@ export const DEFS: Def[] = [
 
   def("disburse.approvalThreshold", "Payouts", "A second person must approve payouts above", "rupees", 0, rupeesToPaise("1000000000"), D, "approvalThreshold"),
   def("disburse.autoAttempts", "Payouts", "Automatic payout attempts before manual review", "int", 1, 10, D, "autoAttempts"),
+
+  def("monitor.rekycMonths", "Compliance", "A company's verification is valid for (months)", "int", 6, 60, MO, "rekycMonths", "After this long it is asked to confirm its details again, and financing waits until it has."),
+  def("monitor.rescreenDays", "Compliance", "A clean sanctions check stays fresh for (days)", "int", 1, 90, MO, "rescreenDays", "Companies and their owners are checked against the lists again after this long."),
 
   def("fraud.caseThreshold", "Fraud engine", "Score that opens a fraud case", "int", 10, 300, F, "caseThreshold", "Each signal adds points; any single high-severity signal also opens a case."),
   def("fraud.velocityPerDay", "Fraud engine", "Invoices from one seller in a day that count as a burst", "int", 2, 500, F, "velocityPerDay"),

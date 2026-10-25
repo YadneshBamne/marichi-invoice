@@ -8,6 +8,8 @@ import { notifyBusiness } from "../notify";
 import { checkId, market } from "../../lib/countries";
 
 export type KybStatus = typeof businesses.$inferSelect.kybStatus;
+/** Every route to "approved" starts the clock for the next periodic re-verification. */
+export const approvedAt = (s: string) => (s === "approved" ? { kybApprovedAt: new Date() } : {});
 export type KybInput = {
   businessId: string;
   pan: string;
@@ -36,7 +38,7 @@ async function assertGstinFree(db: Database, gstin: string, selfId: string) {
 export async function submitKyb(db: Database, input: KybInput, gw: Adapters = gateway) {
   const [biz] = await db.select().from(businesses).where(eq(businesses.id, input.businessId));
   if (!biz) throw new Error("business not found");
-  if (!["draft", "info_requested", "rejected"].includes(biz.kybStatus)) {
+  if (!["draft", "info_requested", "rejected", "rekyc_due"].includes(biz.kybStatus)) {
     throw new Error(`cannot submit KYB from status ${biz.kybStatus}`);
   }
   if (input.ubos.length === 0) throw new Error("at least one director/UBO is required");
@@ -72,7 +74,7 @@ export async function submitKyb(db: Database, input: KybInput, gw: Adapters = ga
 
   await db.transaction(async (tx) => {
     await tx.update(businesses)
-      .set({ pan: taxId, cin, gstin, kybStatus: status, kybNote: reasons.join("; ") || null })
+      .set({ pan: taxId, cin, gstin, kybStatus: status, kybNote: reasons.join("; ") || null, ...approvedAt(status) })
       .where(eq(businesses.id, biz.id));
     await tx.delete(ubos).where(eq(ubos.businessId, biz.id));
     await tx.insert(ubos).values(
@@ -113,7 +115,7 @@ export async function submitLightKyb(
 ) {
   const [biz] = await db.select().from(businesses).where(eq(businesses.id, p.businessId));
   if (!biz) throw new Error("business not found");
-  if (!["draft", "info_requested", "rejected"].includes(biz.kybStatus)) {
+  if (!["draft", "info_requested", "rejected", "rekyc_due"].includes(biz.kybStatus)) {
     throw new Error(`cannot submit KYB from status ${biz.kybStatus}`);
   }
   const ids = market().ids;
@@ -128,7 +130,7 @@ export async function submitLightKyb(
 
   await db.transaction(async (tx) => {
     await tx.update(businesses)
-      .set({ gstin, pan: taxId, kybLevel: "light", kybStatus: status, kybNote: reasons.join("; ") || null })
+      .set({ gstin, pan: taxId, kybLevel: "light", kybStatus: status, kybNote: reasons.join("; ") || null, ...approvedAt(status) })
       .where(eq(businesses.id, biz.id));
     if (aml.hit) await openCase(tx, { entityType: "business", entityId: biz.id, rule: COMPLIANCE_CASE, subjectBusinessId: biz.id, details: { screenedNames: [biz.legalName] } });
     await tx.insert(auditLog).values({
@@ -165,7 +167,7 @@ export async function reviewKyb(
       throw new Error("open AML case: compliance or admin must approve");
     }
     const status: KybStatus = { approve: "approved", reject: "rejected", request_info: "info_requested" }[p.decision] as KybStatus;
-    await tx.update(businesses).set({ kybStatus: status, kybNote: p.note }).where(eq(businesses.id, biz.id));
+    await tx.update(businesses).set({ kybStatus: status, kybNote: p.note, ...approvedAt(status) }).where(eq(businesses.id, biz.id));
     if (status !== "info_requested") {
       await tx.update(fraudCases)
         .set({ status: "closed", outcome: status === "approved" ? "cleared" : "rejected", resolution: `${p.decision}: ${p.note}`, resolvedBy: p.reviewerId, resolvedAt: new Date() })

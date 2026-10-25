@@ -92,7 +92,7 @@ export async function applyResponse(
     }).where(eq(invoiceConfirmations.invoiceId, inv.id));
     // Confirming from the emailed link is the light verification of a buyer a supplier named: the address is proven and the GSTIN was screened when it was added.
     if (p.who.method === "link" && p.decision === "confirm") {
-      await tx.update(businesses).set({ kybStatus: "approved", kybNote: null })
+      await tx.update(businesses).set({ kybStatus: "approved", kybNote: null, kybApprovedAt: new Date() })
         .where(and(eq(businesses.id, inv.buyerId), eq(businesses.kybLevel, "light"), eq(businesses.kybStatus, "submitted")));
     }
     await tx.insert(auditLog).values({

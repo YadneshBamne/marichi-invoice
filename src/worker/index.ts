@@ -19,6 +19,7 @@ import { presentDebits, sendPreDebitNotices } from "../server/collections/nach";
 import { runDisbursements } from "../server/disbursements/service";
 import { prepareAllAccepted } from "../server/agreements/service";
 import { runRegistryFilings } from "../server/registry/service";
+import { recheckIrns, remindLicences, rescreenParties, runRekyc } from "../server/compliance/monitoring";
 import { expireOffers, generateOffers } from "../server/offers/service";
 import { underwriteEligible } from "../server/underwriting/service";
 import { dispatchValidated, runConfirmationSla } from "../server/confirmations/service";
@@ -51,8 +52,10 @@ const jobs: Record<string, { cron: string; run: () => Promise<void> }> = {
   "fraud.scan": { cron: "*/5 * * * *", run: async () => { await scanPending(db); } },                         // Phase 2: score every new invoice for fraud signals
   "fraud.notify-new-cases": { cron: "*/5 * * * *", run: async () => { await notifyNewCases(db); } },     // Module 12
   "irn.retry-pending": { cron: "*/15 * * * *", run: async () => { await revalidatePendingIrns(db); } }, // PRD 12.4
-  "irn.recheck": { cron: "0 3 * * *", run: async () => {} },                  // PRD 12.4: detect post-financing cancellation
-  "aml.rescreen": { cron: "0 2 * * 0", run: async () => {} },                 // PRD 12.10
+  "irn.recheck": { cron: "0 3 * * *", run: async () => { await recheckIrns(db); } },          // PRD 12.4: detect post-financing cancellation
+  "aml.rescreen": { cron: "0 2 * * *", run: async () => { await rescreenParties(db); } },     // PRD 12.10: ongoing sanctions monitoring (each company again after a week, a batch a night)
+  "kyb.rekyc": { cron: "0 4 * * *", run: async () => { await runRekyc(db); } },               // PRD Module 1: periodic re-verification
+  "licences.expiry": { cron: "30 4 * * *", run: async () => { await remindLicences(db); } },  // financier licence expiry notices
 };
 
 // No top-level await: tsx compiles this package as CommonJS (no "type": "module").
