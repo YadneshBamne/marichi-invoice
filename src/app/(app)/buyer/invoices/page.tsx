@@ -17,6 +17,7 @@ import { formatINR, rupeesToPaise } from "@/lib/money";
 import { myMandate } from "@/server/collections/nach";
 import { maskTail } from "@/server/crypto";
 import { Autopay } from "./autopay";
+import { acceptanceText } from "@/server/confirmations/wording";
 
 const Form = z.object({
   invoiceId: z.uuid(),
@@ -101,7 +102,10 @@ export default async function BuyerInvoices() {
                     </form>
                   )}>
                   {c?.status === "clarification" && <p className="mb-2 text-s-600">You asked: {c.note}</p>}
-                  <p className="text-muted">By confirming you acknowledge that this invoice is genuine and payable on the due date to the designated collection account.</p>
+                  <details className="text-muted">
+                    <summary className="cursor-pointer font-semibold text-p-700">What you agree to by confirming</summary>
+                    <ol className="mt-2 list-decimal space-y-1 pl-5">{acceptanceText({ buyer: u.biz?.displayName ?? u.biz?.legalName ?? "your company", seller, invoiceNumber: i.invoiceNumber, amount: formatINR(i.amount), dueDate: i.dueDate }).map((t, k) => <li key={k}>{t}</li>)}</ol>
+                  </details>
                 </ReviewCard>
               ))}
             </div>

@@ -195,6 +195,7 @@ export const buyerSellerRelationships = pgTable("buyer_seller_relationships", {
   creditTermsDays: integer("credit_terms_days").notNull().default(60),
   maxExposure: paise("max_exposure"), // per-seller cap on this buyer; enforced at underwriting (Module 5). null = no cap
   deemedAcceptanceDays: integer("deemed_acceptance_days"), // Module 4 optional rule from the buyer agreement; null = off
+  contactEmail: text("contact_email"), // the person at the buyer who confirms this seller's invoices, named by the seller
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("bsr_pair").on(t.buyerId, t.sellerId)]);
 
@@ -262,6 +263,20 @@ export const invoiceConfirmations = pgTable("invoice_confirmations", {
   reminder24At: timestamp("reminder_24_at", { withTimezone: true }),
   reminder48At: timestamp("reminder_48_at", { withTimezone: true }),
   escalatedAt: timestamp("escalated_at", { withTimezone: true }),
+  // One-click acceptance by emailed link. The link token is kept encrypted (so reminders reuse the same link) and looked up by hash.
+  tokenHash: text("token_hash").unique(),
+  token: encrypted("token"),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+  // One-time code that proves the person holds an address on file. Only a hash is stored.
+  otpHash: text("otp_hash"),
+  otpEmail: text("otp_email"),
+  otpSentAt: timestamp("otp_sent_at", { withTimezone: true }),
+  otpExpiresAt: timestamp("otp_expires_at", { withTimezone: true }),
+  otpAttempts: integer("otp_attempts").notNull().default(0),
+  verifiedEmail: text("verified_email"), // the address that was verified when the decision was made
+  claimUntil: timestamp("claim_until", { withTimezone: true }), // for a minute window after a link decision, that person may create the buyer's account
+  acceptanceVersion: text("acceptance_version"), // which wording the buyer was shown
+  acceptanceText: text("acceptance_text"), // the exact wording, kept as the legal record
 }, (t) => [uniqueIndex("conf_invoice").on(t.invoiceId)]);
 
 // ---- Module 5 / 6 / 7 ----

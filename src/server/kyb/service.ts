@@ -17,6 +17,12 @@ export type KybInput = {
 };
 
 const COMPLIANCE_CASE = KYB_AML_RULE;
+/** A GSTIN belongs to one company. If a supplier already named it, the buyer takes that company over from the emailed link instead. */
+async function assertGstinFree(db: Database, gstin: string, selfId: string) {
+  const [other] = await db.select({ id: businesses.id }).from(businesses).where(eq(businesses.gstin, gstin));
+  if (other && other.id !== selfId) throw new Error("this GSTIN is already registered on Marichi. If a supplier invited you, open the link in that email to take over the company");
+}
+
 
 /**
  * Submit KYB. Auto-approves only when every check is clean. (PRD Module 1 rules)
@@ -103,6 +109,7 @@ export async function submitLightKyb(
     throw new Error(`cannot submit KYB from status ${biz.kybStatus}`);
   }
   const gstin = p.gstin.trim().toUpperCase();
+  await assertGstinFree(db, gstin, biz.id);
   const [pan, aml] = await Promise.all([gw.kyc.verifyPan(p.pan, biz.legalName), gw.kyc.screenAml(biz.legalName)]);
   const reasons: string[] = [];
   let status: KybStatus = "approved";

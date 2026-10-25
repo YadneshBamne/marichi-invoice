@@ -9,10 +9,12 @@ import { linkBuyer } from "@/server/relationships/service";
 import { linkForeignBuyer } from "@/server/crossborder/service";
 import { invitationsFor, respondInvite } from "@/server/scf/service";
 import { formatINR } from "@/lib/money";
+import { attempt } from "../../financier/attempt";
 import { DataTable, Field, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 
 const Form = z.object({
   buyerGstin: z.string().min(15),
+  buyerName: z.string().trim().max(120).optional(),
   buyerEmail: z.email(),
   creditTermsDays: z.coerce.number().int().min(1).max(365),
 });
@@ -21,8 +23,10 @@ async function add(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
   assertCan(u, "buyer.invite");
-  await linkBuyer(db, { sellerId: u.businessId!, ...Form.parse(Object.fromEntries(fd)) });
-  revalidatePath("/seller/buyers");
+  await attempt("/seller/buyers", async () => {
+    const r = await linkBuyer(db, { sellerId: u.businessId!, ...Form.parse(Object.fromEntries(fd)) });
+    return r.linked ? (r.pending ? "Buyer added. You can upload invoices now; the buyer is verified when their contact confirms the first one." : "Buyer linked.") : "Buyer invited. They are linked once they are verified.";
+  });
 }
 
 async function answerInvite(fd: FormData) {
@@ -38,12 +42,12 @@ async function addOverseas(fd: FormData) {
   const u = await requireUser(["seller"]);
   assertCan(u, "buyer.invite");
   const f = z.object({ country: z.string().length(2), taxId: z.string().min(4), buyerEmail: z.email(), creditTermsDays: z.coerce.number().int().min(1).max(365) }).parse(Object.fromEntries(fd));
-  await linkForeignBuyer(db, { sellerId: u.businessId!, ...f });
-  revalidatePath("/seller/buyers");
+  await attempt("/seller/buyers", async () => { await linkForeignBuyer(db, { sellerId: u.businessId!, ...f }); return "Overseas buyer added."; });
 }
 
 const input = "field font-normal";
-export default async function Buyers() {
+export default async function Buyers({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
+  const q = await searchParams;
   const u = await requireUser(["seller"]);
   const [programmes, linked, invited] = await Promise.all([
     invitationsFor(db, u.businessId!),
@@ -59,6 +63,8 @@ export default async function Buyers() {
 
   return (
     <>
+      {q.ok && <div className="mb-4"><Notice tone="good">{q.ok}</Notice></div>}
+      {q.error && <div className="mb-4"><Notice tone="bad">{q.error}</Notice></div>}
       <PageHead title="Buyers" sub="The companies that owe you money. A buyer must be linked and verified before their invoices can be financed." />
       {programmes.length > 0 && (
         <Panel title="Supplier finance programmes" sub="A buyer that runs a programme finances your invoices on its credit, usually at a lower rate than your own." className="mb-5" flush>
@@ -90,10 +96,11 @@ export default async function Buyers() {
           <Panel title="Add a buyer">
             <form action={add} className="space-y-4">
               <Field label="Buyer GSTIN"><input name="buyerGstin" required className={input} /></Field>
-              <Field label="Buyer accounts-payable email"><input name="buyerEmail" type="email" required className={input} /></Field>
+              <Field label="Buyer company name" hint="Needed the first time, if the buyer is not on Marichi yet."><input name="buyerName" className={input} /></Field>
+              <Field label="Email of the person who confirms your invoices" hint="At the buyer, such as accounts payable. They confirm each invoice from an emailed link; they do not need an account."><input name="buyerEmail" type="email" required className={input} /></Field>
               <Field label="Credit terms (days)"><input name="creditTermsDays" type="number" defaultValue={60} className={input} /></Field>
               <button className="btn btn-primary w-full">Add buyer</button>
-              <p className="text-xs text-muted">If the buyer is not verified yet, they are invited and linked automatically once they are.</p>
+              <p className="text-xs text-muted">You can upload invoices straight away. The buyer is verified when their contact confirms the first one.</p>
             </form>
             {u.apps.has("cross-border") && (
               <details className="mt-5 border-t border-hair pt-4">

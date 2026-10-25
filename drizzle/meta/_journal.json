@@ -113,6 +113,13 @@
       "when": 1792861985719,
       "tag": "0015_roles_memberships",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792892001079,
+      "tag": "0016_buyer_link_acceptance",
+      "breakpoints": true
     }
   ]
 }

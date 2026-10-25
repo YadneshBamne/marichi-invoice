@@ -1,6 +1,6 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Database, Tx } from "../db/client";
-import { auditLog, invoiceConfirmations, invoices, buyerSellerRelationships } from "../db/schema";
+import { auditLog, businesses, invoiceConfirmations, invoices, buyerSellerRelationships, memberships } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { checkBasics } from "../invoices/service";
 import { notifyBusiness, notifyStaff } from "../notify";
@@ -8,6 +8,8 @@ import { emitEvent } from "../erp/events";
 import { openDisputeInTx } from "../support/disputes";
 import { announceTicket } from "../support/service";
 import { formatINR } from "../../lib/money";
+import { ACCEPTANCE_VERSION, acceptanceText } from "./wording";
+import { sendToBuyerSide } from "./link";
 
 type Invoice = typeof invoices.$inferSelect;
 export type Actor = { id: string; email: string; role: string; businessId: string | null; ip?: string; userAgent?: string };
@@ -27,7 +29,7 @@ export async function sendForConfirmation(db: Database, invoiceId: string, gw: A
     return row;
   });
   if (!inv) return false; // already sent, or not validated: idempotent no-op
-  await notifyBusiness(db, inv.buyerId, "confirmation_requested", info(inv), gw);
+  await sendToBuyerSide(db, inv, "confirmation_requested", gw, now);
   return true;
 }
 
@@ -48,9 +50,14 @@ async function applyConfirmed(tx: Tx, inv: Invoice, now: Date) {
   return status as "confirmed" | "eligible";
 }
 
-/** Buyer responds. Only a user of the invoice's buyer business may respond. */
-export async function respondToInvoice(
-  db: Database, p: { invoiceId: string; actor: Actor; decision: Decision; note?: string }, gw: Adapters = gateway, now = new Date(),
+export type Who = { userId: string | null; email: string; ip?: string; userAgent?: string; method: "buyer" | "link" };
+
+/**
+ * The one place an invoice response is applied, whether it came from a signed-in buyer user or from the emailed link.
+ * `authorise` decides whether this person may answer for this invoice. The confirm wording the buyer saw is stored with the answer.
+ */
+export async function applyResponse(
+  db: Database, p: { invoiceId: string; decision: Decision; note?: string; who: Who; authorise: (inv: Invoice) => void }, gw: Adapters = gateway, now = new Date(),
 ) {
   const note = p.note?.trim();
   if (p.decision !== "confirm" && !note) throw new Error("a note is required to dispute or ask for clarification");
@@ -58,7 +65,7 @@ export async function respondToInvoice(
   const out = await db.transaction(async (tx) => {
     const [inv] = await tx.select().from(invoices).where(eq(invoices.id, p.invoiceId)).for("update");
     if (!inv) throw new Error("invoice not found");
-    if (p.actor.role !== "buyer" || p.actor.businessId !== inv.buyerId) throw new Error("FORBIDDEN");
+    p.authorise(inv);
     if (inv.status !== "sent_for_confirmation") throw new Error(`invoice is not awaiting confirmation (${inv.status})`);
 
     let invoiceStatus: string = inv.status;
@@ -67,16 +74,29 @@ export async function respondToInvoice(
     if (p.decision === "dispute") {
       invoiceStatus = "disputed"; // pauses underwriting/funding; Module 16 owns resolution
       await tx.update(invoices).set({ status: "disputed", disputeFlag: true, reviewNote: note }).where(eq(invoices.id, inv.id));
-      disputeTicketId = (await openDisputeInTx(tx, { invoice: inv, actor: p.actor, reason: note!, phase: "pre_funding", now })).id;
+      disputeTicketId = (await openDisputeInTx(tx, { invoice: inv, actor: { id: p.who.userId ?? inv.buyerId, role: "buyer", businessId: inv.buyerId }, reason: note!, phase: "pre_funding", now })).id;
     }
+    const [names] = await tx.select({ buyer: businesses.legalName, seller: sql<string>`(select legal_name from businesses where id = ${inv.sellerId})` }).from(businesses).where(eq(businesses.id, inv.buyerId));
+    const claimable = p.who.method === "link" && p.decision === "confirm"
+      ? (await tx.select({ id: memberships.id }).from(memberships).where(eq(memberships.businessId, inv.buyerId)).limit(1)).length === 0 : false;
     const confStatus = { confirm: "confirmed", dispute: "disputed", clarify: "clarification" }[p.decision];
     await tx.update(invoiceConfirmations).set({
-      status: confStatus, method: "buyer", respondedAt: now, respondedBy: p.actor.id,
-      respondedByEmail: p.actor.email, ip: p.actor.ip, userAgent: p.actor.userAgent, note,
+      status: confStatus, method: p.who.method, respondedAt: now, respondedBy: p.who.userId,
+      respondedByEmail: p.who.email, verifiedEmail: p.who.method === "link" ? p.who.email : null, ip: p.who.ip, userAgent: p.who.userAgent, note,
+      ...(p.decision === "confirm" ? {
+        acceptanceVersion: ACCEPTANCE_VERSION,
+        acceptanceText: acceptanceText({ buyer: names.buyer, seller: names.seller, invoiceNumber: inv.invoiceNumber, amount: formatINR(inv.amount), dueDate: inv.dueDate }).join("\n"),
+      } : {}),
+      ...(claimable ? { claimUntil: new Date(now.getTime() + 60 * 60_000) } : {}),
     }).where(eq(invoiceConfirmations.invoiceId, inv.id));
+    // Confirming from the emailed link is the light verification of a buyer a supplier named: the address is proven and the GSTIN was screened when it was added.
+    if (p.who.method === "link" && p.decision === "confirm") {
+      await tx.update(businesses).set({ kybStatus: "approved", kybNote: null })
+        .where(and(eq(businesses.id, inv.buyerId), eq(businesses.kybLevel, "light"), eq(businesses.kybStatus, "submitted")));
+    }
     await tx.insert(auditLog).values({
-      actorId: p.actor.id, action: `confirmation.${p.decision}`, entity: "invoice", entityId: inv.id,
-      before: { status: inv.status }, after: { status: invoiceStatus, note },
+      actorId: p.who.userId ?? undefined, action: `confirmation.${p.decision}`, entity: "invoice", entityId: inv.id,
+      before: { status: inv.status }, after: { status: invoiceStatus, note, via: p.who.method, email: p.who.email },
     });
     return { inv, status: invoiceStatus, disputeTicketId };
   });
@@ -85,7 +105,18 @@ export async function respondToInvoice(
   const template = { confirm: "invoice_confirmed", dispute: "invoice_disputed", clarify: "invoice_clarification_requested" }[p.decision];
   await notifyBusiness(db, out.inv.sellerId, template, { ...info(out.inv), note: note ?? "" }, gw);
   if (out.status === "confirmed" || out.status === "disputed") await emitEvent(db, out.inv.sellerId, out.status === "confirmed" ? "invoice.confirmed" : "invoice.disputed", { invoiceNumber: out.inv.invoiceNumber, note: note ?? null }, now);
-  return { status: out.status };
+  return { status: out.status, invoiceId: out.inv.id };
+}
+
+/** A signed-in user of the invoice's buyer business responds. */
+export async function respondToInvoice(
+  db: Database, p: { invoiceId: string; actor: Actor; decision: Decision; note?: string }, gw: Adapters = gateway, now = new Date(),
+) {
+  return applyResponse(db, {
+    invoiceId: p.invoiceId, decision: p.decision, note: p.note,
+    who: { userId: p.actor.id, email: p.actor.email, ip: p.actor.ip, userAgent: p.actor.userAgent, method: "buyer" },
+    authorise: (inv) => { if (p.actor.role !== "buyer" || p.actor.businessId !== inv.buyerId) throw new Error("FORBIDDEN"); },
+  }, gw, now);
 }
 
 /**
@@ -120,11 +151,11 @@ export async function runConfirmationSla(db: Database, gw: Adapters = gateway, n
       counts.escalated++;
     } else if (hrs >= 48 && !c.reminder48At && !c.escalatedAt) {
       await db.update(invoiceConfirmations).set({ reminder48At: now }).where(eq(invoiceConfirmations.id, c.id));
-      await notifyBusiness(db, i.buyerId, "confirmation_reminder", info(i), gw);
+      await sendToBuyerSide(db, i, "confirmation_reminder", gw, now);
       counts.reminded++;
     } else if (hrs >= 24 && !c.reminder24At && !c.reminder48At && !c.escalatedAt) {
       await db.update(invoiceConfirmations).set({ reminder24At: now }).where(eq(invoiceConfirmations.id, c.id));
-      await notifyBusiness(db, i.buyerId, "confirmation_reminder", info(i), gw);
+      await sendToBuyerSide(db, i, "confirmation_reminder", gw, now);
       counts.reminded++;
     }
   }
