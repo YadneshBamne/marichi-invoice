@@ -1,14 +1,14 @@
-// Local sanctions screening: downloads the public lists (aml/lists), keeps them in the database, and answers screenAml from an
-// in-memory index. Free, no key, no vendor. Fail closed: if the lists were never loaded or have gone stale, screening THROWS, so
+// Local sanctions screening: downloads the public lists (aml/lists), keeps them in the database, and answers screenAml from a small
+// in-memory index built per query from the candidate rows. Free, no key, no vendor. Fail closed: if the lists were never loaded or have gone stale, screening THROWS, so
 // nothing is approved on an out-of-date or empty list (callers already treat a throw as "block", and re-screening as "skip").
 import { createHash } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, like, or } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { sanctionsEntries, sanctionsLoads } from "../db/schema";
 import type { KycPort } from "../integrations/gateway";
 import { EU_URL, OFAC_ALT_URL, OFAC_SDN_URL, UN_URL, parseEuFsf, parseOfacSdn, parseUnConsolidated, type ListEntry, type ListId } from "./lists";
 import { normalizeName } from "./normalize";
-import { buildIndex, HIT_THRESHOLD, screenName, type Match, type SanctionIndex } from "./screen";
+import { buildIndex, HIT_THRESHOLD, screenName, strong, type Match, type SanctionEntry } from "./screen";
 
 export const LISTS: ListId[] = ["ofac_sdn", "un", "eu"];
 const SOURCES: Record<ListId, { urls: string[]; parse: (texts: string[]) => ListEntry[] }> = {
@@ -18,7 +18,6 @@ const SOURCES: Record<ListId, { urls: string[]; parse: (texts: string[]) => List
 };
 
 const BATCH = 2000; // rows per insert: 8 columns each, well inside Postgres's 65,535 parameter limit
-const CACHE_MS = 10 * 60_000; // how long the in-memory index is reused before reloading from the database
 const DAY = 86_400_000;
 export const MAX_AGE_DAYS = 7;
 
@@ -72,46 +71,62 @@ export async function sanctionsStatus(db: Database, opts: { maxAgeDays?: number;
   });
 }
 
-type Loaded = { index: SanctionIndex; at: number; loads: { list: string; loadedAt: Date }[] };
+const STATUS_MS = 60_000; // how long the freshness check is reused before asking the database again
+const MAX_CANDIDATES = 20_000; // most rows read per query; the lists hold ~74,000 names, a 3-letter prefix matches far fewer
+type Freshness = { loads: { list: string; loadedAt: Date }[]; hasRows: boolean };
+const freshness = new WeakMap<Database, { at: number; p: Promise<Freshness> }>();
 
-/** Index cache plus the fail-closed freshness check. */
-function loader(db: Database, maxAgeDays: number, now: () => Date) {
-  let cached: Loaded | null = null, pending: Promise<Loaded> | null = null;
-  const fresh = async (): Promise<Loaded> => {
-    const loads = (await sanctionsStatus(db, { maxAgeDays, now: now() })).filter((s) => s.loadedAt).map((s) => ({ list: s.list as string, loadedAt: s.loadedAt! }));
-    const rows = await db.select().from(sanctionsEntries);
-    return { index: buildIndex(rows), at: now().getTime(), loads };
-  };
-  return async (): Promise<SanctionIndex> => {
-    if (!cached || now().getTime() - cached.at > CACHE_MS) {
-      pending ??= fresh().finally(() => { pending = null; });
-      cached = await pending;
-    }
-    // Checked on every call, so a cached index can never outlive the freshness limit.
-    const t = now().getTime();
-    if (!cached.loads.length || !cached.index.size) throw new Error("sanctions lists have never been loaded; refusing to screen");
-    for (const l of cached.loads) if (t - l.loadedAt.getTime() > maxAgeDays * DAY) throw new Error(`sanctions list "${l.list}" is older than ${maxAgeDays} days; refusing to screen`);
-    return cached.index;
-  };
+/** The fail-closed check, run on EVERY call. The database is asked at most once a minute per db; the age limit is re-applied each time. */
+async function assertFresh(db: Database, maxAgeDays: number, now: () => Date) {
+  const t = now().getTime();
+  let c = freshness.get(db);
+  if (!c || t - c.at > STATUS_MS) {
+    const p = Promise.all([sanctionsStatus(db, { maxAgeDays, now: now() }), db.select({ id: sanctionsEntries.id }).from(sanctionsEntries).limit(1)])
+      .then(([s, any]): Freshness => ({ loads: s.filter((x) => x.loadedAt).map((x) => ({ list: x.list as string, loadedAt: x.loadedAt! })), hasRows: any.length > 0 }));
+    const mine = c = { at: t, p };
+    freshness.set(db, mine);
+    p.catch(() => { if (freshness.get(db) === mine) freshness.delete(db); }); // a failed lookup is not remembered
+  }
+  const { loads, hasRows } = await c.p;
+  if (!loads.length || !hasRows) throw new Error("sanctions lists have never been loaded; refusing to screen");
+  for (const l of loads) if (t - l.loadedAt.getTime() > maxAgeDays * DAY) throw new Error(`sanctions list "${l.list}" is older than ${maxAgeDays} days; refusing to screen`);
+}
+
+const likeEscape = (w: string) => w.replace(/[\\%_]/g, "\\$&"); // LIKE treats \ % _ specially
+
+/** Only the stored rows with a word starting like a query word (first 3 letters), read in one query. Everything else cannot score. */
+async function candidates(db: Database, queryNorm: string): Promise<SanctionEntry[]> {
+  const words = [...new Set(queryNorm.split(" ").filter((w) => w.length > 1))];
+  const key = words.filter(strong); // fuzzy matching only starts from distinctive words; a name of only common words is found by exact match
+  const prefixes = [...new Set((key.length ? key : words).map((w) => likeEscape(w.slice(0, 3))))];
+  if (!prefixes.length) return [];
+  const rows = await db
+    .select({ list: sanctionsEntries.list, externalId: sanctionsEntries.externalId, name: sanctionsEntries.name, norm: sanctionsEntries.norm, kind: sanctionsEntries.kind, isAlias: sanctionsEntries.isAlias, program: sanctionsEntries.program, country: sanctionsEntries.country })
+    .from(sanctionsEntries)
+    .where(or(...prefixes.flatMap((p) => [like(sanctionsEntries.norm, `${p}%`), like(sanctionsEntries.norm, `% ${p}%`)])))
+    .limit(MAX_CANDIDATES);
+  if (rows.length >= MAX_CANDIDATES) console.warn(`sanctions screening: candidate cap of ${MAX_CANDIDATES} reached for "${queryNorm}"; some listed names were not compared`);
+  return rows;
+}
+
+async function screenOnce(db: Database, name: string, limit: number, maxAgeDays: number, now: () => Date): Promise<Match[]> {
+  await assertFresh(db, maxAgeDays, now);
+  const q = normalizeName(name);
+  return screenName(buildIndex(await candidates(db, q)), q, limit);
 }
 
 /** A KycPort.screenAml backed by the stored lists. Throws (fails closed) when the lists are missing or stale. */
 export function localAml(db: Database, opts: { maxAgeDays?: number; now?: () => Date } = {}): Pick<KycPort, "screenAml"> {
-  const index = loader(db, opts.maxAgeDays ?? MAX_AGE_DAYS, opts.now ?? (() => new Date()));
   return {
     async screenAml(name) {
-      const top = screenName(await index(), normalizeName(name), 1)[0];
+      const top = (await screenOnce(db, name, 1, opts.maxAgeDays ?? MAX_AGE_DAYS, opts.now ?? (() => new Date())))[0];
       const score = top?.score ?? 0;
       return { score, hit: score >= HIT_THRESHOLD };
     },
   };
 }
 
-const shared = new WeakMap<Database, ReturnType<typeof loader>>();
-
 /** The listed parties a name resembles, best first, for a compliance reviewer. Same fail-closed rules as screenAml. */
-export async function screenDetailed(db: Database, name: string, opts: { limit?: number; maxAgeDays?: number; now?: () => Date } = {}): Promise<Match[]> {
-  let load = shared.get(db);
-  if (!load) shared.set(db, load = loader(db, opts.maxAgeDays ?? MAX_AGE_DAYS, opts.now ?? (() => new Date())));
-  return screenName(await load(), normalizeName(name), opts.limit ?? 10);
+export function screenDetailed(db: Database, name: string, opts: { limit?: number; maxAgeDays?: number; now?: () => Date } = {}): Promise<Match[]> {
+  return screenOnce(db, name, opts.limit ?? 10, opts.maxAgeDays ?? MAX_AGE_DAYS, opts.now ?? (() => new Date()));
 }

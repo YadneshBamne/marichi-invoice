@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { count, eq } from "drizzle-orm";
 import { testDb } from "../testdb";
 import { sanctionsEntries, sanctionsLoads } from "../db/schema";
 import { ALT_CSV, EU_XML, SDN_CSV, UN_XML } from "./fixtures";
 import { EU_URL, OFAC_ALT_URL, OFAC_SDN_URL, UN_URL } from "./lists";
+import { buildIndex, screenName } from "./screen";
+import { normalizeName } from "./normalize";
 import { localAml, refreshSanctionLists, sanctionsStatus, screenDetailed } from "./service";
 
 const T0 = new Date("2026-10-06T00:00:00Z");
@@ -133,5 +135,67 @@ describe("sanctionsStatus and screenDetailed", () => {
     const m = await screenDetailed(db, "Saddam Hussein Al Tikriti", { now: () => T0 });
     expect(m.map((x) => x.list).sort()).toEqual(["eu", "un"]);
     expect(m[0]).toMatchObject({ kind: "individual", country: expect.any(String) });
+  });
+});
+
+describe("candidate lookup", () => {
+  const loaded = async () => { const db = await testDb(); await refreshSanctionLists(db, { fetch: stub(GOOD), now: T0 }); return db; };
+  const opts = { now: () => T0 };
+
+  it("finds a listed party by its alias", async () => {
+    const db = await loaded();
+    const [m] = await screenDetailed(db, "Aero-Caribbean", opts);
+    expect(m).toMatchObject({ score: 100, externalId: "90004", viaAlias: true, listedName: "AEROCARIBBEAN AIRLINES" });
+  });
+
+  it("finds a name in any word order", async () => {
+    const db = await loaded();
+    const [m] = await screenDetailed(db, "Trading Majeed Hassan Ali", opts);
+    expect(m).toMatchObject({ score: 100, externalId: "90007" });
+  });
+
+  it("finds a one-letter typo that is not in the first three letters", async () => {
+    const db = await loaded();
+    const aml = localAml(db, opts);
+    expect(await aml.screenAml("Ayman Zawahiry")).toMatchObject({ hit: true });
+    expect(await aml.screenAml("Osama bin Ladan")).toMatchObject({ hit: true });
+  });
+
+  it("gives the same answer as scoring every stored row", async () => {
+    const db = await loaded();
+    const all = buildIndex(await db.select().from(sanctionsEntries));
+    for (const name of ["Osama bin Laden", "Usama Bin Ladin", "Melli Bank Iran", "Saddam Hussein", "Abu Sayyaf", "Ayman Zawahiry", "Bharat Retail Pvt Ltd", "Hassan Majeed", "Trading"]) {
+      expect(await screenDetailed(db, name, { ...opts, limit: 10 }), name).toEqual(screenName(all, normalizeName(name), 10));
+    }
+  });
+
+  it("is not thrown by %, _, backslash or quotes in the name", async () => {
+    const db = await loaded();
+    const aml = localAml(db, opts);
+    for (const name of ["%", "_", "\\", "'; DROP TABLE sanctions_entries; --", "Osa%a bin Lad_n", "Osama bin Laden %_\'"]) await expect(aml.screenAml(name)).resolves.toMatchObject({ hit: expect.any(Boolean) });
+    expect(await aml.screenAml("Osama bin Laden %_\'\"")).toMatchObject({ hit: true });
+    expect(await db.select({ n: count() }).from(sanctionsEntries)).toEqual([{ n: 22 }]);
+  });
+
+  it("stops at the candidate cap and says so", async () => {
+    const db = await loaded();
+    for (let i = 0; i < 20_010; i += 2000) await db.insert(sanctionsEntries).values(Array.from({ length: Math.min(2000, 20_010 - i) }, (_, j) => ({ list: "eu", externalId: `cap${i + j}`, name: `QWECAP ${i + j}`, norm: `qwecap n${i + j}`, kind: "entity" })));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(localAml(db, opts).screenAml("Qwecap")).resolves.toMatchObject({ hit: expect.any(Boolean) });
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/candidate cap of 20000/));
+      warn.mockClear();
+      await localAml(db, opts).screenAml("Osama bin Laden"); // a normal query stays well under the cap
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); }
+  }, 60_000);
+
+  it("still fails closed through screenDetailed when never loaded, empty or stale", async () => {
+    await expect(screenDetailed(await testDb(), "Anyone", opts)).rejects.toThrow(/never been loaded/);
+    const empty = await loaded();
+    await empty.delete(sanctionsEntries);
+    await expect(screenDetailed(empty, "Anyone", opts)).rejects.toThrow(/never been loaded/);
+    const stale = await loaded();
+    await expect(screenDetailed(stale, "Anyone", { now: () => new Date(T0.getTime() + 8 * DAY) })).rejects.toThrow(/older than 7 days/);
   });
 });

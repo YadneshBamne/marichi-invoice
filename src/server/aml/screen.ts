@@ -37,7 +37,7 @@ const COMMON_NAMES = new Set([
 ]);
 const weak = (w: string) => GENERIC.has(w) || COMMON_NAMES.has(w);
 const weightOf = (w: string) => (GENERIC.has(w) ? 0.3 : COMMON_NAMES.has(w) ? 0.6 : 1);
-const strong = (w: string) => w.length > 1 && !weak(w);
+export const strong = (w: string) => w.length > 1 && !weak(w);
 
 export type SanctionEntry = { list: string; externalId: string; name: string; norm: string; kind: string; isAlias: boolean; program: string | null; country: string | null };
 export type Match = { score: number; list: string; externalId: string; kind: string; program: string | null; country: string | null; listedName: string; matchedName: string; viaAlias: boolean };
