@@ -20,6 +20,8 @@ import { putDocument } from "@/server/vault";
 import { DataTable, EmptyState, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
 import { UploadForm } from "./upload-form";
 import { formatMoney, formatMinor, rupeesToPaise } from "@/lib/money";
+import { market } from "@/lib/countries";
+import { PopField } from "@/components/ui/page";
 
 export const metadata = { title: "Invoices" };
 
@@ -236,8 +238,8 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                 <form action={creditNote} className="space-y-2">
                   <input type="hidden" name="invoiceId" value={r.id} />
                   <p className="text-xs text-muted">Reduces what {r.invoiceNumber} is worth. Your buyer is told, and any open offer is withdrawn.</p>
-                  <input name="amount" inputMode="decimal" placeholder="Credit amount (₹)" required className="field !py-2 text-sm" />
-                  <input name="reason" placeholder="Reason, e.g. goods returned" required className="field !py-2 text-sm" />
+                  <PopField label={`Credit amount (${market().currency.code})`}><input name="amount" inputMode="decimal" required className="field !py-2 text-sm font-normal" /></PopField>
+                  <PopField label="Reason"><input name="reason" required placeholder="for example, goods returned" className="field !py-2 text-sm font-normal" /></PopField>
                   <button className="btn btn-primary btn-sm w-full">Issue credit note</button>
                 </form>
               </Pop>

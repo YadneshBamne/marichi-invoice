@@ -34,7 +34,8 @@ async function email(gw: Adapters, p: { to: string; company: string; role: OrgRo
   } catch { return false; } // the inviter can press Resend
 }
 
-async function companyName(db: Database, businessId: string) {
+async function companyName(db: Database, businessId: string | null) {
+  if (!businessId) return "the Marichi Labs team";
   const [b] = await db.select({ n: businesses.displayName, l: businesses.legalName }).from(businesses).where(eq(businesses.id, businessId));
   return b.n ?? b.l;
 }
@@ -67,7 +68,7 @@ async function mine(db: Database, actor: Actor, id: string) {
   const [inv] = await db.select().from(invitations).where(and(eq(invitations.id, id), eq(invitations.businessId, businessId)));
   if (!inv || inv.status !== "pending") throw new Error("that invitation is no longer open");
   guard(actor, inv.orgRole);
-  return inv;
+  return { ...inv, businessId }; // the query matched this company, so it is not null
 }
 
 export async function cancelInvitation(db: Database, actor: Actor, id: string) {
@@ -92,7 +93,7 @@ export async function listInvitations(db: Database, businessId: string, now = ne
   return rows.map((r) => ({ id: r.id, email: r.email, orgRole: r.orgRole, expiresAt: r.expiresAt, expired: r.expiresAt <= now }));
 }
 
-export type Preview = { state: "open" | "expired" | "used" | "cancelled"; company: string; orgRole: OrgRole; email: string; hasAccount: boolean; expiresAt: Date };
+export type Preview = { state: "open" | "expired" | "used" | "cancelled"; company: string; orgRole: OrgRole; staffRole: string | null; email: string; hasAccount: boolean; expiresAt: Date };
 
 /** What the invitee sees before they commit. Returns null for a link we do not know. */
 export async function previewInvitation(db: Database, token: string, now = new Date()): Promise<Preview | null> {
@@ -100,7 +101,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
   if (!inv) return null;
   const [acct] = await db.select({ id: users.id }).from(users).where(eq(users.email, inv.email));
   const state = inv.status === "accepted" ? "used" : inv.status === "cancelled" ? "cancelled" : inv.expiresAt <= now ? "expired" : "open";
-  return { state, company: await companyName(db, inv.businessId), orgRole: inv.orgRole, email: inv.email, hasAccount: !!acct, expiresAt: inv.expiresAt };
+  return { state, company: await companyName(db, inv.businessId), orgRole: inv.orgRole, staffRole: inv.staffRole, email: inv.email, hasAccount: !!acct, expiresAt: inv.expiresAt };
 }
 
 async function open(db: Database, token: string, now: Date) {
@@ -117,17 +118,30 @@ export async function acceptAsNewUser(db: Database, hash: Hash, token: string, p
   if (p.password.length < 10) throw new Error("the password must be at least 10 characters");
   const [clash] = await db.select({ id: users.id }).from(users).where(eq(users.email, inv.email));
   if (clash) throw new Error("you already have an account. Sign in to accept this invitation");
-  const [b] = await db.select({ kind: businesses.kind }).from(businesses).where(eq(businesses.id, inv.businessId));
   const passwordHash = await hash(p.password);
+  if (inv.staffRole) { // platform staff: no company, no membership; the role is the one the administrator chose
+    return db.transaction(async (tx) => {
+      const [u] = await tx.insert(users).values({
+        name: p.name.trim(), email: inv.email, emailVerified: true, role: inv.staffRole as "ops" | "compliance" | "admin",
+        invitedBy: inv.invitedBy, termsVersion: PLATFORM_TERMS_VERSION, termsAcceptedAt: now,
+      }).returning();
+      await tx.insert(account).values({ accountId: u.id, providerId: "credential", userId: u.id, password: passwordHash });
+      await tx.update(invitations).set({ status: "accepted", acceptedAt: now, acceptedBy: u.id }).where(eq(invitations.id, inv.id));
+      await tx.insert(auditLog).values({ actorId: u.id, action: "staff.joined", entity: "user", entityId: u.id, after: { email: inv.email, role: inv.staffRole, invitedBy: inv.invitedBy } });
+      return { userId: u.id, email: inv.email };
+    });
+  }
+  const businessId = inv.businessId!;
+  const [b] = await db.select({ kind: businesses.kind }).from(businesses).where(eq(businesses.id, businessId));
   return db.transaction(async (tx) => {
     const [u] = await tx.insert(users).values({
       name: p.name.trim(), email: inv.email, emailVerified: true, role: (b?.kind as "seller" | "buyer" | "financier" | null) ?? "seller",
-      businessId: inv.businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy, termsVersion: PLATFORM_TERMS_VERSION, termsAcceptedAt: now,
+      businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy, termsVersion: PLATFORM_TERMS_VERSION, termsAcceptedAt: now,
     }).returning();
     await tx.insert(account).values({ accountId: u.id, providerId: "credential", userId: u.id, password: passwordHash });
-    await tx.insert(memberships).values({ userId: u.id, businessId: inv.businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy });
+    await tx.insert(memberships).values({ userId: u.id, businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy });
     await tx.update(invitations).set({ status: "accepted", acceptedAt: now, acceptedBy: u.id }).where(eq(invitations.id, inv.id));
-    await tx.insert(auditLog).values({ actorId: u.id, action: "member.joined", entity: "business", entityId: inv.businessId, after: { email: inv.email, orgRole: inv.orgRole } });
+    await tx.insert(auditLog).values({ actorId: u.id, action: "member.joined", entity: "business", entityId: businessId, after: { email: inv.email, orgRole: inv.orgRole } });
     return { userId: u.id, email: inv.email };
   });
 }
@@ -135,14 +149,16 @@ export async function acceptAsNewUser(db: Database, hash: Hash, token: string, p
 /** Someone who already has an account: they must be signed in as the invited address. They gain a second company and switch to it. */
 export async function acceptAsExistingUser(db: Database, userId: string, token: string, now = new Date()) {
   const inv = await open(db, token, now);
+  if (inv.staffRole || !inv.businessId) throw new Error("a staff invitation creates a new staff account; it cannot be added to an existing one");
+  const businessId = inv.businessId;
   const [u] = await db.select().from(users).where(eq(users.id, userId));
   if (!u || u.email.toLowerCase() !== inv.email) throw new Error("this invitation was sent to a different email address");
   if (!["seller", "buyer", "financier"].includes(u.role)) throw new Error("platform staff accounts cannot join a company");
-  const [b] = await db.select({ kind: businesses.kind }).from(businesses).where(eq(businesses.id, inv.businessId));
+  const [b] = await db.select({ kind: businesses.kind }).from(businesses).where(eq(businesses.id, businessId));
   await db.transaction(async (tx) => {
-    await tx.insert(memberships).values({ userId, businessId: inv.businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy }).onConflictDoNothing();
-    await tx.update(users).set({ businessId: inv.businessId, orgRole: inv.orgRole, ...(b?.kind ? { role: b.kind as "seller" | "buyer" | "financier" } : {}) }).where(eq(users.id, userId));
+    await tx.insert(memberships).values({ userId, businessId, orgRole: inv.orgRole, invitedBy: inv.invitedBy }).onConflictDoNothing();
+    await tx.update(users).set({ businessId, orgRole: inv.orgRole, ...(b?.kind ? { role: b.kind as "seller" | "buyer" | "financier" } : {}) }).where(eq(users.id, userId));
     await tx.update(invitations).set({ status: "accepted", acceptedAt: now, acceptedBy: userId }).where(eq(invitations.id, inv.id));
-    await tx.insert(auditLog).values({ actorId: userId, action: "member.joined", entity: "business", entityId: inv.businessId, after: { email: inv.email, orgRole: inv.orgRole, existingAccount: true } });
+    await tx.insert(auditLog).values({ actorId: userId, action: "member.joined", entity: "business", entityId: businessId, after: { email: inv.email, orgRole: inv.orgRole, existingAccount: true } });
   });
 }

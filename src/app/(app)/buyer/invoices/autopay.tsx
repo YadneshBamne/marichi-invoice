@@ -34,7 +34,7 @@ export function Autopay({ mandate, canManage, mock }: { mandate: MandateView; ca
           <label className="block font-medium">Bank account number<input name="accountNumber" required inputMode="numeric" defaultValue={v.accountNumber} className="field font-normal" /></label>
           <label className="block font-medium">{market().ids.bankCode.label}<input name="ifsc" required defaultValue={v.ifsc} className="field font-normal" /></label>
           <label className="block font-medium">Account holder name<input name="holderName" required defaultValue={v.holderName} className="field font-normal" /></label>
-          <label className="block font-medium">Limit for a single debit (₹)<input name="maxAmount" required inputMode="decimal" defaultValue={v.maxAmount} placeholder="e.g. 10,00,000" className="field font-normal" /></label>
+          <label className="block font-medium">Limit for a single debit ({market().currency.symbol})<input name="maxAmount" required inputMode="decimal" defaultValue={v.maxAmount} placeholder="e.g. 10,00,000" className="field font-normal" /></label>
           {state.error && <div className="sm:col-span-2"><Alert>{state.error}</Alert></div>}
           <div className="sm:col-span-2"><button disabled={pending} className="btn btn-primary">{pending && <Spinner />}Turn on auto-pay</button>
             <span className="ml-3 text-xs text-muted">Your bank will ask you to authorise it. You can turn it off any time.</span></div>

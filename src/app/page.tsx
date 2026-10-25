@@ -36,9 +36,9 @@ export default function Home() {
         <div aria-hidden className="pointer-events-none absolute -top-32 -right-32 h-[34rem] w-[34rem] rounded-full border-[56px] border-white/[.04]" />
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.1fr_.9fr] lg:py-24">
           <div className="anim-up">
-            <span className="pill bg-white/10 text-p-100">Invoice financing for MSMEs</span>
+            <span className="pill bg-white/10 text-lt-100">Invoice financing for MSMEs</span>
             <h1 className="mt-5 text-[clamp(34px,5vw,56px)] leading-[1.06] font-semibold tracking-tight">Get paid on your invoices without waiting for the due date.</h1>
-            <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-p-100/80">Marichi turns approved invoices into working capital. Buyers confirm every invoice, pricing is shown in full before you accept, and every step is recorded.</p>
+            <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-lt-100/80">Marichi turns approved invoices into working capital. Buyers confirm every invoice, pricing is shown in full before you accept, and every step is recorded.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn rounded-lg bg-s-500 px-6 text-p-950 hover:bg-[#f0a845]">Create an account<Icon name="arrow-right" className="h-4 w-4" /></Link>
               <Link href="/login" className="btn rounded-lg px-6 text-white ring-1 ring-white/30 hover:bg-white/10">Log in</Link>
@@ -58,7 +58,7 @@ export default function Home() {
               </dl>
               <div className="mt-5 rounded-lg bg-p-100 px-4 py-2.5 text-center text-sm font-semibold text-p-700">Accept and sign</div>
             </div>
-            <p className="mt-3 text-center text-xs text-p-200/60">Illustrative example, not a live offer.</p>
+            <p className="mt-3 text-center text-xs text-lt-200/60">Illustrative example, not a live offer.</p>
           </div>
         </div>
       </section>
@@ -84,12 +84,13 @@ export default function Home() {
             {[
               { role: "seller", t: "Sellers", d: "Suppliers who invoice on credit terms. Upload invoices, see offers, sign and get paid. Track every invoice and your available credit.", icon: "invoice" },
               { role: "buyer", t: "Buyers", d: "Companies whose suppliers use Marichi. Confirm or dispute invoices, see what is due, and pay on the original due date.", icon: "building" },
-              { role: "staff", t: "Operations teams", d: "Queues for KYB, underwriting, payouts, collections, fraud and support, with approvals, SLAs and a ledger that reconciles.", icon: "shield" },
+              { role: "financier", t: "Financiers", d: "Licensed institutions that fund confirmed invoices. Set a mandate and limits, bid on deals, and follow what you funded and what it earned.", icon: "bank" },
             ].map((c) => (
-              <div key={c.t} data-role={c.role} className="rounded-card bg-card p-6 shadow-card">
+              <Link key={c.t} href={`/for/${c.role}`} data-role={c.role} className="lift group rounded-card bg-card p-6 shadow-card">
                 <span className="grid h-11 w-11 place-items-center rounded-lg bg-p-700 text-white"><Icon name={c.icon} className="h-5 w-5" /></span>
                 <h3 className="mt-4 text-lg font-semibold">{c.t}</h3><p className="mt-1.5 text-[14.5px] text-muted">{c.d}</p>
-              </div>
+                <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-p-700">See how it works<Icon name="arrow-right" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></span>
+              </Link>
             ))}
           </div>
         </div>
@@ -109,12 +110,12 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
           <p className="text-xs font-semibold tracking-[.14em] text-s-500 uppercase">Roadmap</p>
           <h2 className="mt-2 max-w-2xl text-[clamp(26px,3.4vw,38px)] leading-tight font-semibold tracking-tight">What we are building next</h2>
-          <p className="mt-3 max-w-2xl text-p-100/75">Planned, not yet available. We show it so you know where the platform is going.</p>
+          <p className="mt-3 max-w-2xl text-lt-100/75">Planned, not yet available. We show it so you know where the platform is going.</p>
           <ul className="stagger mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {ROADMAP.slice(0, 6).map((p) => (
               <li key={p.slug} className="rounded-card bg-white/6 p-5 ring-1 ring-white/10">
-                <div className="flex items-center justify-between"><Icon name={p.icon} className="h-5 w-5 text-p-200" /><span className="pill bg-white/10 text-p-100">Phase {p.phase}</span></div>
-                <h3 className="mt-3 font-semibold">{p.title}</h3><p className="mt-1 text-sm text-p-100/70">{p.summary}</p>
+                <div className="flex items-center justify-between"><Icon name={p.icon} className="h-5 w-5 text-lt-200" /><span className="pill bg-white/10 text-lt-100">Phase {p.phase}</span></div>
+                <h3 className="mt-3 font-semibold">{p.title}</h3><p className="mt-1 text-sm text-lt-100/70">{p.summary}</p>
               </li>
             ))}
           </ul>
@@ -124,7 +125,7 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
         <h2 className="mx-auto max-w-2xl text-[clamp(26px,3.4vw,38px)] leading-tight font-semibold tracking-tight">Ready to see it with your own invoices?</h2>
         <p className="mx-auto mt-3 max-w-xl text-muted">Create an account, verify your business and your first offer is a few steps away.</p>
-        <div className="mt-7 flex justify-center gap-3"><Link href="/signup" className="btn btn-primary px-6">Create an account</Link><Link href="/grievance" className="btn btn-ghost px-6">Talk to us</Link></div>
+        <div className="mt-7 flex flex-wrap justify-center gap-3"><Link href="/for/seller" className="btn btn-primary px-6">I am a seller</Link><Link href="/for/buyer" className="btn btn-ghost px-6">I am a buyer</Link><Link href="/for/financier" className="btn btn-ghost px-6">I am a financier</Link></div>
       </section>
       <PublicFooter />
     </div>

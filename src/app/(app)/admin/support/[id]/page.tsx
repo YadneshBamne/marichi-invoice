@@ -9,6 +9,7 @@ import { canWork } from "@/server/support/policy";
 import { KV, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Thread } from "@/components/ui/thread";
 import { formatMoney, rupeesToPaise } from "@/lib/money";
+import { market } from "@/lib/countries";
 
 const F = z.object({
   ticketId: z.uuid(),
@@ -83,7 +84,7 @@ export default async function AdminTicket({ params }: { params: Promise<{ id: st
                   <option value="upheld">Dispute upheld: invoice cancelled{dispute.phase === "post_funding" ? " (clawback from seller)" : ""}</option>
                   <option value="credit_note">Credit note agreed (partial)</option>
                 </select>
-                <input name="credit" inputMode="decimal" placeholder="Credit note amount (₹), only for a credit note" className="field" />
+                <input name="credit" inputMode="decimal" placeholder={`Credit note amount (${market().currency.code}), only for a credit note`} className="field" />
                 <textarea name="text" rows={2} required placeholder="Resolution note (required)" className="field" />
                 <button className="btn btn-primary btn-sm">Resolve dispute</button>
               </form>

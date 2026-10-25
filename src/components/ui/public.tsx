@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon, Logo } from "./icons";
+import { market } from "@/lib/countries";
 
 export function Brand({ light, className = "" }: { light?: boolean; className?: string }) {
   return (
@@ -8,7 +9,7 @@ export function Brand({ light, className = "" }: { light?: boolean; className?: 
       <Logo className="h-9 w-9" />
       <span className="leading-tight">
         <span className={`block text-[19px] font-semibold tracking-tight ${light ? "text-white" : "text-ink"}`}>Marichi</span>
-        <span className={`block text-[10.5px] tracking-[.12em] uppercase ${light ? "text-p-200/60" : "text-faint"}`}>Invoice financing</span>
+        <span className={`block text-[10.5px] tracking-[.12em] uppercase ${light ? "text-lt-200/60" : "text-faint"}`}>Invoice financing</span>
       </span>
     </Link>
   );
@@ -22,7 +23,9 @@ export function PublicHeader() {
         <Brand />
         <nav aria-label="Site" className="ml-6 hidden items-center gap-1 md:flex">
           <a className={link} href="/#how">How it works</a>
-          <a className={link} href="/#who">Who it&apos;s for</a>
+          <Link className={link} href="/for/seller">Sellers</Link>
+          <Link className={link} href="/for/buyer">Buyers</Link>
+          <Link className={link} href="/for/financier">Financiers</Link>
           <a className={link} href="/#trust">Security</a>
           <a className={link} href="/#roadmap">Roadmap</a>
         </nav>
@@ -36,31 +39,32 @@ export function PublicHeader() {
 }
 
 export function PublicFooter() {
-  const h = "text-[11px] font-semibold tracking-[.1em] text-p-200/60 uppercase";
-  const l = "block py-1 text-sm text-p-100/75 transition-colors hover:text-white";
+  const h = "text-[11px] font-semibold tracking-[.1em] text-lt-200/60 uppercase";
+  const l = "block py-1 text-sm text-lt-100/75 transition-colors hover:text-white";
   return (
-    <footer className="bg-p-950 text-p-100">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-4">
+    <footer className="bg-p-950 text-lt-100">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-5">
         <div className="md:col-span-2">
           <Brand light />
-          <p className="mt-4 max-w-sm text-sm text-p-100/70">Working capital against approved invoices for Indian MSMEs, with buyer-confirmed invoices, transparent pricing and a full audit trail.</p>
+          <p className="mt-4 max-w-sm text-sm text-lt-100/70">Working capital against approved invoices for {market().adjective} MSMEs, with buyer-confirmed invoices, transparent pricing and a full audit trail.</p>
         </div>
+        <div><p className={h}>For</p><Link className={l} href="/for/seller">Sellers</Link><Link className={l} href="/for/buyer">Buyers</Link><Link className={l} href="/for/financier">Financiers</Link></div>
         <div><p className={h}>Product</p><a className={l} href="/#how">How it works</a><a className={l} href="/#trust">Security and control</a><a className={l} href="/#roadmap">Roadmap</a></div>
         <div><p className={h}>Company</p><Link className={l} href="/grievance">Grievance redressal</Link><Link className={l} href="/terms">Terms of use</Link><Link className={l} href="/privacy">Privacy notice</Link></div>
       </div>
       <div className="border-t border-white/10">
-        <p className="mx-auto max-w-6xl px-4 py-5 text-xs text-p-200/60 sm:px-6">&copy; {new Date().getFullYear()} Marichi Labs. All rights reserved.</p>
+        <p className="mx-auto max-w-6xl px-4 py-5 text-xs text-lt-200/60 sm:px-6">&copy; {new Date().getFullYear()} Marichi Labs. All rights reserved.</p>
       </div>
     </footer>
   );
 }
 
 /** Frame for simple signed-out content pages (grievance, terms, privacy): site header + footer around one card. */
-export function PublicFrame({ wide, children }: { wide?: boolean; children: ReactNode }) {
+export function PublicFrame({ wide, doc, children }: { wide?: boolean; doc?: boolean; children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-page">
       <PublicHeader />
-      <main className={`anim-up mx-auto w-full flex-1 px-4 py-10 sm:px-6 sm:py-14 ${wide ? "max-w-3xl" : "max-w-md"}`}>
+      <main className={`anim-up mx-auto w-full flex-1 px-4 py-10 sm:px-6 sm:py-14 ${doc ? "max-w-5xl" : wide ? "max-w-3xl" : "max-w-md"}`}>
         <div className="rounded-panel bg-card p-6 shadow-card sm:p-9">{children}</div>
       </main>
       <PublicFooter />
@@ -84,17 +88,17 @@ export function AuthLayout({ title, sub, wide, children, footer }: { title: stri
         <Brand light />
         <div className="my-auto max-w-md">
           <h2 className="text-[34px] leading-[1.15] font-semibold tracking-tight">Working capital against the invoices you have already earned.</h2>
-          <p className="mt-4 text-[15.5px] leading-relaxed text-p-100/75">One platform for sellers, their buyers and the teams that run the programme.</p>
+          <p className="mt-4 text-[15.5px] leading-relaxed text-lt-100/75">One platform for sellers, their buyers and the teams that run the programme.</p>
           <ul className="stagger mt-10 space-y-5">
             {POINTS.map((p) => (
               <li key={p.t} className="flex gap-4">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/10"><Icon name={p.icon} className="h-5 w-5 text-p-200" /></span>
-                <span><span className="block font-semibold">{p.t}</span><span className="block text-sm text-p-100/65">{p.d}</span></span>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/10"><Icon name={p.icon} className="h-5 w-5 text-lt-200" /></span>
+                <span><span className="block font-semibold">{p.t}</span><span className="block text-sm text-lt-100/65">{p.d}</span></span>
               </li>
             ))}
           </ul>
         </div>
-        <p className="text-xs text-p-200/55">&copy; {new Date().getFullYear()} Marichi Labs</p>
+        <p className="text-xs text-lt-200/55">&copy; {new Date().getFullYear()} Marichi Labs</p>
       </aside>
 
       <main className="flex flex-col bg-card">

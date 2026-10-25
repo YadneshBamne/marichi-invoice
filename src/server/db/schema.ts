@@ -453,9 +453,10 @@ export const memberships = pgTable("memberships", {
 // Joining a company is by emailed link, never by a password someone else typed. Only the hash of the token is stored.
 export const invitations = pgTable("invitations", {
   id: id(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  businessId: uuid("business_id").references(() => businesses.id), // null for an invitation to join the platform's staff
   email: text("email").notNull(),
-  orgRole: text("org_role").$type<OrgRole>().notNull(),
+  orgRole: text("org_role").$type<OrgRole>().notNull(), // for a staff invitation this is a placeholder; staffRole says what was meant
+  staffRole: text("staff_role"), // ops | compliance | admin, only on staff invitations
   tokenHash: text("token_hash").notNull().unique(),
   status: text("status").notNull().default("pending"), // pending | accepted | cancelled
   invitedBy: uuid("invited_by").notNull(),

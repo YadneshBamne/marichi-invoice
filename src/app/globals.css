@@ -6,37 +6,42 @@
   component re-themes without knowing the role: seller = green, buyer = indigo, staff = graphite, financier = plum.
 */
 @theme {
-  --color-page: #e6eae7;
-  --color-panel: #f4f6f4;
-  --color-card: #fdfefd;
-  --color-hair: #e1e6e2;
-  --color-ink: #14201a;
-  --color-muted: #5f6b64;
-  --color-faint: #78847d;
+  /* Every colour that changes with the theme is written light-dark(light, dark). The browser picks by the colour-scheme in force:
+     the device's by default, or the one the user chose (see :root below). */
+  --color-page: light-dark(#e6eae7, #0d1210);
+  --color-panel: light-dark(#f4f6f4, #151b18);
+  --color-card: light-dark(#fdfefd, #1a211e);
+  --color-hair: light-dark(#e1e6e2, #29322e);
+  --color-ink: light-dark(#14201a, #e8eeea);
+  --color-muted: light-dark(#5f6b64, #a4b0a9);
+  --color-faint: light-dark(#78847d, #86928b);
 
-  --color-p-950: #0e3b2e;
+  --color-p-950: light-dark(#0e3b2e, #0a2a20);
   --color-p-800: #14573f;
-  --color-p-700: #1b6e50;
-  --color-p-600: #258763;
+  --color-p-700: light-dark(#1b6e50, #1f7a58);
+  --color-p-600: light-dark(#258763, #2c9873);
   --color-p-400: #62bd97;
-  --color-p-200: #b4e0cc;
-  --color-p-100: #e4f3ec;
+  --color-p-200: light-dark(#b4e0cc, #a6d8c0);
+  --color-p-100: light-dark(#e4f3ec, #17302a);
+  /* Light shades for text on a dark brand surface (hero, footer, sign-in panel). Unlike p-100/p-200 they stay light in dark mode. */
+  --color-lt-100: #e4f3ec;
+  --color-lt-200: #b4e0cc;
 
   --color-s-600: #a85f0e;
   --color-s-500: #e39a35;
-  --color-s-100: #fbecd2;
+  --color-s-100: light-dark(#fbecd2, #33260f);
   --color-r-600: #b3302f;
-  --color-r-100: #fbe3e1;
+  --color-r-100: light-dark(#fbe3e1, #36191a);
   --color-i-500: #4a5bc7;
-  --color-i-100: #e4e8fa;
+  --color-i-100: light-dark(#e4e8fa, #1d2347);
   --color-g-600: #1f7a4d;
-  --color-g-100: #dff3e8;
+  --color-g-100: light-dark(#dff3e8, #14301f);
 
   --font-sans: var(--font-sans-brand), system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius-card: 20px;
   --radius-panel: 28px;
-  --shadow-card: 0 1px 2px rgb(18 29 40 / 0.05), 0 10px 28px -16px rgb(18 29 40 / 0.2);
-  --shadow-pop: 0 0 0 1px var(--color-hair), 0 18px 44px -12px rgb(18 29 40 / 0.28);
+  --shadow-card: 0 1px 2px light-dark(rgb(18 29 40 / 0.05), rgb(0 0 0 / 0.4)), 0 10px 28px -16px light-dark(rgb(18 29 40 / 0.2), rgb(0 0 0 / 0.6));
+  --shadow-pop: 0 0 0 1px var(--color-hair), 0 18px 44px -12px light-dark(rgb(18 29 40 / 0.28), rgb(0 0 0 / 0.7));
 
   --animate-fade-up: fade-up .38s cubic-bezier(.2,.7,.2,1) both;
   --animate-fade-in: fade-in .25s ease both;
@@ -59,17 +64,34 @@
 
 /* Account-type themes. Only the brand ramp changes; neutrals, status colours and the saffron accent are shared. */
 [data-role="buyer"] {
-  --color-p-950: #121c47; --color-p-800: #1c2d6e; --color-p-700: #2a4096; --color-p-600: #3a53b3;
-  --color-p-400: #7e92e2; --color-p-200: #c5cef6; --color-p-100: #e8ecfb;
+  --color-p-950: light-dark(#121c47, #0f1636); --color-p-800: #1c2d6e; --color-p-700: light-dark(#2a4096, #3249ad); --color-p-600: light-dark(#3a53b3, #4b63c9);
+  --color-p-400: light-dark(#7e92e2, #8a9cea); --color-p-200: #c5cef6; --color-p-100: light-dark(#e8ecfb, #1a2147); --color-lt-100: #e8ecfb; --color-lt-200: #c5cef6;
 }
 [data-role="ops"], [data-role="admin"], [data-role="compliance"] {
-  --color-p-950: #141a22; --color-p-800: #222b37; --color-p-700: #2f3a49; --color-p-600: #435063;
-  --color-p-400: #8a99ad; --color-p-200: #cbd3de; --color-p-100: #e8ecf1;
+  --color-p-950: light-dark(#141a22, #0b0f14); --color-p-800: #222b37; --color-p-700: light-dark(#2f3a49, #3a4757); --color-p-600: light-dark(#435063, #52627a);
+  --color-p-400: light-dark(#8a99ad, #9aa8bb); --color-p-200: #cbd3de; --color-p-100: light-dark(#e8ecf1, #1d242d); --color-lt-100: #e8ecf1; --color-lt-200: #cbd3de;
 }
 [data-role="financier"] {
-  --color-p-950: #2a1233; --color-p-800: #431a5a; --color-p-700: #5a2477; --color-p-600: #733394;
-  --color-p-400: #b07fd0; --color-p-200: #dcc4ec; --color-p-100: #f1e7f8;
+  --color-p-950: light-dark(#2a1233, #1d0b25); --color-p-800: #431a5a; --color-p-700: light-dark(#5a2477, #6a2d8c); --color-p-600: light-dark(#733394, #8441a8);
+  --color-p-400: light-dark(#b07fd0, #b88fd6); --color-p-200: #dcc4ec; --color-p-100: light-dark(#f1e7f8, #2b1737); --color-lt-100: #f1e7f8; --color-lt-200: #dcc4ec;
 }
+
+/*
+  Theme. Colours above are light-dark() pairs, so there is no second set of rules: the browser follows the device, and
+  <html data-theme="light|dark"> (set from the saved choice by the root layout) forces one. Nothing runs in the browser to decide it.
+*/
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+/* Text colours that read well on a light card are too dark on a dark one. Solid fills (buttons, dots, badges) keep their colour. */
+.text-p-600, .text-p-700, .text-p-800 { color: light-dark(var(--color-p-700), var(--color-p-400)); }
+.text-s-600 { color: light-dark(var(--color-s-600), #f0b45f); }
+.text-r-600 { color: light-dark(var(--color-r-600), #ff8f8a); }
+.text-g-600 { color: light-dark(var(--color-g-600), #5fd39a); }
+.text-i-500 { color: light-dark(var(--color-i-500), #a3b0f7); }
+.btn-ghost { box-shadow: inset 0 0 0 1.5px light-dark(var(--color-p-800), var(--color-p-400)); }
+.btn-danger { background: light-dark(var(--color-r-600), #b3302f); }
+.skeleton { background-image: linear-gradient(90deg, var(--color-panel) 25%, var(--color-card) 50%, var(--color-panel) 75%); }
 
 /* Base rules MUST live in a layer: unlayered CSS beats every Tailwind utility regardless of specificity. */
 @layer base {
@@ -91,7 +113,7 @@
     border-radius: 14px; border: 1.5px solid var(--color-hair); background: var(--color-card); padding: 9px 14px; font: inherit; color: var(--color-ink);
     transition: border-color .15s, box-shadow .15s;
   }
-  select:hover, input:hover, textarea:hover { border-color: #c3ccd5; }
+  select:hover, input:hover, textarea:hover { border-color: color-mix(in srgb, var(--color-ink) 22%, var(--color-hair)); }
   select:focus, input:focus, textarea:focus { outline: none; border-color: var(--color-p-600); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-p-600) 18%, transparent); }
   input::placeholder, textarea::placeholder { color: var(--color-faint); }
   /* Raw tables inside the app get the same dense data-grid treatment as .tbl */
@@ -148,7 +170,7 @@
 .anim-up { animation: var(--animate-fade-up); }
 .anim-in { animation: var(--animate-fade-in); }
 .anim-pop { animation: var(--animate-pop); transform-origin: top; }
-.skeleton { background: linear-gradient(90deg, var(--color-panel) 25%, #f6f8f9 50%, var(--color-panel) 75%); background-size: 200% 100%; animation: var(--animate-shimmer); border-radius: 8px; }
+.skeleton { background: linear-gradient(90deg, var(--color-panel) 25%, var(--color-card) 50%, var(--color-panel) 75%); background-size: 200% 100%; animation: var(--animate-shimmer); border-radius: 8px; }
 .stagger > * { animation: fade-in .35s ease both; }
 .stagger > :nth-child(2) { animation-delay: .05s; } .stagger > :nth-child(3) { animation-delay: .1s; }
 .stagger > :nth-child(4) { animation-delay: .15s; } .stagger > :nth-child(5) { animation-delay: .2s; }

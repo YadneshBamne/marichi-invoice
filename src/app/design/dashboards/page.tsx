@@ -21,7 +21,7 @@ const seller: SellerData = {
 };
 
 const buyer: BuyerData = {
-  kyb: "approved", pendingCount: 3, pendingValue: 14n * L, due30Value: 22n * L, due30Count: 4, overdueCount: 1, overdueValue: 6n * L,
+  kyb: "approved", confirmed: true, autopay: false, pendingCount: 3, pendingValue: 14n * L, due30Value: 22n * L, due30Count: 4, overdueCount: 1, overdueValue: 6n * L,
   suppliers: [
     { seller: "Asha Traders", invoices: 18, volume: 95n * L, terms: 60 }, { seller: "Kiran Components", invoices: 9, volume: 41n * L, terms: 45 }, { seller: "Delta Packaging", invoices: 4, volume: 12n * L, terms: 90 },
   ],

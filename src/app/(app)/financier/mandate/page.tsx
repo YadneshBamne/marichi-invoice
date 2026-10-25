@@ -9,6 +9,7 @@ import { DataTable, EmptyState, Field, Notice, PageHead, Panel, Pop, StatusPill 
 import { formatMoney, rupeesToPaise, toDecimal } from "@/lib/money";
 import { attempt } from "../attempt";
 import { market } from "@/lib/countries";
+import { PopField } from "@/components/ui/page";
 
 export const metadata = { title: "Mandate and limits" };
 const PATH = "/financier/mandate";
@@ -73,11 +74,11 @@ export default async function Mandate({ searchParams }: { searchParams: Promise<
           <form action={saveRules} className="grid gap-4 sm:grid-cols-2">
             <Field label="Status"><select name="status" defaultValue={m?.status ?? "active"} disabled={!may} className={input}><option value="active">Active</option><option value="paused">Paused: no new bids</option></select></Field>
             <Field label="Worst grade you accept" hint="A is best, E is worst."><select name="minGrade" defaultValue={m?.minGrade ?? "C"} disabled={!may} className={input}>{GRADES.map((g) => <option key={g}>{g}</option>)}</select></Field>
-            <Field label="Smallest ticket (₹)"><input name="minTicket" inputMode="decimal" defaultValue={m ? toDecimal(m.minTicket) : "0"} disabled={!may} className={input} /></Field>
-            <Field label="Largest ticket (₹)" hint="Blank means no cap."><input name="maxTicket" inputMode="decimal" defaultValue={m?.maxTicket != null ? toDecimal(m.maxTicket) : ""} disabled={!may} className={input} /></Field>
+            <Field label={`Smallest ticket (${market().currency.symbol})`}><input name="minTicket" inputMode="decimal" defaultValue={m ? toDecimal(m.minTicket) : "0"} disabled={!may} className={input} /></Field>
+            <Field label={`Largest ticket (${market().currency.symbol})`} hint="Blank means no cap."><input name="maxTicket" inputMode="decimal" defaultValue={m?.maxTicket != null ? toDecimal(m.maxTicket) : ""} disabled={!may} className={input} /></Field>
             <Field label="Shortest tenor (days)"><input name="minTenorDays" type="number" min={1} defaultValue={m?.minTenorDays ?? 1} disabled={!may} className={input} /></Field>
             <Field label="Longest tenor (days)"><input name="maxTenorDays" type="number" min={1} defaultValue={m?.maxTenorDays ?? 365} disabled={!may} className={input} /></Field>
-            <Field label="Most you will have out to one seller (₹)" hint="Blank means no cap."><input name="maxPerSeller" inputMode="decimal" defaultValue={m?.maxPerSeller != null ? toDecimal(m.maxPerSeller) : ""} disabled={!may} className={input} /></Field>
+            <Field label={`Most you will have out to one seller (${market().currency.symbol})`} hint="Blank means no cap."><input name="maxPerSeller" inputMode="decimal" defaultValue={m?.maxPerSeller != null ? toDecimal(m.maxPerSeller) : ""} disabled={!may} className={input} /></Field>
             <Field label="Industries" hint="Comma-separated, blank for any."><input name="sectors" defaultValue={m?.sectors.join(", ") ?? ""} disabled={!may} className={input} /></Field>
             <fieldset className="rounded-xl bg-panel p-4 sm:col-span-2">
               <label className="flex items-start gap-3 text-sm"><input type="checkbox" name="autoBid" defaultChecked={m?.autoBid} disabled={!may} className="mt-1" /><span><b>Bid automatically</b><span className="mt-0.5 block text-xs text-muted">We bid on every open deal that fits this mandate and a buyer limit, at the rate below. You can still bid by hand, and withdraw any bid.</span></span></label>
@@ -94,9 +95,9 @@ export default async function Mandate({ searchParams }: { searchParams: Promise<
           action={may ? (
             <Pop id="new-limit" label="Set a limit" cls="btn btn-primary btn-sm">
               <form action={saveLimit} className="space-y-2">
-                <input name="gstin" required placeholder={`Buyer ${market().ids.taxReg.label}`} className="field !py-2 text-sm uppercase" />
-                <input name="limit" inputMode="decimal" required placeholder="Limit (₹)" className="field !py-2 text-sm" />
-                <select name="status" className="field !py-2 text-sm"><option value="active">Active</option><option value="blocked">Blocked</option></select>
+                <PopField label={`Buyer ${market().ids.taxReg.label}`}><input name="gstin" required className="field !py-2 text-sm font-normal uppercase" /></PopField>
+                <PopField label={`Limit (${market().currency.code})`}><input name="limit" inputMode="decimal" required className="field !py-2 text-sm font-normal" /></PopField>
+                <PopField label="Status"><select name="status" className="field !py-2 text-sm font-normal"><option value="active">Active</option><option value="blocked">Blocked</option></select></PopField>
                 <button className="btn btn-primary btn-sm w-full">Save limit</button>
               </form>
             </Pop>

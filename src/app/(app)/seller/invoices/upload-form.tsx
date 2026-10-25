@@ -56,7 +56,7 @@ export function UploadForm({ buyers, action }: { buyers: Buyer[]; action: (fd: F
       <label className="block text-sm font-medium sm:col-span-2">Buyer
         <select name="buyerId" value={v.buyerId} onChange={set("buyerId")} className={`${input} mt-1`}>{buyers.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
       <label className="block text-sm font-medium">Invoice number<input name="invoiceNumber" required value={v.invoiceNumber} onChange={set("invoiceNumber")} className={`${input} mt-1`} /></label>
-      <label className="block text-sm font-medium">Amount (₹, incl. tax)<input name="amount" inputMode="decimal" required value={v.amount} onChange={set("amount")} className={`${input} mt-1`} /></label>
+      <label className="block text-sm font-medium">Amount ({market().currency.symbol}, incl. tax)<input name="amount" inputMode="decimal" required value={v.amount} onChange={set("amount")} className={`${input} mt-1`} /></label>
       <label className="block text-sm font-medium">Invoice date<input name="invoiceDate" type="date" required value={v.invoiceDate} onChange={set("invoiceDate")} className={`${input} mt-1`} /></label>
       <label className="block text-sm font-medium">Due date<input name="dueDate" type="date" required value={v.dueDate} onChange={set("dueDate")} className={`${input} mt-1`} /></label>
       <label className="block text-sm font-medium">e-Invoice {market().eInvoice.short} (if issued)<input name="irn" value={v.irn} onChange={set("irn")} className={`${input} mt-1`} /></label>

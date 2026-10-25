@@ -75,7 +75,7 @@ export default async function Programme({ searchParams }: { searchParams: Promis
           <Panel title="Apply for a programme">
             <form action={apply} className="space-y-4">
               <Field label="Programme name"><input name="name" required defaultValue="Supplier programme" className={input} /></Field>
-              <Field label="Limit you want (₹)"><input name="limit" inputMode="decimal" required placeholder="e.g. 5,00,00,000" className={input} /></Field>
+              <Field label={`Limit you want (${market().currency.symbol})`}><input name="limit" inputMode="decimal" required placeholder="e.g. 5,00,00,000" className={input} /></Field>
               <details className="text-xs text-muted"><summary className="cursor-pointer font-semibold text-p-700">Programme terms</summary><ol className="mt-2 list-decimal space-y-1.5 pl-4">{programmeTerms().blocks.flatMap((b) => ("ol" in b ? b.ol.map((r) => r.map((x) => (typeof x === "string" ? x : x.b)).join("")) : [])).map((t, i) => <li key={i}>{t}</li>)}</ol></details>
               <label className="flex items-start gap-2 text-xs"><input name="terms" type="checkbox" required className="mt-0.5" />I have read the programme terms and accept them for {u.biz?.displayName ?? u.biz?.legalName ?? "my company"}.</label>
               <button className="btn btn-primary w-full">Apply</button>

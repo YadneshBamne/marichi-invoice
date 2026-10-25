@@ -8,7 +8,7 @@ import { signUp, type SignUpState } from "./actions";
 const TYPES = [
   { id: "seller", icon: "invoice", title: "Seller", d: "I supply goods or services and want to be paid sooner on my invoices." },
   { id: "buyer", icon: "building", title: "Buyer", d: "I buy from suppliers who finance their invoices with Marichi." },
-  { id: "financier", icon: "bank", title: "Financier", d: "I want to deploy capital against verified invoices.", soon: true },
+  { id: "financier", icon: "bank", title: "Financier", d: "I am a licensed institution and want to deploy capital against confirmed invoices." },
 ] as const;
 const ENTITIES = [["pvt_ltd", "Private limited company"], ["public_ltd", "Public limited company"], ["llp", "Limited liability partnership"], ["partnership", "Partnership firm"], ["proprietorship", "Sole proprietorship"], ["other", "Other"]];
 const STEPS = ["Account type", "Your details", "Security"];
@@ -20,10 +20,10 @@ const rules = (p: string) => [
   { ok: /[^A-Za-z0-9]/.test(p), t: "A symbol" },
 ];
 
-export function SignupWizard() {
+export function SignupWizard({ initialRole }: { initialRole?: "seller" | "buyer" | "financier" }) {
   const [state, action, pending] = useActionState<SignUpState, FormData>(signUp, {});
-  const [step, setStep] = useState(0);
-  const [role, setRole] = useState<string>("seller");
+  const [step, setStep] = useState(initialRole ? 1 : 0); // coming from a front door, the role is already chosen
+  const [role, setRole] = useState<string>(initialRole ?? "seller");
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
   const [local, setLocal] = useState("");
@@ -78,9 +78,10 @@ export function SignupWizard() {
       </div>
 
       <div data-step="1" hidden={step !== 1} className="space-y-4">
+        {initialRole && <p className="rounded-lg bg-p-100 px-4 py-2.5 text-sm text-p-800">Creating a <b>{TYPES.find((t) => t.id === role)?.title.toLowerCase()}</b> account. <button type="button" onClick={() => setStep(0)} className="font-semibold underline">Change</button></p>}
         <label className="block text-sm font-medium">Your full name<input name="name" required autoComplete="name" className="field font-normal" /></label>
         <label className="block text-sm font-medium">Work email<input name="email" type="email" required autoComplete="username" className="field font-normal" placeholder="you@company.com" /></label>
-        <label className="block text-sm font-medium">Business legal name<input name="legalName" required className="field font-normal" placeholder="As registered, e.g. Asha Traders Private Limited" /></label>
+        <label className="block text-sm font-medium">Business legal name<input name="legalName" required className="field font-normal" placeholder={role === "financier" ? "The institution's registered name" : "As registered, e.g. Asha Traders Private Limited"} /></label>
         <label className="block text-sm font-medium">Entity type
           <select name="entityType" required defaultValue="" className="field font-normal"><option value="" disabled>Select</option>{ENTITIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         </label>

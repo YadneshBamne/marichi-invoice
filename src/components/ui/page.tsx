@@ -74,6 +74,11 @@ export function Pop({ id, label, cls = "btn btn-primary btn-sm", children }: { i
   );
 }
 
+/** A labelled field for popover forms. Placeholders disappear as soon as you type, so they are never the only label. */
+export function PopField({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return <label className="block text-xs font-medium">{label}{children}</label>;
+}
+
 /** Label / value pairs. */
 export function KV({ rows, cols = 1 }: { rows: [ReactNode, ReactNode][]; cols?: 1 | 2 }) {
   return (

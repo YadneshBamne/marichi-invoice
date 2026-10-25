@@ -78,9 +78,9 @@ export function Sidebar({ sections, badges, collapsed, ws, onNavigate, onToggle 
       </nav>
 
       {!collapsed && (
-        <div className="mx-4 mb-3 rounded-card bg-p-800 p-4 text-sm text-p-100">
+        <div className="mx-4 mb-3 rounded-card bg-p-800 p-4 text-sm text-lt-100">
           <p className="font-semibold text-white">Need a hand?</p>
-          <p className="mt-1 text-p-100/80">{staff ? "Open the support queue for customer requests." : "Raise a request and we respond within a day."}</p>
+          <p className="mt-1 text-lt-100/80">{staff ? "Open the support queue for customer requests." : "Raise a request and we respond within a day."}</p>
           <Link href={staff ? "/admin/support" : "/support"} onClick={onNavigate} className="mt-3 inline-block rounded-full bg-white px-4 py-1.5 text-[13px] font-semibold text-p-800 transition-transform hover:scale-[1.03]">{staff ? "Support queue" : "Contact support"}</Link>
         </div>
       )}

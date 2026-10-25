@@ -9,6 +9,7 @@ import { ACCOUNTS, balance } from "@/server/ledger/accounts";
 import { DataTable, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
 import { formatMoney, rupeesToPaise } from "@/lib/money";
+import { market } from "@/lib/countries";
 
 export const metadata = { title: "Disbursements" };
 
@@ -70,7 +71,7 @@ export default async function Disbursements() {
         <Panel title="Fund escrow" sub="Record money moved into the escrow account.">
           <form action={fund} className="space-y-3">
             <input type="hidden" name="ref" value={crypto.randomUUID()} />
-            <label className="block text-sm font-medium">Amount (₹)<input name="amount" inputMode="decimal" placeholder="e.g. 10,00,000" required className="field font-normal" /></label>
+            <label className="block text-sm font-medium">Amount ({market().currency.symbol})<input name="amount" inputMode="decimal" placeholder="e.g. 10,00,000" required className="field font-normal" /></label>
             <button className="btn btn-primary w-full">Record funding</button>
           </form>
         </Panel>

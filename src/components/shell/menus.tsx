@@ -5,6 +5,7 @@ import { authClient } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icons";
 import { useDropdown } from "./use-dropdown";
 import { switchTo } from "@/app/(app)/switch-company";
+import { ThemeSwitch } from "./theme-switch";
 
 export type InboxItem = { id: string; subject: string; body: string; at: string };
 
@@ -108,6 +109,7 @@ export function UserMenu({ user, roleLabel, business, companies, onTour }: { use
             <Link className={row} href="/settings/notifications" onClick={close}><Icon name="bell" className="h-4 w-4 text-p-600" />Notification settings</Link>
             <button className={row} onClick={() => { close(); onTour(); }}><Icon name="play" className="h-4 w-4 text-p-600" />Replay product tour</button>
           </div>
+          <div className="border-t border-hair p-1.5"><ThemeSwitch /></div>
           <div className="border-t border-hair p-1.5">
             <button className={`${row} text-r-600`} onClick={async () => { await authClient.signOut(); window.location.href = "/login"; }}><Icon name="logout" className="h-4 w-4" />Sign out</button>
           </div>

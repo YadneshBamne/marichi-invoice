@@ -7,7 +7,7 @@ export function PasswordInput({ label, hint, ...p }: { label: string; hint?: Rea
   const [show, setShow] = useState(false);
   return (
     <label className="block text-sm font-medium">
-      <span className="flex items-center justify-between">{label}{hint}</span>
+      <span className="flex flex-wrap items-center justify-between gap-x-3">{label}{hint}</span>
       <span className="relative mt-1 block">
         <input {...p} type={show ? "text" : "password"} className="field mt-0 pr-11 font-normal" />
         <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 grid w-11 place-items-center text-faint transition-colors hover:text-ink">

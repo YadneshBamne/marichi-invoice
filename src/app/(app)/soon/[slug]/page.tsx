@@ -42,8 +42,8 @@ export default async function Soon({ params, searchParams }: { params: Promise<{
           <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white/10"><Icon name={p.icon} className="h-7 w-7" /></span>
           <h1 className="page-title text-white">{p.title}</h1>
         </div>
-        <p className="mt-4 max-w-2xl text-[15.5px] leading-relaxed text-p-100/85">{p.summary}</p>
-        <p className="mt-4 text-sm text-p-200/70">This module is not available yet. Nothing on this page is active, and no dates are committed.</p>
+        <p className="mt-4 max-w-2xl text-[15.5px] leading-relaxed text-lt-100/85">{p.summary}</p>
+        <p className="mt-4 text-sm text-lt-200/70">This module is not available yet. Nothing on this page is active, and no dates are committed.</p>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">

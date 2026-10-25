@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
 import {
   agreements, businesses, buyerSellerRelationships, disbursements, financingOffers, fraudCases, invoiceCollections, invoiceDisputes, invoices,
-  reconciliationRuns, repayments, tickets, underwritingDecisions, unmatchedCredits,
+  mandates, reconciliationRuns, repayments, tickets, underwritingDecisions, unmatchedCredits,
 } from "../db/schema";
 import { bucketOf, daysBetween, isoDay, type Bucket } from "../collections/waterfall";
 import { ACCOUNTS, balance } from "../ledger/accounts";
@@ -81,6 +81,8 @@ export async function buyerDashboard(db: Database, businessId: string, now = new
   const [biz] = await db.select({ kyb: businesses.kybStatus }).from(businesses).where(eq(businesses.id, businessId));
   const invs = await db.select({ i: invoices, seller: businesses.legalName }).from(invoices)
     .innerJoin(businesses, eq(businesses.id, invoices.sellerId)).where(eq(invoices.buyerId, businessId));
+  const [live] = await db.select({ id: mandates.id }).from(mandates).where(and(eq(mandates.businessId, businessId), eq(mandates.status, "active"))).limit(1);
+  const mandateActive = !!live;
   const today = isoDay(now);
   const pending = invs.filter((r) => r.i.status === "sent_for_confirmation");
   const payables = invs.filter((r) => (OPEN_STATUSES as readonly string[]).includes(r.i.status));
@@ -97,6 +99,8 @@ export async function buyerDashboard(db: Database, businessId: string, now = new
 
   return {
     kyb: biz.kyb,
+    confirmed: invs.some((r) => !(["uploaded", "validated", "sent_for_confirmation"] as string[]).includes(r.i.status)), // answered at least one invoice
+    autopay: mandateActive,
     pendingCount: pending.length, pendingValue: sum(pending.map((r) => r.i.amount)),
     due30Value: sum(in30.map((r) => r.i.amount)), due30Count: in30.length,
     overdueCount: overdue.length, overdueValue: sum(overdue.map((r) => r.i.amount)),

@@ -24,7 +24,7 @@ export default async function Invite({ params }: { params: Promise<{ token: stri
   const s = await getSession();
   const signedIn = s?.user.email.toLowerCase() === p.email;
   return (
-    <AuthLayout title={`Join ${p.company}`} sub={`You were invited as ${ORG_ROLE_LABEL[p.orgRole]}. ${ORG_ROLE_BLURB[p.orgRole]}`}>
+    <AuthLayout title={p.staffRole ? "Join the Marichi Labs team" : `Join ${p.company}`} sub={p.staffRole ? `You were invited as ${p.staffRole}. Staff sign-in always needs two-step verification, which you set up next.` : `You were invited as ${ORG_ROLE_LABEL[p.orgRole]}. ${ORG_ROLE_BLURB[p.orgRole]}`}>
       {signedIn ? <JoinExisting token={token} company={p.company} />
         : s ? <Alert>You are signed in as {s.user.email}, but this invitation is for {p.email}. Sign out first, then open the link again.</Alert>
         : p.hasAccount ? (

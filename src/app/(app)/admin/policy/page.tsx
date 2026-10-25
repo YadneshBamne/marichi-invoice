@@ -26,7 +26,8 @@ async function reset(fd: FormData) {
   redirect("/admin/policy?saved=1");
 }
 
-const unit = (k: string) => (k === "percent" ? "%" : k === "rupees" ? "₹" : k === "hours" ? "hours" : "");
+const SYM = market().currency.symbol;
+const unit = (k: string) => (k === "percent" ? "%" : k === "rupees" ? SYM : k === "hours" ? "hours" : "");
 
 export default async function Policy({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   await requireUser(["admin"]);
@@ -53,9 +54,9 @@ export default async function Policy({ searchParams }: { searchParams: Promise<{
                     {d.help && <p className="text-xs text-muted">{d.help}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    {unit(d.kind) === "₹" && <span className="text-muted">₹</span>}
+                    {unit(d.kind) === SYM && <span className="text-muted">{SYM}</span>}
                     <input id={d.key} name={d.key} defaultValue={toInput(d, current)} inputMode="decimal" className="field-inline w-full text-right !py-1.5" />
-                    {unit(d.kind) && unit(d.kind) !== "₹" && <span className="w-12 text-sm text-muted">{unit(d.kind)}</span>}
+                    {unit(d.kind) && unit(d.kind) !== SYM && <span className="w-12 text-sm text-muted">{unit(d.kind)}</span>}
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs sm:justify-end">
                     {overridden ? (<><StatusPill status="due" label="changed" /><button formAction={reset} formNoValidate name="reset" value={d.key} className="font-semibold text-p-700 hover:underline" title={`Default is ${display(d, d.fallback)}`}>Reset</button></>) : <span className="text-faint">default</span>}

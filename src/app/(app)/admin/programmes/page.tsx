@@ -5,6 +5,8 @@ import { decideProgramme, listProgrammes, SCF } from "@/server/scf/service";
 import { DataTable, Notice, PageHead, Panel, StatusPill, Pop } from "@/components/ui/page";
 import { formatMoney, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
+import { market } from "@/lib/countries";
+import { PopField } from "@/components/ui/page";
 
 export const metadata = { title: "Programmes" };
 const PATH = "/admin/programmes";
@@ -47,10 +49,10 @@ export default async function Programmes({ searchParams }: { searchParams: Promi
               <Pop id={`pd-${r.p.id}`} label="Decide" cls="btn btn-primary btn-sm">
                 <form action={decide} className="space-y-2">
                   <input type="hidden" name="id" value={r.p.id} />
-                  <input name="limit" inputMode="decimal" defaultValue={(Number(r.p.requestedLimit) / 100).toString()} placeholder="Limit (₹)" className="field !py-2 text-sm" />
-                  <input name="discountPct" type="number" step="0.01" min={SCF.minDiscountBps / 100} max={SCF.maxDiscountBps / 100} placeholder="Yearly discount %" className="field !py-2 text-sm" />
-                  <input name="advancePct" type="number" step="0.01" max={SCF.maxAdvanceBps / 100} placeholder="Advance % of invoice" className="field !py-2 text-sm" />
-                  <input name="note" placeholder="Note (required to decline)" className="field !py-2 text-sm" />
+                  <PopField label={`Limit (${market().currency.code})`}><input name="limit" inputMode="decimal" defaultValue={(Number(r.p.requestedLimit) / 100).toString()} className="field !py-2 text-sm font-normal" /></PopField>
+                  <PopField label="Yearly discount (%)"><input name="discountPct" type="number" step="0.01" min={SCF.minDiscountBps / 100} max={SCF.maxDiscountBps / 100} className="field !py-2 text-sm font-normal" /></PopField>
+                  <PopField label="Advance (% of invoice)"><input name="advancePct" type="number" step="0.01" max={SCF.maxAdvanceBps / 100} className="field !py-2 text-sm font-normal" /></PopField>
+                  <PopField label="Note (required to decline)"><input name="note" className="field !py-2 text-sm font-normal" /></PopField>
                   <div className="flex gap-2"><button name="decision" value="approve" className="btn btn-primary btn-sm flex-1">Approve</button><button name="decision" value="decline" className="btn btn-ghost btn-sm flex-1">Decline</button></div>
                 </form>
               </Pop>

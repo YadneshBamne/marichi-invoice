@@ -19,6 +19,7 @@ import { maskTail } from "@/server/crypto";
 import { Autopay } from "./autopay";
 import { acceptanceText } from "@/server/confirmations/wording";
 import { market } from "@/lib/countries";
+import { PopField } from "@/components/ui/page";
 
 const Form = z.object({
   invoiceId: z.uuid(),
@@ -128,8 +129,8 @@ export default async function BuyerInvoices() {
                   <Pop id={`dp-${i.id}`} label="Dispute" cls="btn btn-ghost btn-sm">
                     <form action={dispute} className="space-y-2">
                       <input type="hidden" name="invoiceId" value={i.id} />
-                      <input name="reason" placeholder="What is wrong?" required className="field !py-2 text-sm" />
-                      <input name="amount" inputMode="decimal" placeholder="Disputed amount (blank = all)" className="field !py-2 text-sm" />
+                      <PopField label="What is wrong?"><input name="reason" required className="field !py-2 text-sm font-normal" /></PopField>
+                      <PopField label="Disputed amount (leave blank for all)"><input name="amount" inputMode="decimal" className="field !py-2 text-sm font-normal" /></PopField>
                       <button className="btn btn-danger btn-sm w-full">Raise dispute</button>
                     </form>
                   </Pop>

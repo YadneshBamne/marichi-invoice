@@ -4,6 +4,8 @@ import { Card, Empty, PageHead, Pill, Stat, type Tone } from "@/components/ui/ca
 import { Bars, Donut, HBars } from "@/components/ui/charts";
 import { Icon } from "@/components/ui/icons";
 import { formatCompactMoney, formatMoney } from "@/lib/money";
+import { buyerSteps, sellerSteps } from "@/lib/next-steps";
+import { NextSteps } from "./next-steps";
 
 // Pure presentation: data in, JSX out. Pages fetch; /design/dashboards renders the same views with sample data.
 export type SellerData = Awaited<ReturnType<typeof sellerDashboard>>;
@@ -16,47 +18,6 @@ const STAGE: Record<string, string> = {
 };
 const ORDER = Object.keys(STAGE);
 const dueTone = (dpd: number): Tone => (dpd > 5 ? "bad" : dpd > 0 ? "warn" : "good");
-function VerifyBanner({ status }: { status: string }) {
-  if (status === "approved") return null;
-  const waiting = status === "under_review" || status === "submitted";
-  return (
-    <Card className="mb-4 border border-s-500/40 bg-s-100/60">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span><b>{waiting ? "Verification in progress" : "Finish verification"}</b>{waiting ? ": our team is reviewing your details." : " to start using Marichi."} Status: {status.replaceAll("_", " ")}.</span>
-        {!waiting && <Link className="btn btn-primary btn-sm" href="/onboarding">Continue</Link>}
-      </div>
-    </Card>
-  );
-}
-function GetStarted({ setup }: { setup: SellerData["setup"] }) {
-  const steps = [
-    { done: setup.verified, t: "Verify your business", d: "A one-time KYB check.", href: "/onboarding", cta: "Verify" },
-    { done: setup.buyer, t: "Add a buyer", d: "The company that owes you money.", href: "/seller/buyers", cta: "Add buyer" },
-    { done: setup.invoice, t: "Upload your first invoice", d: "Your buyer is asked to confirm it.", href: "/seller/invoices", cta: "Upload" },
-    { done: setup.funded, t: "Accept an offer and get paid", d: "Review, e-sign and receive the advance.", href: "/seller/invoices", cta: "View offers" },
-  ];
-  const left = steps.filter((s) => !s.done).length;
-  if (!left) return null;
-  const next = steps.findIndex((s) => !s.done);
-  return (
-    <Card tour="setup" className="mb-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="text-[15.5px] font-semibold tracking-tight">Get started</h2><p className="text-sm text-muted">{steps.length - left} of {steps.length} steps done</p></div>
-        <div className="h-2 w-40 overflow-hidden rounded-full bg-panel"><div className="h-full rounded-full bg-p-700 transition-all duration-700" style={{ width: `${((steps.length - left) / steps.length) * 100}%` }} /></div>
-      </div>
-      <ol className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {steps.map((s, n) => (
-          <li key={s.t} className={`flex flex-col rounded-lg p-4 ${s.done ? "bg-g-100/60" : n === next ? "bg-p-100 ring-1 ring-p-400" : "bg-page"}`}>
-            <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${s.done ? "bg-g-600 text-white" : "bg-card text-p-700 ring-1 ring-hair"}`}>{s.done ? <Icon name="check" className="h-3.5 w-3.5" /> : n + 1}</span>
-            <p className="mt-3 text-sm font-semibold">{s.t}</p><p className="mt-0.5 text-[13px] text-muted">{s.d}</p>
-            {!s.done && n === next && <Link href={s.href} className="btn btn-primary btn-sm mt-3 self-start">{s.cta}</Link>}
-          </li>
-        ))}
-      </ol>
-    </Card>
-  );
-}
-
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 
@@ -76,8 +37,8 @@ export function SellerDashboardView({ d, first, exports = true, company }: { d: 
         <Link className="btn btn-primary" href="/seller/invoices">Upload invoice</Link>
         {exports && <a className="btn btn-ghost" href="/api/export/invoices">Export CSV</a>}
       </PageHead>
-      <VerifyBanner status={d.kyb} />
-      <GetStarted setup={d.setup} />
+      <NextSteps steps={sellerSteps({ kyb: d.kyb, ...d.setup })} />
+      {d.kyb !== "approved" ? <Empty>Your limit, balances and invoices appear here once your business is verified.</Empty> : <>
       <div data-tour="kpis" className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat hero label="Available credit" value={formatCompactMoney(d.available)} note={`of ${formatCompactMoney(d.limit)} limit`} href="/seller/invoices" />
         <Stat label="Outstanding" value={formatCompactMoney(d.outstanding)} note={plural(d.upcoming.length, "open invoice")} href="/seller/invoices" />
@@ -135,6 +96,7 @@ export function SellerDashboardView({ d, first, exports = true, company }: { d: 
           ) : <Empty>No payouts yet.</Empty>}
         </Card>
       </div>
+      </>}
     </>
   );
 }
@@ -148,7 +110,7 @@ export function BuyerDashboardView({ d, first, exports = true, company }: { d: B
         <Link className="btn btn-primary" href="/buyer/invoices">Review invoices</Link>
         {exports && <a className="btn btn-ghost" href="/api/export/invoices">Export CSV</a>}
       </PageHead>
-      <VerifyBanner status={d.kyb} />
+      <NextSteps steps={buyerSteps({ kyb: d.kyb, confirmed: d.confirmed, autopay: d.autopay })} />
       <div data-tour="kpis" className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat hero label="Awaiting your confirmation" value={String(d.pendingCount)} note={`${formatCompactMoney(d.pendingValue)} in total`} href="/buyer/invoices" />
         <Stat label="Due in 30 days" value={formatCompactMoney(d.due30Value)} note={plural(d.due30Count, "invoice")} href="/buyer/invoices" />

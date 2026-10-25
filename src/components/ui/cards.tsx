@@ -25,11 +25,11 @@ export function Stat({ label, value, note, tone, hero, href }: { label: string; 
   const body = (
     <div className={`relative flex min-h-[132px] flex-col overflow-hidden rounded-card p-5 shadow-card sm:p-6 ${hero ? "bg-p-800 text-white" : "bg-card"}`}>
       <div className="flex items-start justify-between gap-3">
-        <span className={`text-[15px] font-medium ${hero ? "text-p-100" : "text-muted"}`}>{label}</span>
+        <span className={`text-[15px] font-medium ${hero ? "text-lt-100" : "text-muted"}`}>{label}</span>
         {href && <span className={`grid h-9 w-9 place-items-center rounded-full ${hero ? "bg-white/15" : "bg-panel"}`}><Icon name="arrow" className="h-4 w-4" /></span>}
       </div>
       <div className="mt-auto pt-5 text-[clamp(30px,3.2vw,40px)] font-semibold leading-none tracking-tight">{value}</div>
-      {note && <div className={`mt-2 text-[13px] ${hero ? "text-p-200" : tone ? TONES[tone].split(" ")[1] : "text-muted"}`}>{note}</div>}
+      {note && <div className={`mt-2 text-[13px] ${hero ? "text-lt-200" : tone ? TONES[tone].split(" ")[1] : "text-muted"}`}>{note}</div>}
     </div>
   );
   return href ? <Link href={href} className="block lift rounded-card">{body}</Link> : body;

@@ -7,6 +7,8 @@ import { position, recordFunding, recordWithdrawal } from "@/server/marketplace/
 import { DataTable, Notice, PageHead, Panel, Pop, StatusPill } from "@/components/ui/page";
 import { formatMoney, rupeesToPaise } from "@/lib/money";
 import { attempt } from "../../financier/attempt";
+import { market } from "@/lib/countries";
+import { PopField } from "@/components/ui/page";
 
 export const metadata = { title: "Financiers" };
 const PATH = "/admin/financiers";
@@ -49,9 +51,9 @@ export default async function Financiers({ searchParams }: { searchParams: Promi
                 <form action={move} className="space-y-2">
                   <input type="hidden" name="financierId" value={r.id} />
                   <input type="hidden" name="ref" value={crypto.randomUUID()} />
-                  <select name="kind" className="field !py-2 text-sm"><option value="fund">Deposit received</option><option value="withdraw">Withdrawal paid</option></select>
-                  <input name="amount" inputMode="decimal" placeholder="Amount (₹)" required className="field !py-2 text-sm" />
-                  <input name="bankRef" placeholder="Bank reference (UTR)" className="field !py-2 text-sm" />
+                  <PopField label="What happened"><select name="kind" className="field !py-2 text-sm font-normal"><option value="fund">Deposit received</option><option value="withdraw">Withdrawal paid</option></select></PopField>
+                  <PopField label={`Amount (${market().currency.code})`}><input name="amount" inputMode="decimal" required className="field !py-2 text-sm font-normal" /></PopField>
+                  <PopField label="Bank reference (optional)"><input name="bankRef" className="field !py-2 text-sm font-normal" /></PopField>
                   <button className="btn btn-primary btn-sm w-full">Record</button>
                 </form>
               </Pop>
