@@ -3,6 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { agreements, auditLog, businesses, financingOffers, invoices, users } from "../db/schema";
+import { participantsOf } from "../marketplace/pool";
 import { COLLECTIONS } from "../collections/waterfall";
 import { describeOffer } from "../offers/pricing";
 import { putGenerated } from "../vault";
@@ -11,10 +12,12 @@ import { renderPdf } from "./pdf";
 import { keyFacts, PLATFORM, TEMPLATE_VERSION, type Party } from "./templates";
 
 /** The financier that owns the receivable if this offer is accepted: the bidding financier, or the platform's own balance sheet. */
-export async function financierFor(db: Database, offer: { financierId: string | null }): Promise<Party> {
+export async function financierFor(db: Database, offer: { id: string; financierId: string | null; advanceAmount: bigint }): Promise<Party> {
   if (!offer.financierId) return PLATFORM;
-  const [b] = await db.select({ n: businesses.legalName }).from(businesses).where(eq(businesses.id, offer.financierId));
-  return { legalName: b?.n ?? "Financier", platform: false };
+  const parts = await participantsOf(db, offer);
+  const names = await Promise.all(parts.map(async (x) => (await db.select({ n: businesses.legalName }).from(businesses).where(eq(businesses.id, x.financierId)))[0]?.n ?? "Financier"));
+  // Several financiers fund together: the assignees are all of them, each for its share, which counsel will want to see in the contract text.
+  return { legalName: parts.length > 1 ? names.map((n, i) => `${n} (${parts[i].shareBps / 100}%)`).join(" and ") : names[0], platform: false };
 }
 
 /** Make the Key Facts sheet for an offer if there is not one yet. Safe to call any number of times. */

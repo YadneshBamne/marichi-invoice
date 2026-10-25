@@ -19,6 +19,7 @@ export const IN: Pack = {
     { kind: "udyam", label: "Udyam registration certificate", required: false },
     { kind: "bank_proof", label: "Cancelled cheque or a letter from the bank", required: false },
   ],
+  tds: { name: "TDS (tax deducted at source)", suggestedBps: 1000 },
   tax: { name: "GST", rateBps: 1800 },
   eInvoice: { short: "IRN", long: "e-invoice reference number", authority: "the Invoice Registration Portal" },
   registry: { text: "the Central Registry of Securitisation Asset Reconstruction and Security Interest of India (CERSAI)", short: "CERSAI", when: "after_assignment", withinDays: 30 },

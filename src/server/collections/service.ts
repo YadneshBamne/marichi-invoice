@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Database, Tx } from "../db/client";
 import {
   auditLog, businessBankAccounts, collectionEvents, earlyPayments, financingOffers, invoiceCollections, invoiceDisputes, invoices, repayments,
-  sellerPayouts, unmatchedCredits, virtualAccounts,
+  sellerPayouts, tdsWithheld, unmatchedCredits, virtualAccounts,
 } from "../db/schema";
 import { gateway, type Adapters } from "../integrations/gateway";
 import { railPlan } from "../disbursements/service";
@@ -12,6 +12,7 @@ import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
 import { formatMoney } from "../../lib/money";
 import { repaymentLegs } from "../marketplace/service";
+import { participantsOf, splitAmount } from "../marketplace/pool";
 import { settleEarlyPayment } from "../earlypay/service";
 import { accrue, applyPayment, bucketOf, COLLECTIONS, daysBetween, isoDay, type State } from "./waterfall";
 
@@ -74,12 +75,17 @@ async function settle(db: Database, invoiceId: string, c: Credit, now: Date, gw:
     ];
     const lines: Line[] = [{ account: ACCOUNTS.escrow, direction: "debit", amount: c.amount }];
     for (const [account, amount] of credits) if (amount > 0n) lines.push({ account, direction: "credit", amount });
-    const [funded] = await tx.select({ f: financingOffers.financierId }).from(financingOffers).where(and(eq(financingOffers.invoiceId, invoiceId), eq(financingOffers.status, "accepted")));
-    if (funded?.f) { // financier-funded: principal and their share of discount/penal go back to their funds
-      await ensureAccounts(tx, [ACCOUNTS.financierFunds(funded.f), ACCOUNTS.financierDeployed(funded.f), ACCOUNTS.discountIncome]);
-      lines.push(...repaymentLegs(funded.f, paid));
+    const [offer] = await tx.select().from(financingOffers).where(and(eq(financingOffers.invoiceId, invoiceId), eq(financingOffers.status, "accepted")));
+    const parts = offer ? await participantsOf(tx, offer) : [];
+    let held: { financierId: string; base: bigint; rateBps: number; amount: bigint }[] = [];
+    if (parts.length) { // financier-funded: each one's principal and share of discount/penal go back to its funds, less any tax held back
+      await ensureAccounts(tx, [...parts.flatMap((x) => [ACCOUNTS.financierFunds(x.financierId), ACCOUNTS.financierDeployed(x.financierId)]), ACCOUNTS.discountIncome, ACCOUNTS.tdsPayable]);
+      const legs = repaymentLegs(parts, paid);
+      lines.push(...legs.lines);
+      held = legs.tds;
     }
     await postEntry(tx, { ref: `repay:${c.utr}`, type: "repayment", lines });
+    for (const t of held) await tx.insert(tdsWithheld).values({ financierId: t.financierId, invoiceId, repaymentId: rep.id, base: t.base, rateBps: t.rateBps, amount: t.amount });
 
     await tx.update(invoiceCollections).set({
       principal: state.principal, discount: state.discount, penal: state.penal, lastAccruedOn: state.lastAccrued, closedAt: closed ? now : null,
@@ -198,10 +204,15 @@ export async function writeOff(db: Database, invoiceId: string, staff: { id: str
     if (daysBetween(inv.dueDate, isoDay(now)) <= COLLECTIONS.writeOffAfterDpd) throw new Error(`not yet ${COLLECTIONS.writeOffAfterDpd}+ days past due`);
     await ensureAccounts(tx, [ACCOUNTS.creditLoss, ACCOUNTS.receivable(inv.sellerId), ACCOUNTS.accruedDiscount, ACCOUNTS.discountIncome]);
     // Principal is lost; discount we already booked as income but will never collect is reversed out of income.
-    const [funded] = await tx.select({ f: financingOffers.financierId }).from(financingOffers).where(and(eq(financingOffers.invoiceId, invoiceId), eq(financingOffers.status, "accepted")));
-    if (funded?.f) await ensureAccounts(tx, [ACCOUNTS.financierDeployed(funded.f)]);
+    const [offer] = await tx.select().from(financingOffers).where(and(eq(financingOffers.invoiceId, invoiceId), eq(financingOffers.status, "accepted")));
+    const parts = offer ? await participantsOf(tx, offer) : [];
+    if (parts.length) await ensureAccounts(tx, parts.map((x) => ACCOUNTS.financierDeployed(x.financierId)));
+    const loss = parts.length ? splitAmount(col.principal, parts.map((x) => x.shareBps)) : [];
     const lines: Line[] = [
-      { account: funded?.f ? ACCOUNTS.financierDeployed(funded.f) : ACCOUNTS.creditLoss, direction: "debit", amount: col.principal }, // a financier bears its own loss
+      // each financier bears its own share of the loss; with none, the platform does
+      ...(parts.length
+        ? parts.flatMap((x, i) => (loss[i] > 0n ? [{ account: ACCOUNTS.financierDeployed(x.financierId), direction: "debit" as const, amount: loss[i] }] : []))
+        : [{ account: ACCOUNTS.creditLoss, direction: "debit" as const, amount: col.principal }]),
       { account: ACCOUNTS.receivable(inv.sellerId), direction: "credit", amount: col.principal },
     ];
     if (col.discount > 0n) {

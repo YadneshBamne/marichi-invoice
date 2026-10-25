@@ -121,6 +121,7 @@ async function respond(db: Database, offerId: string, actor: SellerActor, to: "a
       return null;
     }
     if (to === "accepted" && (inv.status !== "eligible" || inv.disputeFlag)) throw new Error("invoice is no longer eligible for financing");
+    if (to === "accepted" && inv.bundleId) throw new Error("this invoice is in a bundle. Take a financier's bids on the bundle, or take the bundle apart first");
     if (to === "accepted") { await assertNotFrozen(tx, inv.id); await assertNoEarlyPayment(tx, inv.id); }
     await tx.update(financingOffers).set({ status: to, ...(to === "accepted" ? { acceptedAt: now, acceptedBy: actor.id } : {}) })
       .where(eq(financingOffers.id, offer.id));

@@ -14,6 +14,7 @@ export const ACCOUNTS = {
   receivable: (sellerId: string) => `receivable:${sellerId}`,
   discountIncome: "discount_income", // recognised daily as it accrues (Dr accrued_discount, Cr discount_income)
   accruedDiscount: "accrued_discount_receivable", // asset: discount earned but not yet collected; always equals sum(invoice_collections.discount)
+  tdsPayable: "tds_payable", // liability: tax held back from financiers' earnings, until it is paid over to the tax authority
   gstPayable: "gst_payable", // liability: GST collected inside processing fees
   penalIncome: "penal_income",
   creditLoss: "credit_loss", // expense: principal written off

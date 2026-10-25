@@ -1,8 +1,9 @@
 // Analytics and scheduled reports. Everything here is read-only over data the platform already holds.
 // ponytail: aggregates are computed in JS from plain selects, like the dashboards. Move to SQL/materialised views when one book gets large.
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { businesses, disbursements, financingOffers, invoiceCollections, invoices, repayments, reportRuns, reportSchedules } from "../db/schema";
+import { businesses, disbursements, financingOffers, invoiceCollections, invoices, offerShares, repayments, reportRuns, reportSchedules } from "../db/schema";
+import { splitAmount } from "../marketplace/pool";
 import { daysBetween, isoDay } from "../collections/waterfall";
 import { notifyUser } from "../notify";
 import { gateway, type Adapters } from "../integrations/gateway";
@@ -14,6 +15,18 @@ export type Scope = { role: string; businessId: string | null };
 const month = (d: Date) => d.toISOString().slice(0, 7);
 const alloc = (a: unknown, k: string) => BigInt((a as Record<string, string> | null)?.[k] ?? "0");
 
+/** For a financier: how to take its own part of any amount on an offer (the whole of it on a single-financier offer; its share of a shared one). Offers it is not in are absent. */
+async function partsFor(db: Database, financierId: string, offers: { id: string; financierId: string | null }[]) {
+  const shares = offers.length ? await db.select().from(offerShares).where(inArray(offerShares.offerId, offers.map((o) => o.id))) : [];
+  const out = new Map<string, (v: bigint) => bigint>();
+  for (const o of offers) {
+    const mine = shares.filter((s) => s.offerId === o.id).sort((a, b) => b.shareBps - a.shareBps || a.createdAt.getTime() - b.createdAt.getTime());
+    if (mine.length) { const at = mine.findIndex((s) => s.financierId === financierId); if (at >= 0) { const bps = mine.map((s) => s.shareBps); out.set(o.id, (v) => splitAmount(v, bps)[at]); } }
+    else if (o.financierId === financierId) out.set(o.id, (v) => v);
+  }
+  return out;
+}
+
 /** Everything funded, one row per invoice, with what has come back. The base for vintages and portfolio views. */
 async function funded(db: Database, scope: Scope) {
   const q = db.select({ d: disbursements, o: financingOffers, i: invoices, c: invoiceCollections }).from(disbursements)
@@ -22,7 +35,7 @@ async function funded(db: Database, scope: Scope) {
     .leftJoin(invoiceCollections, eq(invoiceCollections.invoiceId, invoices.id));
   const where = eq(disbursements.status, "succeeded");
   const rows = scope.role === "seller" ? await q.where(and(where, eq(invoices.sellerId, scope.businessId!)))
-    : scope.role === "financier" ? await q.where(and(where, eq(financingOffers.financierId, scope.businessId!)))
+    : scope.role === "financier" ? await q.where(and(where, or(eq(financingOffers.financierId, scope.businessId!), sql`exists (select 1 from offer_shares s where s.offer_id = ${financingOffers.id} and s.financier_id = ${scope.businessId})`)))
     : scope.role === "buyer" ? await q.where(and(where, eq(invoices.buyerId, scope.businessId!)))
     : await q.where(where);
   const ids = rows.map((r) => r.i.id);
@@ -33,7 +46,20 @@ async function funded(db: Database, scope: Scope) {
     e.principal += alloc(r.allocation, "principal"); e.discount += alloc(r.allocation, "discount"); e.penal += alloc(r.allocation, "penal");
     repaid.set(r.invoiceId, e);
   }
-  return rows.map((r) => ({ ...r, paid: repaid.get(r.i.id) ?? { principal: 0n, discount: 0n, penal: 0n } }));
+  const none = { principal: 0n, discount: 0n, penal: 0n };
+  if (scope.role !== "financier") return rows.map((r) => ({ ...r, paid: repaid.get(r.i.id) ?? none }));
+  // A financier sees only its own part of each offer: its advance, its principal and discount coming back.
+  const part = await partsFor(db, scope.businessId!, rows.map((r) => r.o));
+  return rows.flatMap((r) => {
+    const f = part.get(r.o.id);
+    if (!f) return [];
+    const p = repaid.get(r.i.id) ?? none;
+    return [{
+      ...r, o: { ...r.o, advanceAmount: f(r.o.advanceAmount), feeAmount: f(r.o.feeAmount), expectedDiscount: f(r.o.expectedDiscount) },
+      c: r.c ? { ...r.c, principal: f(r.c.principal), discount: f(r.c.discount), penal: f(r.c.penal) } : r.c,
+      paid: { principal: f(p.principal), discount: f(p.discount), penal: f(p.penal) },
+    }];
+  });
 }
 
 /** Vintage analysis: group by the month money went out and follow each group's repayment and delinquency over time. */
@@ -88,6 +114,7 @@ export async function forecast(db: Database, scope: Scope, now = new Date(), wee
   const columns = scope.role === "seller" ? ["Buyer pays you", "Buyer pays, net of your advance"] : scope.role === "buyer" ? ["You owe"] : scope.role === "financier" ? ["Principal back", "Your share of discount"] : ["Principal", "Discount"];
   const today = isoDay(now);
   const out: Forecast = { columns, overdue: Object.fromEntries(columns.map((c) => [c, 0n])), weeks: Array.from({ length: weeks }, (_, w) => ({ start: isoDay(new Date(now.getTime() + w * 7 * 86_400_000)), values: Object.fromEntries(columns.map((c) => [c, 0n])) })) };
+  const part = scope.role === "financier" ? await partsFor(db, scope.businessId!, rows.flatMap((r) => (r.o ? [r.o] : []))) : null;
   for (const { i, o, c } of rows) {
     const add: Record<string, bigint> = {};
     if (scope.role === "seller") {
@@ -95,8 +122,9 @@ export async function forecast(db: Database, scope: Scope, now = new Date(), wee
       else if (!o) add["Buyer pays you"] = i.amount;
     } else if (scope.role === "buyer") add["You owe"] = i.amount;
     else if (scope.role === "financier") {
-      if (!o || !c || o.financierId !== scope.businessId) continue;
-      add["Principal back"] = c.principal; add["Your share of discount"] = financierShare(o.expectedDiscount);
+      const f = o && part?.get(o.id);
+      if (!o || !c || !f) continue;
+      add["Principal back"] = f(c.principal); add["Your share of discount"] = financierShare(f(o.expectedDiscount));
     } else if (o && c) { add["Principal"] = c.principal; add["Discount"] = o.expectedDiscount; }
     else continue;
     const d = daysBetween(today, i.dueDate); // days from today to due

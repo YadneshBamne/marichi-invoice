@@ -20,6 +20,7 @@ export const ZM: Pack = {
     { kind: "tax_clearance", label: "Tax clearance certificate (ZRA)", required: false, expires: true },
     { kind: "bank_proof", label: "A letter from the bank or a recent statement", required: false },
   ],
+  tds: { name: "Withholding tax on interest", suggestedBps: 1500 },
   tax: { name: "VAT", rateBps: 1600 },
   eInvoice: { short: "Smart Invoice number", long: "Smart Invoice number", authority: "the Zambia Revenue Authority" },
   registry: { text: "the Collateral Registry maintained by PACRA under the Movable Property (Security Interest) Act, 2016", short: "PACRA", when: "before_payout", withinDays: null },

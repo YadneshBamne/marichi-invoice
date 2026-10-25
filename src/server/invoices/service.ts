@@ -15,6 +15,7 @@ export type NewInvoice = {
   amount: bigint; // paise
   irn?: string; poReference?: string; taxBreakup?: unknown; lineItems?: unknown;
   contentHash: string; documentRef?: string;
+  kind?: "invoice" | "debit_note"; parentInvoiceId?: string; // a debit note is raised by issueDebitNote
   currency?: string; foreignAmount?: bigint; fxRateMicro?: bigint; shippingBill?: string; purposeCode?: string; // export invoices (amount stays in rupees)
 };
 

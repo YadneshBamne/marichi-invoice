@@ -1,10 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
-import { agreements, bids, businesses, buyerSellerRelationships, financingOffers, invoices, underwritingDecisions } from "@/server/db/schema";
+import { agreements, bids, bundles, businesses, buyerSellerRelationships, financingOffers, invoices, underwritingDecisions } from "@/server/db/schema";
+import { bundleBids, createBundle, dissolveBundle } from "@/server/marketplace/bundles";
 import { acceptOffer, acceptOffers, expireOffers, generateOffer, rejectOffer, repriceOffer } from "@/server/offers/service";
 import { describeOffer } from "@/server/offers/pricing";
 import { acceptBid, bidsFor } from "@/server/marketplace/service";
@@ -14,6 +15,7 @@ import { requireUser } from "@/server/rbac";
 import { assertCan, can } from "@/server/permissions";
 import { createInvoice } from "@/server/invoices/service";
 import { issueCreditNote, listCreditNotes } from "@/server/invoices/credit-notes";
+import { issueDebitNote } from "@/server/invoices/debit-notes";
 import { sendForConfirmation } from "@/server/confirmations/service";
 import { scanInvoice } from "@/server/fraud/engine";
 import { putDocument } from "@/server/vault";
@@ -136,6 +138,52 @@ async function chooseBid(fd: FormData) {
     return r.status === "queued" ? QUEUED : "Bid accepted. Sign the agreement to receive the funds.";
   });
 }
+async function chooseBids(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  await attempt(async () => {
+    assertCan(u, "offer.prepare");
+    const bidIds = z.array(z.uuid()).min(2, "tick two or more bids to combine").parse(fd.getAll("bidId"));
+    const rows = await db.select({ b: bids, no: invoices.invoiceNumber, fin: businesses.legalName }).from(bids).innerJoin(invoices, eq(invoices.id, bids.invoiceId)).innerJoin(businesses, eq(businesses.id, bids.financierId)).where(inArray(bids.id, bidIds));
+    if (rows.length !== bidIds.length) throw new Error("bid not found");
+    const advance = rows.reduce((a, r) => a + r.b.advanceAmount, 0n);
+    const r = await submit(db, actorOf(u), "bid.accept_group", { bidIds, ack: fd.get("ack") === "on" }, { summary: `Combine ${rows.map((x) => x.fin).join(" and ")} on invoice ${rows[0].no}: ${formatMoney(advance)} advanced in total`, amount: advance });
+    return r.status === "queued" ? QUEUED : "Bids combined. Sign the agreement to receive the funds.";
+  });
+}
+async function makeBundle(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  await attempt(async () => {
+    assertCan(u, "invoice.upload");
+    const ids = z.array(z.uuid()).min(2, "tick two or more invoices to bundle").parse(fd.getAll("invoiceId"));
+    await createBundle(db, actorOf(u), ids);
+    return "Bundle created. Financiers can now bid on all of it at once.";
+  });
+}
+async function breakBundle(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  await attempt(async () => {
+    assertCan(u, "invoice.upload");
+    await dissolveBundle(db, actorOf(u), z.uuid().parse(fd.get("bundleId")));
+    return "Bundle taken apart. Its invoices are open to financiers one by one again.";
+  });
+}
+async function chooseBundle(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  await attempt(async () => {
+    assertCan(u, "offer.prepare");
+    const bundleId = z.uuid().parse(fd.get("bundleId")), financierId = z.uuid().parse(fd.get("financierId"));
+    const pick = (await bundleBids(db, bundleId)).find((x) => x.financierId === financierId);
+    if (!pick) throw new Error("that financier no longer has bids on the whole bundle");
+    const [fin] = await db.select({ name: businesses.legalName }).from(businesses).where(eq(businesses.id, financierId));
+    const r = await submit(db, actorOf(u), "bundle.accept", { bundleId, financierId, ack: fd.get("ack") === "on" },
+      { summary: `Take ${fin?.name ?? "a financier"}'s bids on a bundle of ${pick.bids.length} invoices: ${formatMoney(pick.advance - pick.fee)} paid to you`, amount: pick.advance });
+    return r.status === "queued" ? QUEUED : "Bundle accepted. Sign the agreement for each invoice to receive the funds.";
+  });
+}
 async function answerEarly(fd: FormData) {
   "use server";
   const u = await requireUser(["seller"]);
@@ -158,6 +206,19 @@ async function creditNote(fd: FormData) {
   });
 }
 
+async function debitNote(fd: FormData) {
+  "use server";
+  const u = await requireUser(["seller"]);
+  await attempt(async () => {
+    assertCan(u, "creditnote.issue"); // a debit note changes what the buyer owes, so it needs the same authority as a credit note
+    const r = await issueDebitNote(db, { id: u.id, role: u.role, businessId: u.businessId }, {
+      invoiceId: z.uuid().parse(fd.get("invoiceId")), amount: rupeesToPaise(String(fd.get("amount") ?? "")), reason: String(fd.get("reason") ?? ""),
+    });
+    return `Debit note ${r.number} raised, due ${r.dueDate}. Your buyer is asked to confirm it like any invoice.`;
+  });
+}
+
+const DEBITABLE = ["confirmed", "eligible", "financed", "due", "overdue", "paid"];
 const CREDITABLE = ["uploaded", "validated", "sent_for_confirmation", "confirmed", "eligible", "financed", "due", "overdue"];
 
 export default async function Invoices({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
@@ -178,6 +239,11 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
     listCreditNotes(db, ids),
   ]);
   const bidMap = await bidsFor(db, ids);
+  const liveBundles = await db.select().from(bundles).where(and(eq(bundles.sellerId, u.businessId!), isNull(bundles.dissolvedAt))).orderBy(desc(bundles.createdAt));
+  const bundleOffers = new Map(await Promise.all(liveBundles.map(async (b) => [b.id, await bundleBids(db, b.id)] as const)));
+  const bundleFinNames = new Map<string, string>();
+  const finIds = [...new Set([...bundleOffers.values()].flat().map((x) => x.financierId))];
+  if (finIds.length) for (const b of await db.select({ id: businesses.id, name: businesses.legalName }).from(businesses).where(inArray(businesses.id, finIds))) bundleFinNames.set(b.id, b.name);
   const keyFactsOf = new Map((await db.select({ o: agreements.offerId, ref: agreements.documentRef }).from(agreements).where(and(eq(agreements.businessId, u.businessId!), eq(agreements.kind, "key_facts")))).map((r) => [r.o ?? "", r.ref]));
   const earlyOffers = (await listEarlyPayments(db, { sellerId: u.businessId! })).filter((e) => e.e.status === "proposed" && e.e.expiresAt > new Date());
   const bidders = new Map<string, string>();
@@ -189,6 +255,9 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const creditOf = new Map<string, bigint>();
   for (const n of notes) creditOf.set(n.invoiceId, (creditOf.get(n.invoiceId) ?? 0n) + n.amount);
   const actionable = rows.filter((r) => decisionOf.has(r.id));
+  const buyerName = new Map(buyers.map((b) => [b.id, b.name]));
+  const bundleable = rows.filter((r) => r.status === "eligible" && !r.disputeFlag && !r.bundleId && decisionOf.get(r.id)?.decision === "approved" && offerOf.get(r.id)?.status !== "accepted");
+  const bundleGroups = [...Map.groupBy(bundleable, (r) => r.buyerId).entries()].filter(([, list]) => list.length >= 2);
   const openOffers = actionable.map((r) => offerOf.get(r.id)).filter((o): o is NonNullable<typeof o> => !!o && o.status === "open");
   const bulkNet = openOffers.reduce((a, o) => a + describeOffer(o).netDisbursal, 0n);
 
@@ -225,15 +294,66 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         </Panel>
       )}
 
+      {(liveBundles.length > 0 || bundleGroups.length > 0) && (
+        <Panel title="Bundles" sub="Group several approved invoices on the same buyer so a financier funds them in one decision. Each invoice is still signed, paid out and collected on its own." className="mb-5">
+          {liveBundles.map((b) => {
+            const members = rows.filter((r) => r.bundleId === b.id);
+            const offers = bundleOffers.get(b.id) ?? [];
+            return (
+              <div key={b.id} className="mb-4 border-b border-hair pb-4 last:mb-0 last:border-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold">{buyerName.get(b.buyerId) ?? "Buyer"}: {members.length} invoices · {formatMoney(members.reduce((a, r) => a + r.amount, 0n))}</p>
+                  {prepare && <form action={breakBundle}><input type="hidden" name="bundleId" value={b.id} /><button className="btn btn-ghost btn-sm">Take apart</button></form>}
+                </div>
+                <p className="text-xs text-muted">{members.map((r) => r.invoiceNumber).join(", ")}</p>
+                {offers.length === 0 ? <p className="mt-2 text-muted">No financier has bid on the whole bundle yet.</p> : (
+                  <div className="mt-2">
+                    <DataTable rows={offers} rowKey={(x) => x.financierId}
+                      cols={[
+                        { h: "Financier", cell: (x) => bundleFinNames.get(x.financierId) ?? "Financier" },
+                        { h: "You receive now", align: "right", cell: (x) => formatMoney(x.advance - x.fee) },
+                        { h: "Discount", align: "right", cell: (x) => `${x.discountBps / 100}% p.a.` },
+                        { h: "", align: "right", cell: (x) => prepare
+                          ? <form action={chooseBundle} className="flex flex-col items-end gap-1"><input type="hidden" name="bundleId" value={b.id} /><input type="hidden" name="financierId" value={x.financierId} /><label className="flex items-start gap-1.5 text-xs text-muted"><input name="ack" type="checkbox" className="mt-0.5" />I have read the rate and cost of each invoice.</label><button className="btn btn-primary btn-sm">{commit ? "Take this bid" : "Submit for approval"}</button></form>
+                          : <span className="text-xs text-s-600">View only</span> },
+                      ]} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {bundleGroups.length > 0 && prepare && bundleGroups.map(([buyerId, list]) => (
+            <form key={buyerId} action={makeBundle} className="mt-3 rounded-lg bg-panel p-4">
+              <p className="text-sm font-semibold">New bundle for {buyerName.get(buyerId) ?? "this buyer"}</p>
+              <ul className="my-2 space-y-1">{list.map((r) => <li key={r.id}><label className="flex items-center gap-2"><input type="checkbox" name="invoiceId" value={r.id} />{r.invoiceNumber}: {formatMoney(r.amount)}, due {r.dueDate}</label></li>)}</ul>
+              <button className="btn btn-primary btn-sm">Bundle the ticked invoices</button>
+            </form>
+          ))}
+        </Panel>
+      )}
+
       <Panel title={`All invoices (${rows.length})`} className="mb-5" flush>
         <DataTable rows={rows} rowKey={(r) => r.id} empty="No invoices yet. Upload your first one below."
           cols={[
-            { h: "No.", cell: (r) => r.invoiceNumber },
+            { h: "No.", cell: (r) => <>{r.invoiceNumber}{r.bundleId && <span className="pill ml-2 bg-i-100 text-i-500">In a bundle</span>}{r.kind === "debit_note" && <span className="pill ml-2 bg-i-100 text-i-500">Debit note</span>}</> },
             { h: "Amount", align: "right", cell: (r) => <>{formatMoney(r.amount)}{r.currency !== "INR" && <span className="block text-xs font-normal text-muted">{formatMinor(r.foreignAmount ?? 0n, r.currency)}</span>}{creditOf.has(r.id) && <span className="block text-xs font-normal text-muted">after {formatMoney(creditOf.get(r.id)!)} credit</span>}</> },
             { h: "Due", cell: (r) => r.dueDate },
             { h: "Status", cell: (r) => <StatusPill status={r.status} /> },
             { h: "e-Invoice", cell: (r) => <span className="font-normal text-muted">{r.irnStatus}</span> },
-            { h: "", align: "right", cell: (r) => can(u, "creditnote.issue") && CREDITABLE.includes(r.status) && !r.disputeFlag && (
+            { h: "", align: "right", cell: (r) => can(u, "creditnote.issue") && !r.disputeFlag && (
+              <span className="inline-flex gap-2">
+              {r.kind === "invoice" && DEBITABLE.includes(r.status) && (
+                <Pop id={`dn-${r.id}`} label="Debit note" cls="btn btn-ghost btn-sm">
+                  <form action={debitNote} className="space-y-2">
+                    <input type="hidden" name="invoiceId" value={r.id} />
+                    <p className="text-xs text-muted">Adds a charge to {r.invoiceNumber}, such as extra freight. It becomes its own invoice that your buyer confirms; the original is not changed.</p>
+                    <PopField label={`Extra amount (${market().currency.code})`}><input name="amount" inputMode="decimal" required className="field !py-2 text-sm font-normal" /></PopField>
+                    <PopField label="Reason"><input name="reason" required placeholder="for example, extra freight" className="field !py-2 text-sm font-normal" /></PopField>
+                    <button className="btn btn-primary btn-sm w-full">Raise debit note</button>
+                  </form>
+                </Pop>
+              )}
+              {CREDITABLE.includes(r.status) && (
               <Pop id={`cn-${r.id}`} label="Credit note" cls="btn btn-ghost btn-sm">
                 <form action={creditNote} className="space-y-2">
                   <input type="hidden" name="invoiceId" value={r.id} />
@@ -243,6 +363,8 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                   <button className="btn btn-primary btn-sm w-full">Issue credit note</button>
                 </form>
               </Pop>
+              )}
+              </span>
             ) },
           ]} />
       </Panel>
@@ -252,7 +374,8 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         const o = offerOf.get(r.id);
         const p = o && describeOffer(o);
         const maxAdvance = (r.amount * BigInt(d.advanceRateBps)) / 10_000n;
-        const bidList = o?.status === "accepted" ? [] : (bidMap.get(r.id) ?? []);
+        const inBundle = !!r.bundleId;
+        const bidList = o?.status === "accepted" || inBundle ? [] : (bidMap.get(r.id) ?? []);
         return (
           <Panel key={r.id} title={`Invoice ${r.invoiceNumber} · ${formatMoney(r.amount)}`} className="mb-5">
             {d.decision === "declined" && (
@@ -262,8 +385,9 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
               </div>
             )}
             {d.decision === "referred" && <p className="text-s-600">Under review by our credit team.</p>}
-            {d.decision === "approved" && !o && <p className="text-muted">Your invoice is open to financiers. Offers and bids appear here as they come in.</p>}
-            {o && p && (
+            {d.decision === "approved" && !o && !inBundle && <p className="text-muted">Your invoice is open to financiers. Offers and bids appear here as they come in.</p>}
+            {inBundle && <p className="text-muted">This invoice is in a bundle. It is financed together with the others, so decide it in the Bundles section above.</p>}
+            {!inBundle && o && p && (
               <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 sm:max-w-lg sm:gap-x-8">
                   <dt className="text-muted">Advance{o.advanceAmount < maxAdvance ? " (part of the invoice)" : ` (${d.advanceRateBps / 100}%)`}</dt><dd className="text-right">{formatMoney(o.advanceAmount)}</dd>
@@ -308,15 +432,28 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                 <p className="mb-2 text-xs text-muted">Lowest all-in rate first. Choosing a bid replaces the offer above.</p>
                 <DataTable rows={bidList} rowKey={(b) => b.id}
                   cols={[
-                    { h: "Financier", cell: (b) => bidders.get(b.financierId) ?? "Financier" },
+                    { h: "Financier", cell: (b) => <>{bidders.get(b.financierId) ?? "Financier"}{b.shareBps < 10_000 && <span className="pill ml-2 bg-i-100 text-i-500">{b.shareBps / 100}% of the advance</span>}</> },
                     { h: "You receive now", align: "right", cell: (b) => formatMoney(b.netDisbursal) },
                     { h: "Discount", align: "right", cell: (b) => `${b.discountBps / 100}% p.a.` },
                     { h: "All-in rate", align: "right", cell: (b) => `${(b.effectiveAprBps / 100).toFixed(2)}% p.a.` },
                     { h: "Valid until", cell: (b) => <span className="text-muted">{b.expiresAt.toLocaleString("en-IN")}</span> },
-                    { h: "", align: "right", cell: (b) => prepare
+                    { h: "", align: "right", cell: (b) => b.shareBps < 10_000
+                      ? <span className="text-xs text-muted">Part of the advance: combine it below</span>
+                      : prepare
                       ? <form action={chooseBid} className="flex flex-col items-end gap-1"><input type="hidden" name="bidId" value={b.id} /><label className="flex items-start gap-1.5 text-xs text-muted"><input name="ack" type="checkbox" className="mt-0.5" />I have read the rate and cost above.</label><button className="btn btn-primary btn-sm">{commit ? "Choose this bid" : "Submit for approval"}</button></form>
                       : <span className="text-xs text-s-600">View only</span> },
                   ]} />
+                {bidList.some((b) => b.shareBps < 10_000) && prepare && (
+                  <form action={chooseBids} className="mt-4 rounded-lg bg-panel p-4">
+                    <p className="text-sm font-semibold">Combine bids from several financiers</p>
+                    <p className="mb-2 text-xs text-muted">Tick bids that together fund the whole advance (their shares add up to 100%) and offer the same advance. They become one offer at the blended rate.</p>
+                    <ul className="space-y-1 text-sm">
+                      {bidList.map((b) => <li key={b.id}><label className="flex items-center gap-2"><input type="checkbox" name="bidId" value={b.id} />{bidders.get(b.financierId) ?? "Financier"}: {b.shareBps / 100}% of the advance at {b.discountBps / 100}% a year</label></li>)}
+                    </ul>
+                    <label className="mt-3 flex items-start gap-1.5 text-xs text-muted"><input name="ack" type="checkbox" className="mt-0.5" />I have read the rate and cost above.</label>
+                    <button className="btn btn-primary btn-sm mt-3">{commit ? "Accept the ticked bids together" : "Submit for approval"}</button>
+                  </form>
+                )}
               </div>
             )}
           </Panel>

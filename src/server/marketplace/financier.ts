@@ -136,16 +136,23 @@ export async function saveMandate(db: Database, actor: Actor, m: MandateInput) {
 }
 
 /** What the financier has out to a buyer: advances accepted but not yet repaid (including ones accepted and waiting for payout). */
-export async function exposureToBuyer(db: Database | Tx, financierId: string, buyerId: string) {
-  const [r] = await db.select({ v: sql<string>`coalesce(sum(${financingOffers.advanceAmount}), 0)` }).from(financingOffers).innerJoin(invoices, eq(invoices.id, financingOffers.invoiceId))
-    .where(and(eq(financingOffers.financierId, financierId), eq(financingOffers.status, "accepted"), eq(invoices.buyerId, buyerId), inArray(invoices.status, [...LIVE])));
-  return BigInt(r.v);
+/** What this financier has out against one party on live invoices: its own advance on a single-financier offer, or its part of a shared one. */
+async function exposure(db: Database | Tx, financierId: string, col: "buyer_id" | "seller_id", partyId: string) {
+  const live = sql.join(LIVE.map((s) => sql`${s}`), sql`, `);
+  const party = col === "buyer_id" ? sql`i.buyer_id` : sql`i.seller_id`;
+  const r = await db.execute(sql`
+    select coalesce(sum(x.amt), 0)::text as v from (
+      select o.advance_amount as amt from financing_offers o join invoices i on i.id = o.invoice_id
+        where o.financier_id = ${financierId} and o.status = 'accepted' and ${party} = ${partyId} and i.status in (${live})
+          and not exists (select 1 from offer_shares s where s.offer_id = o.id)
+      union all
+      select s.advance_amount from offer_shares s join financing_offers o on o.id = s.offer_id join invoices i on i.id = o.invoice_id
+        where s.financier_id = ${financierId} and o.status = 'accepted' and ${party} = ${partyId} and i.status in (${live})
+    ) x`);
+  return BigInt((r as unknown as { rows: { v: string }[] }).rows[0].v);
 }
-export async function exposureToSeller(db: Database | Tx, financierId: string, sellerId: string) {
-  const [r] = await db.select({ v: sql<string>`coalesce(sum(${financingOffers.advanceAmount}), 0)` }).from(financingOffers).innerJoin(invoices, eq(invoices.id, financingOffers.invoiceId))
-    .where(and(eq(financingOffers.financierId, financierId), eq(financingOffers.status, "accepted"), eq(invoices.sellerId, sellerId), inArray(invoices.status, [...LIVE])));
-  return BigInt(r.v);
-}
+export const exposureToBuyer = (db: Database | Tx, financierId: string, buyerId: string) => exposure(db, financierId, "buyer_id", buyerId);
+export const exposureToSeller = (db: Database | Tx, financierId: string, sellerId: string) => exposure(db, financierId, "seller_id", sellerId);
 
 export async function setBuyerLimit(db: Database, actor: Actor, p: { buyerId: string; limit: bigint; status?: "active" | "blocked" }) {
   assertCan(actor, "mandate.manage");

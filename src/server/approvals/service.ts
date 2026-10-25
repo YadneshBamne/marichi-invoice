@@ -7,7 +7,8 @@ import { auditLog, businesses, memberships, pendingActions, users } from "../db/
 import { gateway, type Adapters } from "../integrations/gateway";
 import { notifyUser } from "../notify";
 import { acceptOffer, acceptOffers } from "../offers/service";
-import { acceptBid, placeBid } from "../marketplace/service";
+import { acceptBid, acceptBids, placeBid } from "../marketplace/service";
+import { acceptBundle, placeBundleBid } from "../marketplace/bundles";
 import { proposeEarlyPayment } from "../earlypay/service";
 import { assertCan, can, ForbiddenError, type Permission } from "../permissions";
 import { acknowledgeKeyFacts } from "../agreements/keyfacts";
@@ -25,7 +26,10 @@ type Payloads = {
   "offer.accept": { offerId: string; ack?: boolean };
   "offer.accept_many": { offerIds: string[]; ack?: boolean };
   "bid.accept": { bidId: string; ack?: boolean };
-  "bid.place": { invoiceId: string; advanceBps: number; discountBps: number };
+  "bid.accept_group": { bidIds: string[]; ack?: boolean };
+  "bundle.bid": { bundleId: string; advanceBps: number; discountBps: number };
+  "bundle.accept": { bundleId: string; financierId: string; ack?: boolean };
+  "bid.place": { invoiceId: string; advanceBps: number; discountBps: number; shareBps?: number };
   "earlypay.propose": { invoiceId: string; discountBps: number };
 };
 export type Kind = keyof Payloads;
@@ -51,6 +55,19 @@ const HANDLERS: { [K in Kind]: { commit: Permission; prepare: Permission; run: (
     const offer = await acceptBid(db, p.bidId, who(a), gw, now);
     await acknowledgeKeyFacts(db, offer.id, a.id, now);
     return offer;
+  } },
+  "bid.accept_group": { commit: "offer.answer", prepare: "offer.prepare", run: async (db, p, a, gw, now) => {
+    mustAck(p.ack);
+    const offer = await acceptBids(db, p.bidIds, who(a), gw, now);
+    await acknowledgeKeyFacts(db, offer.id, a.id, now);
+    return offer;
+  } },
+  "bundle.bid": { commit: "bid.place", prepare: "bid.prepare", run: (db, p, a, gw, now) => placeBundleBid(db, who(a), p, gw, now) },
+  "bundle.accept": { commit: "offer.answer", prepare: "offer.prepare", run: async (db, p, a, gw, now) => {
+    mustAck(p.ack);
+    const offers = await acceptBundle(db, p.bundleId, p.financierId, who(a), gw, now);
+    for (const o of offers) await acknowledgeKeyFacts(db, o.id, a.id, now);
+    return offers;
   } },
   "bid.place": { commit: "bid.place", prepare: "bid.prepare", run: (db, p, a, gw, now) => placeBid(db, who(a), p, gw, now) },
   "earlypay.propose": { commit: "earlypay.propose", prepare: "earlypay.prepare", run: (db, p, a, gw, now) => proposeEarlyPayment(db, who(a), p, gw, now) },

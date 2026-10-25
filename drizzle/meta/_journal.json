@@ -169,6 +169,27 @@
       "when": 1792923284887,
       "tag": "0023_flags_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792923981092,
+      "tag": "0024_debit_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792924900121,
+      "tag": "0025_pooling_tds",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792925435894,
+      "tag": "0026_bundles",
+      "breakpoints": true
     }
   ]
 }

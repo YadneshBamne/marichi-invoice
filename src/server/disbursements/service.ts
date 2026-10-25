@@ -13,6 +13,7 @@ import { notifyBusiness, notifyStaff } from "../notify";
 import { emitEvent } from "../erp/events";
 import { platformCash, position } from "../marketplace/service";
 import { assertActiveFinancier } from "../marketplace/financier";
+import { participantsOf } from "../marketplace/pool";
 import { formatMoney } from "../../lib/money";
 import { market } from "../../lib/countries";
 
@@ -96,12 +97,13 @@ async function finalize(db: Database, d: typeof disbursements.$inferSelect, bank
       ...(fee.base > 0n ? [{ account: ACCOUNTS.feeIncome, direction: "credit" as const, amount: fee.base }] : []),
       ...(fee.tax > 0n ? [{ account: ACCOUNTS.gstPayable, direction: "credit" as const, amount: fee.tax }] : []),
     ] });
-    if (offer.financierId) { // the advance is now the financier's capital out in this invoice
-      await ensureAccounts(tx, [ACCOUNTS.financierFunds(offer.financierId), ACCOUNTS.financierDeployed(offer.financierId)]);
-      await postEntry(tx, { ref: `deploy:${d.id}`, type: "deploy", lines: [
-        { account: ACCOUNTS.financierFunds(offer.financierId), direction: "debit", amount: offer.advanceAmount },
-        { account: ACCOUNTS.financierDeployed(offer.financierId), direction: "credit", amount: offer.advanceAmount },
-      ] });
+    const parts = await participantsOf(tx, offer);
+    if (parts.length) { // the advance is now the financiers' capital out in this invoice, each its own part
+      await ensureAccounts(tx, parts.flatMap((x) => [ACCOUNTS.financierFunds(x.financierId), ACCOUNTS.financierDeployed(x.financierId)]));
+      await postEntry(tx, { ref: `deploy:${d.id}`, type: "deploy", lines: parts.flatMap((x) => [
+        { account: ACCOUNTS.financierFunds(x.financierId), direction: "debit" as const, amount: x.advanceAmount },
+        { account: ACCOUNTS.financierDeployed(x.financierId), direction: "credit" as const, amount: x.advanceAmount },
+      ]) });
     }
     await tx.update(disbursements).set({ status: "succeeded", bankRef, completedAt: now, failureReason: null }).where(eq(disbursements.id, d.id));
     // Start the collections clock: the seller now owes the advance, accruing discount from today (Module 9).
@@ -155,9 +157,9 @@ export async function executeDisbursement(db: Database, id: string, gw: Adapters
       const [{ inflight }] = await tx.select({ inflight: sql<string>`coalesce(sum(${disbursements.amount}), 0)` }).from(disbursements).where(eq(disbursements.status, "processing"));
       if ((await balance(tx, ACCOUNTS.escrow)) - BigInt(inflight) < d.amount) throw new Error("ESCROW_INSUFFICIENT");
       if (!offer.financierId && (await platformCash(tx)) - BigInt(inflight) < d.amount) throw new Error("ESCROW_INSUFFICIENT"); // financiers' cash is not ours to lend
-      if (offer.financierId) {
-        await assertActiveFinancier(tx, offer.financierId, null).catch((e) => { throw new Error(`FINANCIER_NOT_ACTIVE: ${(e as Error).message}`); }); // a lapsed or suspended licence stops the payout
-        if ((await position(tx, offer.financierId)).funds < offer.advanceAmount) throw new Error("FINANCIER_FUNDS_INSUFFICIENT");
+      for (const part of await participantsOf(tx, offer)) { // every financier behind the offer, not only the lead
+        await assertActiveFinancier(tx, part.financierId, null).catch((e) => { throw new Error(`FINANCIER_NOT_ACTIVE: ${(e as Error).message}`); }); // a lapsed or suspended licence stops the payout
+        if ((await position(tx, part.financierId)).funds < part.advanceAmount) throw new Error("FINANCIER_FUNDS_INSUFFICIENT");
       }
       await tx.update(disbursements).set({ status: "processing", rail }).where(eq(disbursements.id, id));
     }

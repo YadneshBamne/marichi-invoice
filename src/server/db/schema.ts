@@ -284,6 +284,9 @@ export const invoices = pgTable("invoices", {
   purposeCode: text("purpose_code"), // RBI purpose-of-remittance code, services exports
   documentRef: text("document_ref"), // vault reference to the uploaded PDF/image
   // absent = no IRN supplied (compensating controls apply); pending = IRP down, auto-retried
+  kind: text("kind").notNull().default("invoice"), // invoice | debit_note (a debit note is its own document, linked to the invoice it adds to)
+  parentInvoiceId: uuid("parent_invoice_id"),
+  bundleId: uuid("bundle_id"), // set while the invoice is part of a bundle
   irnStatus: text("irn_status").notNull().default("absent"), // absent | verified | mismatch | pending
   docFingerprint: jsonb("doc_fingerprint"), // what the uploaded file says about how it was made (tool, dates, pages): see integrations/ocr/forensics.ts
   irnRecheckedAt: timestamp("irn_rechecked_at", { withTimezone: true }), // the last time a financed invoice's e-invoice was looked up again
@@ -381,6 +384,39 @@ export const financingOffers = pgTable("financing_offers", {
   uniqueIndex("offer_live").on(t.invoiceId).where(sql`status in ('open','accepted')`),
 ]);
 
+// A seller's group of invoices on one buyer, offered to financiers as one decision. Each invoice is still financed on its own underneath.
+export const bundles = pgTable("bundles", {
+  id: id(),
+  sellerId: uuid("seller_id").notNull().references(() => businesses.id),
+  buyerId: uuid("buyer_id").notNull().references(() => businesses.id),
+  dissolvedAt: timestamp("dissolved_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+// When several financiers fund one invoice together, each one's part of the advance. Their bids are accepted as a group and become ONE
+// offer to the seller (financierId on the offer is the lead, the largest share). A single-financier offer has no rows here: it is 100% the lead.
+export const offerShares = pgTable("offer_shares", {
+  id: id(),
+  offerId: uuid("offer_id").notNull().references(() => financingOffers.id),
+  financierId: uuid("financier_id").notNull().references(() => businesses.id),
+  shareBps: integer("share_bps").notNull(), // of the advance; the rows of one offer add to 10000
+  advanceAmount: paise("advance_amount").notNull(),
+  discountBps: integer("discount_bps").notNull(), // what this financier bid; the offer carries the blended rate
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("offer_share_pair").on(t.offerId, t.financierId)]);
+
+// Tax held back from a financier's earnings and owed to the tax authority. One row per repayment that carried a deduction.
+export const tdsWithheld = pgTable("tds_withheld", {
+  id: id(),
+  financierId: uuid("financier_id").notNull().references(() => businesses.id),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  repaymentId: uuid("repayment_id").notNull().references(() => repayments.id),
+  base: paise("base").notNull(), // the discount and penal charges the tax was worked out on
+  rateBps: integer("rate_bps").notNull(),
+  amount: paise("amount").notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("tds_financier").on(t.financierId, t.createdAt)]);
+
 // Marketplace: a financier's bid to fund one invoice. Accepting a bid creates the (accepted) financing offer with that financier.
 export const bids = pgTable("bids", {
   id: id(),
@@ -392,6 +428,8 @@ export const bids = pgTable("bids", {
   expectedDiscount: paise("expected_discount").notNull(),
   tenorDays: integer("tenor_days").notNull(),
   status: text("status").notNull().default("open"), // open | accepted | rejected | withdrawn | expired
+  shareBps: integer("share_bps").notNull().default(10000), // the part of the advance this bid would fund; under 100% it is only accepted together with others
+  advanceBps: integer("advance_bps"), // the advance rate bid, so a group can be checked for agreeing on it
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   createdAt: createdAt(),
@@ -521,7 +559,7 @@ export const invitations = pgTable("invitations", {
 export const pendingActions = pgTable("pending_actions", {
   id: id(),
   businessId: uuid("business_id").notNull().references(() => businesses.id),
-  kind: text("kind").notNull(), // offer.accept | offer.accept_many | bid.accept | bid.place | earlypay.propose
+  kind: text("kind").notNull(), // offer.accept | offer.accept_many | bid.accept | bid.accept_group | bundle.bid | bundle.accept | bid.place | earlypay.propose
   payload: jsonb("payload").notNull(),
   summary: text("summary").notNull(), // what the approver is being asked to approve, in plain words
   amount: paise("amount").notNull().default(sql`0`),
@@ -560,6 +598,7 @@ export const financierProfiles = pgTable("financier_profiles", {
   settlementAccount: encrypted("settlement_account"), // where its repayments and withdrawals are paid
   settlementIfsc: text("settlement_ifsc"),
   settlementName: text("settlement_name"),
+  tdsBps: integer("tds_bps"), // tax held back from this financier's earnings (null = none); set by staff from its tax status
   settlementVerified: boolean("settlement_verified").notNull().default(false),
   termsVersion: text("terms_version"), // the participation terms it accepted, and a hash of their exact text
   termsHash: text("terms_hash"),

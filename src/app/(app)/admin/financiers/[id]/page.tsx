@@ -6,6 +6,8 @@ import { businesses } from "@/server/db/schema";
 import { requireUser } from "@/server/rbac";
 import { institutionLabel, listLimits, mandateOf, profileOf, reviewApplication, type Review } from "@/server/marketplace/financier";
 import { position } from "@/server/marketplace/service";
+import { setFinancierTds } from "@/server/tax/tds";
+import { market } from "@/lib/countries";
 import { KV, Notice, PageHead, Panel, StatusPill } from "@/components/ui/page";
 import { formatMoney } from "@/lib/money";
 import { attempt } from "../../../financier/attempt";
@@ -19,6 +21,18 @@ async function decide(fd: FormData) {
   await attempt(`/admin/financiers/${f.id}`, async () => {
     await reviewApplication(db, u, f.id, f.decision as Review, f.note ?? "");
     return "Recorded. The financier has been told.";
+  });
+}
+
+async function setTax(fd: FormData) {
+  "use server";
+  const u = await requireUser(["ops", "compliance", "admin"]);
+  const f = z.object({ id: z.uuid(), rate: z.string(), note: z.string().max(300) }).parse(Object.fromEntries(fd));
+  await attempt(`/admin/financiers/${f.id}`, async () => {
+    const t = f.rate.trim();
+    if (t !== "" && !/^\d+(\.\d{1,2})?$/.test(t)) throw new Error("enter the rate as a percentage, such as 10 or 7.5, or leave it blank for none");
+    await setFinancierTds(db, u, f.id, t === "" ? null : Math.round(parseFloat(t) * 100), f.note);
+    return t === "" ? "No tax is held back from this financier from now on." : `${t}% of its earnings will be held back from now on.`;
   });
 }
 
@@ -69,6 +83,14 @@ export default async function Review({ params, searchParams }: { params: Promise
                   {p.status === "suspended" && <button name="decision" value="reinstate" className="btn btn-primary btn-sm">Reinstate</button>}
                 </div>
                 <p className="text-xs text-muted">Approval creates a default mandate (grade C or better, no caps, no automatic bidding) for the financier to adjust. Suspending stops new bids, payouts on accepted bids, and funding.</p>
+              </form>
+            </Panel>
+            <Panel title={market().tds.name} sub="Held back from this financier's earnings on every repayment from now on, and owed to the tax authority. Leave blank when it is exempt.">
+              <form action={setTax} className="space-y-2">
+                <input type="hidden" name="id" value={id} />
+                <label className="block text-xs font-medium">Rate (%)<input name="rate" inputMode="decimal" defaultValue={p.tdsBps ? String(p.tdsBps / 100) : ""} placeholder={`for example ${market().tds.suggestedBps / 100}`} className="field !py-2 text-sm font-normal" /></label>
+                <label className="block text-xs font-medium">Why (tax status, exemption certificate)<input name="note" required minLength={5} className="field !py-2 text-sm font-normal" /></label>
+                <button className="btn btn-primary btn-sm w-full">Save</button>
               </form>
             </Panel>
             <Panel title="Funds and limits"><KV rows={[["In escrow", formatMoney(pos.funds)], ["Promised to deals", formatMoney(pos.reserved)], ["Deployed", formatMoney(pos.deployed)], ["Buyer limits set", String(limits.length)]]} /></Panel>

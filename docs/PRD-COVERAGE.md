@@ -57,8 +57,8 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Credit notes with automatic clawback | Built |
 | Line items and tax breakup stored | Built |
 | ERP connectors: Tally agent, Zoho Books, QuickBooks, SAP, NetSuite | Not built (API keys, CSV import and webhooks only) |
-| Debit notes | Not built |
-| Bundling several invoices into one facility | Partial. Several offers can be accepted together; there is no single facility |
+| Debit notes | Built. A debit note is its own linked invoice that the buyer confirms |
+| Bundling several invoices into one facility | Built. One buyer, one bid and one acceptance for the group, all or nothing; each invoice is still signed, paid out and collected on its own |
 | IRN generation mode (we create the IRN for sellers without e-invoicing) | Not built |
 
 ### Module 4. Buyer confirmation
@@ -114,7 +114,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Idempotent payout; automatic retry on the alternate rail; status polling | Built, simulated rails |
 | Payout advice to the seller | Built |
 | Rail chosen by amount | Built (India: IMPS/NEFT/RTGS; Zambia: EFT/ZIPSS) |
-| Funds from several financiers for one invoice, pro rata | Not built (one financier per offer) |
+| Funds from several financiers for one invoice, pro rata | Built. Part-bids are combined by the seller into one offer at the blended rate; money is split by share |
 | UPI rail | Not built |
 
 ### Module 9. Repayment and collections
@@ -136,7 +136,7 @@ Counts: automated tests pass. Real today: email (Resend, once a key is set) and 
 | Bank reconciliation with an end-of-day gate | Built, simulated statement feed |
 | Trial balance and general ledger export | Built |
 | Tax on platform fees (GST, VAT) | Built |
-| TDS on interest | Not built |
+| TDS on interest | Built. Staff set each financier's rate; it is withheld from their return into a tax-payable account, reported and remitted |
 | Multi-currency ledger | By design not built: one currency per deployment (see the guide, 8.5). Export invoices keep a foreign face value |
 
 ### Module 11. Integrations
@@ -254,8 +254,8 @@ Invitations, five company roles and maker-checker approvals; one-click buyer acc
 4. Buyer confirmation through the API.
 5. Platform sector concentration limits; periodic re-scoring of limits.
 6. Feature flags.
-7. Debit notes; invoice bundling into one facility; pooled funding from several financiers.
-8. TDS on interest.
+7. (done) Debit notes; invoice bundling; pooled funding from several financiers.
+8. (done) TDS on interest.
 9. PDF and Excel exports; regulatory-return drafts.
 10. Data-subject request workflow and retention policy.
 11. Forgery heuristics on uploaded PDFs; a rules editor for fraud signals.

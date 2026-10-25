@@ -26,6 +26,7 @@ export type Pack = {
     director: string; // what a director or owner is identified by
   };
   documents: DocSpec[];
+  tds: { name: string; suggestedBps: number }; // tax held back from a financier's interest; staff set the rate for each financier
   tax: { name: string; rateBps: number }; // on the platform's own fees; the financing discount is not taxed
   eInvoice: { short: string; long: string; authority: string };
   registry: { text: string; short: string; when: "before_payout" | "after_assignment"; withinDays: number | null } | null;

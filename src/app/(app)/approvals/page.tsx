@@ -10,7 +10,7 @@ import { attempt } from "../financier/attempt";
 export const metadata = { title: "Approvals" };
 const PATH = "/approvals";
 const KIND: Record<string, string> = {
-  "offer.accept": "Accept an offer", "offer.accept_many": "Accept several offers", "bid.accept": "Choose a financier's bid",
+  "offer.accept": "Accept an offer", "offer.accept_many": "Accept several offers", "bid.accept": "Choose a financier's bid", "bid.accept_group": "Combine financiers' bids", "bundle.bid": "Bid on a bundle of invoices", "bundle.accept": "Accept a financier's bids on a bundle",
   "bid.place": "Place a bid", "earlypay.propose": "Propose early payment",
 };
 

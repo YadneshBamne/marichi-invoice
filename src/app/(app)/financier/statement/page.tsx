@@ -1,6 +1,6 @@
 import { db } from "@/server/db/client";
 import { requireUser } from "@/server/rbac";
-import { position, statement } from "@/server/marketplace/service";
+import { position, statement, taxHeld } from "@/server/marketplace/service";
 import { DataTable, PageHead, Panel } from "@/components/ui/page";
 import { Stat } from "@/components/ui/cards";
 import { formatMoney, toDecimal } from "@/lib/money";
@@ -9,7 +9,7 @@ export const metadata = { title: "Statement" };
 
 export default async function Statement() {
   const u = await requireUser(["financier"]);
-  const [rows, pos] = await Promise.all([statement(db, u.businessId!), position(db, u.businessId!)]);
+  const [rows, pos, tax] = await Promise.all([statement(db, u.businessId!), position(db, u.businessId!), taxHeld(db, u.businessId!)]);
   const csv = "date,description,reference,amount,balance\n" + rows.map((r) => [r.at.toISOString(), `"${r.label}"`, r.ref, toDecimal(r.delta), toDecimal(r.running)].join(",")).join("\n");
   return (
     <>
@@ -21,6 +21,7 @@ export default async function Statement() {
         <Stat label="Promised to deals" value={formatMoney(pos.reserved)} note="accepted, not yet paid out" />
         <Stat label="Available" value={formatMoney(pos.available)} note="free to bid or withdraw" tone="good" />
       </div>
+      {tax > 0n && <p className="mb-4 rounded-lg bg-s-100 px-4 py-3 text-sm text-s-600">Tax held back from your earnings so far: <b>{formatMoney(tax)}</b>. Repayments above are already net of it; your tax certificate shows the same figure.</p>}
       <p className="mb-4 text-sm text-muted">To add funds, transfer to the escrow account and tell us the reference; to withdraw, raise a request from Support. Our operations team records both.</p>
       <Panel flush>
         <DataTable rows={[...rows].reverse()} rowKey={(r) => r.ref + r.label} empty="No movements yet."

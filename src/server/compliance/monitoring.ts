@@ -10,6 +10,7 @@ import { gateway, type Adapters } from "../integrations/gateway";
 import { KYB_AML_RULE, openCase } from "../fraud/service";
 import { validateIrn } from "../invoices/service";
 import { notifyBusiness } from "../notify";
+import { participantsOf } from "../marketplace/pool";
 
 export const MONITOR = {
   rescreenDays: 7, // how long a clean sanctions check stays fresh
@@ -106,8 +107,8 @@ export async function recheckIrns(db: Database, gw: Adapters = gateway, now = ne
     });
     if (!c.created) continue; // already under review
     out.flagged++;
-    const [offer] = await db.select({ f: financingOffers.financierId }).from(financingOffers).where(and(eq(financingOffers.invoiceId, inv.id), eq(financingOffers.status, "accepted")));
-    if (offer?.f) await notifyBusiness(db, offer.f, "financed_invoice_flagged", { invoiceNumber: inv.invoiceNumber, reason }, gw, now);
+    const [offer] = await db.select().from(financingOffers).where(and(eq(financingOffers.invoiceId, inv.id), eq(financingOffers.status, "accepted")));
+    if (offer) for (const part of await participantsOf(db, offer)) await notifyBusiness(db, part.financierId, "financed_invoice_flagged", { invoiceNumber: inv.invoiceNumber, reason }, gw, now);
   }
   return out;
 }
